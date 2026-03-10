@@ -1,15 +1,35 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
-import { useRef } from "react";
+import { motion, useInView, useReducedMotion } from "framer-motion";
+import { useRef, useEffect } from "react";
 import { Sparkles } from "lucide-react";
 
-const row1 = ["/examples/v1.mp4", "/examples/v2.mp4", "/examples/v3.mp4", "/examples/v4.mp4", "/examples/v5.mp4"];
-const row2 = ["/examples/v6.mp4", "/examples/v7.mp4", "/examples/v8.mp4", "/examples/v9.mp4", "/examples/v10.mp4"];
+/* 8 unique videos per row, no overlap. Marquee duplicates set for seamless loop. */
+const row1 = ["/examples/v1.mp4", "/examples/v2.mp4", "/examples/v3.mp4", "/examples/v4.mp4", "/examples/v5.mp4", "/examples/v6.mp4", "/examples/v7.mp4", "/examples/v8.mp4"];
+const row2 = ["/examples/v9.mp4", "/examples/v10.mp4", "/examples/v11.mp4", "/examples/v12.mp4", "/examples/v13.mp4", "/examples/v14.mp4", "/examples/v15.mp4", "/examples/v16.mp4"];
 
 function VideoCard({ src }: { src: string }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const card = cardRef.current;
+    const video = videoRef.current;
+    if (!card || !video) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) video.play().catch(() => {});
+        else video.pause();
+      },
+      { threshold: 0.2, rootMargin: "40px" }
+    );
+    io.observe(card);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <div
+      ref={cardRef}
       style={{
         flexShrink: 0,
         width: 200,
@@ -23,31 +43,31 @@ function VideoCard({ src }: { src: string }) {
         cursor: "default",
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.transform = "scale(1.03)";
+        e.currentTarget.style.transform = "scale(1.03) translateZ(0)";
         e.currentTarget.style.borderColor = "rgba(0,212,255,0.35)";
         e.currentTarget.style.boxShadow = "0 0 30px rgba(0,212,255,0.12)";
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.transform = "scale(1)";
+        e.currentTarget.style.transform = "scale(1) translateZ(0)";
         e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
         e.currentTarget.style.boxShadow = "none";
       }}
     >
       <video
+        ref={videoRef}
         src={src}
-        autoPlay
         muted
         loop
         playsInline
+        preload="metadata"
         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
       />
     </div>
   );
 }
 
-function VideoRow({ videos, reverse = false }: { videos: string[]; reverse?: boolean }) {
+function VideoRow({ videos, reverse = false, paused = false }: { videos: string[]; reverse?: boolean; paused?: boolean }) {
   const items = [...videos, ...videos];
-  const animName = reverse ? "vsrow-r" : "vsrow-l";
 
   return (
     <div style={{
@@ -56,26 +76,30 @@ function VideoRow({ videos, reverse = false }: { videos: string[]; reverse?: boo
       WebkitMaskImage: "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
     }}>
       <style>{`
-        @keyframes vsrow-l { from { transform: translateX(0) } to { transform: translateX(-50%) } }
-        @keyframes vsrow-r { from { transform: translateX(-50%) } to { transform: translateX(0) } }
-        .vs-track-l { display: flex; width: max-content; animation: vsrow-l 40s linear infinite; will-change: transform; }
-        .vs-track-l:hover { animation-play-state: paused; }
-        .vs-track-r { display: flex; width: max-content; animation: vsrow-r 36s linear infinite; will-change: transform; }
-        .vs-track-r:hover { animation-play-state: paused; }
+        @keyframes vsrow-l { from { transform: translate3d(0,0,0) } to { transform: translate3d(-50%,0,0) } }
+        @keyframes vsrow-r { from { transform: translate3d(-50%,0,0) } to { transform: translate3d(0,0,0) } }
+        .vs-track-l { display: flex; width: max-content; animation: vsrow-l 44s linear infinite; transform: translateZ(0); }
+        .vs-track-l:hover, .vs-track-l.paused { animation-play-state: paused; }
+        .vs-track-r { display: flex; width: max-content; animation: vsrow-r 40s linear infinite; transform: translateZ(0); }
+        .vs-track-r:hover, .vs-track-r.paused { animation-play-state: paused; }
+        @media (prefers-reduced-motion: reduce) { .vs-track-l, .vs-track-r { animation: none; } }
       `}</style>
-      <div className={reverse ? "vs-track-r" : "vs-track-l"}>
-        {items.map((src, i) => <VideoCard key={i} src={src} />)}
+      <div className={`${reverse ? "vs-track-r" : "vs-track-l"}${paused ? " paused" : ""}`}>
+        {items.map((src, i) => <VideoCard key={`${src}-${i}`} src={src} />)}
       </div>
     </div>
   );
 }
 
 export default function VideoShowcaseSection() {
-  const ref    = useRef(null);
+  const ref = useRef(null);
   const inView = useInView(ref, { once: true, amount: 0.1 });
+  const reduced = useReducedMotion();
+  const pauseMarquee = reduced || !inView;
+  const t = { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const };
 
   return (
-    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "100px 0", overflow: "hidden" }}>
+    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "100px 0", overflow: "hidden", contain: "layout style" }}>
       {/* Ambient glow */}
       <div style={{
         position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
@@ -86,9 +110,9 @@ export default function VideoShowcaseSection() {
 
       {/* Heading */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: reduced ? 1 : 0, y: reduced ? 0 : 16 }}
         animate={inView ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.6 }}
+        transition={t}
         style={{ textAlign: "center", padding: "0 24px", marginBottom: 48, position: "relative" }}
       >
         <div style={{
@@ -110,21 +134,21 @@ export default function VideoShowcaseSection() {
 
       {/* Row 1 — scrolls left */}
       <motion.div
-        initial={{ opacity: 0 }}
+        initial={{ opacity: reduced ? 1 : 0 }}
         animate={inView ? { opacity: 1 } : {}}
-        transition={{ duration: 0.7, delay: 0.2 }}
+        transition={{ ...t, delay: 0.15 }}
         style={{ marginBottom: 12 }}
       >
-        <VideoRow videos={row1} />
+        <VideoRow videos={row1} paused={pauseMarquee} />
       </motion.div>
 
       {/* Row 2 — scrolls right */}
       <motion.div
-        initial={{ opacity: 0 }}
+        initial={{ opacity: reduced ? 1 : 0 }}
         animate={inView ? { opacity: 1 } : {}}
-        transition={{ duration: 0.7, delay: 0.35 }}
+        transition={{ ...t, delay: 0.3 }}
       >
-        <VideoRow videos={row2} reverse />
+        <VideoRow videos={row2} reverse paused={pauseMarquee} />
       </motion.div>
     </section>
   );
