@@ -1,0 +1,119 @@
+"use client";
+
+import { motion, useInView } from "framer-motion";
+import { useRef, useState } from "react";
+import { Plus, Minus } from "lucide-react";
+
+const faqs = [
+  {
+    q: "Da li je ovo za potpune početnike?",
+    a: "Da. Kurs je dizajniran od nule. Ne trebaju ti prethodno znanje o AI-u, kodiranju niti filmskoj produkciji. Vodiš se korak po korak od osnova do prvog projekta.",
+  },
+  {
+    q: "Na kom jeziku je sadržaj?",
+    a: "Ceo kurs je na srpskom jeziku. Svi materijali, videi i zajednica su u potpunosti lokalizovani za Balkan.",
+  },
+  {
+    q: "Koliko traje kurs i koliko vremena sedmično treba?",
+    a: "Program ima 8 modula sa 30+ sati sadržaja. Možeš napredovati sopstvenim tempom, preporučujemo 3-5 sati sedmično za optimalne rezultate.",
+  },
+  {
+    q: "Kada dobijam pristup kursu?",
+    a: "Nakon što se prijaviš, dolaziš na listu čekanja. Za 3 nedelje otvaramo kupovinu samo za prijavljene. Imaš 7 dana da se odlučiš, posle toga zatvaramo prijave.",
+  },
+  {
+    q: "Postoji li podrška tokom kursa?",
+    a: "Da. Dobijаš pristup privatnoj zajednici gdje možeš postavljati pitanja, deliti projekte i dobijati feedback. Instruktori su aktivni u zajednici.",
+  },
+  {
+    q: "Šta ako nisam zadovoljan kursem?",
+    a: "Ovo je program koji zahteva akciju, ne pasivno gledanje. Ako prođeš kroz gradivo i ne vidiš vrednost, razgovaraćemo. Cilj nam je tvoj napredak, ne tvoj novac.",
+  },
+];
+
+function FAQItem({ q, a, index }: { q: string; a: string; index: number }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.06 }}
+      style={{
+        borderBottom: "1px solid rgba(255,255,255,0.05)",
+        overflow: "hidden",
+      }}
+    >
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "20px 0", background: "none", border: "none", cursor: "pointer",
+          textAlign: "left", gap: 16, fontFamily: "inherit",
+        }}
+      >
+        <span style={{ fontSize: 15, fontWeight: 600, color: open ? "#fff" : "#ccc", lineHeight: 1.4, transition: "color 0.2s" }}>
+          {q}
+        </span>
+        <div style={{
+          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+          background: open ? "rgba(0,212,255,0.12)" : "rgba(255,255,255,0.04)",
+          border: `1px solid ${open ? "rgba(0,212,255,0.25)" : "rgba(255,255,255,0.06)"}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "all 0.25s ease",
+        }}>
+          {open
+            ? <Minus size={13} color="#00d4ff" />
+            : <Plus size={13} color="#888" />}
+        </div>
+      </button>
+      <div style={{
+        maxHeight: open ? 300 : 0,
+        overflow: "hidden",
+        transition: "max-height 0.35s cubic-bezier(0.4,0,0.2,1)",
+      }}>
+        <p style={{ fontSize: 14, color: "#888", lineHeight: 1.75, paddingBottom: 20 }}>
+          {a}
+        </p>
+      </div>
+    </motion.div>
+  );
+}
+
+export default function FAQSection() {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, amount: 0.1 });
+
+  return (
+    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "100px 24px" }}>
+      <div className="section-container" style={{ maxWidth: 720 }}>
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.65 }}
+          style={{ textAlign: "center", marginBottom: 48 }}
+        >
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 50, padding: "6px 16px", marginBottom: 18,
+          }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#00d4ff", boxShadow: "0 0 6px #00d4ff" }} />
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#aaa", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>FAQ</span>
+          </div>
+          <h2 style={{ fontSize: "clamp(26px, 4.5vw, 44px)", fontWeight: 800, lineHeight: 1.15 }}>
+            Imaš pitanja? <span style={{ color: "#00d4ff" }}>Mi imamo odgovore.</span>
+          </h2>
+        </motion.div>
+
+        {inView && (
+          <div>
+            {faqs.map((item, i) => (
+              <FAQItem key={i} q={item.q} a={item.a} index={i} />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}

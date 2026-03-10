@@ -1,0 +1,89 @@
+-- =====================================================
+-- AI HYPE ACADEMY — Popolna Supabase SQL Shema
+-- Kopiraj vse skupaj in zazeni v SQL Editorju
+-- =====================================================
+
+
+-- 1. LEADS (email prijave s spletne strani)
+-- =====================================================
+create table if not exists leads (
+  id uuid default gen_random_uuid() primary key,
+  email text not null,
+  phone text,
+  city text,
+  country text,
+  country_code text,
+  ip text,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_leads_email on leads(email);
+create index if not exists idx_leads_created_at on leads(created_at);
+
+
+-- 2. AFFILIATES (affiliate partnerji)
+-- =====================================================
+create table if not exists affiliates (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  email text unique not null,
+  password_hash text not null,
+  affiliate_code text unique not null,
+  payout_email text,
+  commission_rate numeric default 30,
+  status text default 'active' check (status in ('active', 'suspended', 'pending')),
+  created_at timestamptz default now()
+);
+
+
+-- 3. AFFILIATE CLICKS (kliki na referalne linke)
+-- =====================================================
+create table if not exists affiliate_clicks (
+  id uuid default gen_random_uuid() primary key,
+  affiliate_id uuid references affiliates(id) on delete cascade,
+  ip_address text,
+  user_agent text,
+  referrer text,
+  country text,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_affiliate_clicks_affiliate_id on affiliate_clicks(affiliate_id);
+create index if not exists idx_affiliate_clicks_created_at on affiliate_clicks(created_at);
+
+
+-- 4. AFFILIATE CONVERSIONS (prodaje)
+-- =====================================================
+create table if not exists affiliate_conversions (
+  id uuid default gen_random_uuid() primary key,
+  affiliate_id uuid references affiliates(id) on delete cascade,
+  click_id uuid references affiliate_clicks(id) on delete set null,
+  order_amount numeric not null,
+  commission_amount numeric not null,
+  status text default 'pending' check (status in ('pending', 'approved', 'paid', 'rejected')),
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_affiliate_conversions_affiliate_id on affiliate_conversions(affiliate_id);
+create index if not exists idx_affiliate_conversions_status on affiliate_conversions(status);
+
+
+-- 5. AFFILIATE PAYOUTS (izplacila)
+-- =====================================================
+create table if not exists affiliate_payouts (
+  id uuid default gen_random_uuid() primary key,
+  affiliate_id uuid references affiliates(id) on delete cascade,
+  amount numeric not null,
+  status text default 'pending' check (status in ('pending', 'paid', 'rejected')),
+  created_at timestamptz default now(),
+  paid_at timestamptz
+);
+
+
+-- 6. IZKLOPI RLS na vseh tabelah (obvezno!)
+-- =====================================================
+alter table leads disable row level security;
+alter table affiliates disable row level security;
+alter table affiliate_clicks disable row level security;
+alter table affiliate_conversions disable row level security;
+alter table affiliate_payouts disable row level security;
