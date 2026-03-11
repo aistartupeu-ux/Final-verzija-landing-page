@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import NetworkBackground from "@/components/ui/NetworkBackground";
 import ChatBubble from "@/components/ui/ChatBubble";
 import ScrollProgress from "@/components/ui/ScrollProgress";
-import CursorGlow from "@/components/ui/CursorGlow";
+import { SpotlightCursor } from "@/components/ui/spotlight-cursor";
 import MobileCTABar from "@/components/ui/MobileCTABar";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -25,25 +25,35 @@ export default function Home() {
   return (
     <div style={{ position: "relative", minHeight: "100vh" }}>
       <ScrollProgress />
-      <CursorGlow />
+      <SpotlightCursor />
       <NetworkBackground />
       <Header />
       <main style={{ position: "relative", zIndex: 1 }}>
         <HeroSection />
         <div className="section-divider" />
-        <ProblemSection />
-        <SolutionSection />
+        <div className="problem-solution-bg">
+          <div className="problem-solution-bg__image" aria-hidden />
+          <ProblemSection />
+          <div className="section-divider section-divider--visible" />
+          <SolutionSection />
+        </div>
         <div className="section-divider" />
-        <VideoShowcaseSection />
-        <div className="section-divider" />
-        <SocialProofSection />
-        <div className="section-divider" />
-        <ForWhoSection />
-        <HowToEnterSection />
-        <FAQSection />
-        <FinalCTASection />
-        <div className="section-divider" />
-        <BlogSection />
+        <div className="plexus-sections-bg">
+          <div className="plexus-sections-bg__image" aria-hidden />
+          <VideoShowcaseSection />
+          <div className="section-divider section-divider--visible" />
+          <SocialProofSection />
+          <div className="section-divider section-divider--visible" />
+          <ForWhoSection />
+          <div className="section-divider section-divider--visible" />
+          <HowToEnterSection />
+          <div className="section-divider section-divider--visible" />
+          <FAQSection />
+          <div className="section-divider section-divider--visible" />
+          <FinalCTASection />
+          <div className="section-divider section-divider--visible" />
+          <BlogSection />
+        </div>
         <div className="section-divider" />
         <AffiliateSection />
       </main>

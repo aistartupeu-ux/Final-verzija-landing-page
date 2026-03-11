@@ -1,14 +1,16 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
-import { useRef, useState } from "react";
-import { Trophy, ChevronDown, ChevronUp, Cpu } from "lucide-react";
+import { motion, AnimatePresence, useInView } from "framer-motion";
+import { useRef, useState, useEffect } from "react";
+import { Trophy, ChevronDown, ChevronUp, Music2, Briefcase } from "lucide-react";
 import Image from "next/image";
 
 interface Article {
   id: string;
   badge: { icon: React.ReactNode; label: string; color: string; bg: string; border: string };
   heroImage: string;
+  heroImages?: string[];
+  heroImagePosition?: string; // npr. "center 30%" da se vidi lik
   overlayLogo?: { src: string; alt: string; subtitle: string; title: string };
   title: React.ReactNode;
   intro: React.ReactNode;
@@ -18,6 +20,79 @@ interface Article {
 }
 
 const articles: Article[] = [
+  {
+    id: "trile",
+    badge: {
+      icon: <Music2 size={12} color="#a855f7" />,
+      label: "CEO",
+      color: "#a855f7",
+      bg: "rgba(168,85,247,0.07)",
+      border: "rgba(168,85,247,0.18)",
+    },
+    heroImage: "/blog-trile-2.png",
+    heroImages: ["/blog-trile-2.png", "/blog-trile-3.png", "/blog-trile-4.png", "/blog-trile-5.png"],
+    heroImagePosition: "center 25%",
+    title: (
+      <>Trile: muzičar, osnivač <span style={{ color: "#a855f7" }}>AI Hype Akademije</span></>
+    ),
+    date: "2026",
+    intro: (
+      <>
+        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
+          <strong style={{ color: "#fff" }}>Trile</strong> je poznati muzičar sa Balkana i osnivač AI Hype Akademije. Godinama je aktivan na regionalnoj muzičkoj sceni i kroz svoje pesme je izgradio veliku publiku širom Balkana, sa milionima pregleda na spotovima i pesmama.
+        </p>
+        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 20 }}>
+          Autor je hitova poput „Ciganka“, „Hugo“, „Feragamo“, „Moja Lelo“ i „Kaljinka“. Poznat je po autentičnom stilu i spremnosti da eksperimentiše i pomera granice u produkciji.
+        </p>
+      </>
+    ),
+    full: (
+      <>
+        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
+          U poslednjih nekoliko godina intenzivno koristi veštačku inteligenciju u video i audio produkciji, koristeći AI alate za razvoj ideja, kreiranje vizuelnih stilova i unapređenje kvaliteta produkcije.
+        </p>
+        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
+          Iz tog iskustva nastala je <strong style={{ color: "#fff" }}>AI Hype Akademija</strong>. Cilj akademije je da pokaže ljudima kako uz pomoć AI alata mogu sami da prave muziku, video sadržaj i moderan digitalni sadržaj, čak i bez velikog produkcijskog tima.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "rok-kadoic",
+    badge: {
+      icon: <Briefcase size={12} color="#22c55e" />,
+      label: "Project manager",
+      color: "#22c55e",
+      bg: "rgba(34,197,94,0.07)",
+      border: "rgba(34,197,94,0.18)",
+    },
+    heroImage: "/blog-rok-kadoic.png",
+    heroImagePosition: "center 5%",
+    title: (
+      <>Rok Kadoič: reditelj, kreativni producent <span style={{ color: "#22c55e" }}>AI Hype Akademije</span></>
+    ),
+    date: "2026",
+    intro: (
+      <>
+        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
+          <strong style={{ color: "#fff" }}>Rok Kadoič</strong> je slovenački reditelj, direktor fotografije i kreativni producent koji godinama radi na muzičkim spotovima i vizuelnim projektima za izvođače iz regiona i inostranstva. Njegov rad je prepoznatljiv po snažnoj vizuelnoj estetici i filmskom pristupu video produkciji.
+        </p>
+        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 20 }}>
+          Pored rada u muzici, Rok je deo glavnog video tima MMA borca <strong style={{ color: "#fff" }}>Francisa Ngannoua</strong>, gde učestvuje u produkciji sadržaja i razvoju vizuelne strategije za globalnu publiku.
+        </p>
+      </>
+    ),
+    full: (
+      <>
+        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
+          U poslednje vreme intenzivno radi sa AI tehnologijom u muzici i videu. Njegov AI film „Milivojka“ osvojio je nagradu na AI International Music Video Festivalu u Los Anđelesu, a već ima iskustvo u produkciji potpuno AI muzičkih spotova i AI pesama.
+        </p>
+        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
+          U AI Hype Akademiji, zajedno sa Triletom, deli svoje iskustvo iz video produkcije i rada sa AI alatima kako bi pokazao kako danas mogu da se prave AI spotovi, muzika i video sadržaj na profesionalnom nivou.
+        </p>
+      </>
+    ),
+  },
   {
     id: "milivojka",
     badge: {
@@ -71,73 +146,78 @@ const articles: Article[] = [
       </>
     ),
   },
-  {
-    id: "seedance",
-    badge: {
-      icon: <Cpu size={12} color="#00d4ff" />,
-      label: "AI Alati",
-      color: "#00d4ff",
-      bg: "rgba(0,212,255,0.07)",
-      border: "rgba(0,212,255,0.18)",
-    },
-    heroImage: "/blog-seedance-thumb.png",
-    title: (
-      <>Seedance 2.0: AI Video Generator{" "}<span style={{ color: "#00d4ff" }}>kompanije ByteDance</span></>
-    ),
-    date: "2026.",
-    intro: (
-      <>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
-          <strong style={{ color: "#fff" }}>Seedance 2.0</strong> je napredni AI video generator koji razvija kompanija <strong style={{ color: "#fff" }}>ByteDance</strong>, globalno poznata po platformama kao što je TikTok. Ovaj alat predstavlja sledeću fazu u razvoju tekst-u-video tehnologije, gde korisnici mogu generisati dinamične, vizuelno sofisticirane video sekvence na osnovu jednostavnih promptova.
-        </p>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 20 }}>
-          Za razliku od ranijih AI video alata koji su često imali problem sa &ldquo;raspadanjem&rdquo; likova ili promenama identiteta između frejmova, Seedance 2.0 naglasak stavlja na <strong style={{ color: "#fff" }}>stabilnost i kontinuitet</strong>.
-        </p>
-      </>
-    ),
-    full: (
-      <>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
-          <div style={{ position: "relative", height: 160, borderRadius: 10, overflow: "hidden" }}>
-            <Image src="/blog-seedance-hud.png" alt="Seedance interface" fill style={{ objectFit: "cover" }} sizes="25vw" />
-          </div>
-          <div style={{ position: "relative", height: 160, borderRadius: 10, overflow: "hidden" }}>
-            <Image src="/blog-seedance-control.png" alt="Seedance controls" fill style={{ objectFit: "cover" }} sizes="25vw" />
-          </div>
-        </div>
-        {[
-          { t: "Konzistentnost kroz vreme", d: "Jedan od najvećih izazova u AI videu je održavanje istog lika, proporcija i stila kroz čitavu sekvencu. Seedance 2.0 značajno unapređuje ovaj aspekt." },
-          { t: "Filmski kvalitet", d: "Vizuelni rezultat je bliži profesionalnoj produkciji. Dubina kadra, simulacija kamere i svetlosni uslovi deluju prirodnije." },
-          { t: "Brza produkcija sadržaja", d: "Za kreatore sadržaja, brendove i marketinške timove, ovaj alat omogućava brzo kreiranje video koncepata bez velikih budžeta." },
-          { t: "Integracija sa ekosistemom društvenih mreža", d: "S obzirom na to da dolazi iz kompanije koja stoji iza TikToka, potencijal za direktnu integraciju AI video generacije u društvene platforme može značajno promeniti način nastanka sadržaja." },
-        ].map((item, i) => (
-          <div key={i} style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#00d4ff", flexShrink: 0, marginTop: 7 }} />
-            <div>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{item.t}: </span>
-              <span style={{ fontSize: 14, color: "#999", lineHeight: 1.7 }}>{item.d}</span>
-            </div>
-          </div>
-        ))}
-        <div style={{
-          background: "rgba(0,212,255,0.04)", border: "1px solid rgba(0,212,255,0.1)",
-          borderLeft: "3px solid #00d4ff", borderRadius: "0 12px 12px 0",
-          padding: "16px 18px", marginTop: 20,
-        }}>
-          <p style={{ fontSize: 14, color: "#aaa", lineHeight: 1.75, fontStyle: "italic" }}>
-            &ldquo;Seedance 2.0 nije samo tehnološki update. On pokazuje da kompanije poput ByteDance vide budućnost u AI generisanom videu kao centralnom alatu digitalne komunikacije.&rdquo;
-          </p>
-        </div>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginTop: 16 }}>
-          Za kreatore to znači veću brzinu, veću kontrolu i nove estetske mogućnosti. Za AI svet, to je još jedan dokaz da <strong style={{ color: "#fff" }}>video postaje sledeće veliko bojno polje generativne inteligencije</strong>.
-        </p>
-      </>
-    ),
-  },
 ];
+
+function HeroSlideshow({ images, alt, objectPosition }: { images: string[]; alt?: string; objectPosition?: string }) {
+  const [index, setIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const imgStyle = { objectFit: "cover" as const, objectPosition: objectPosition || "center" };
+  useEffect(() => {
+    setPrefersReducedMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }, []);
+
+  useEffect(() => {
+    if (images.length <= 1 || prefersReducedMotion || isHovered) return;
+    const id = setInterval(() => setIndex(i => (i + 1) % images.length), 4500);
+    return () => clearInterval(id);
+  }, [images.length, prefersReducedMotion, isHovered]);
+
+  if (images.length === 1) {
+    return (
+      <Image src={images[0]} alt={alt ?? ""} fill style={imgStyle} sizes="(max-width: 768px) 100vw, 50vw" />
+    );
+  }
+
+  return (
+    <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{ position: "absolute", inset: 0 }}
+    >
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={index}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.5 }}
+          style={{ position: "absolute", inset: 0 }}
+        >
+          <Image
+            src={images[index]}
+            alt={alt ?? ""}
+            fill
+            style={imgStyle}
+            sizes="(max-width: 768px) 100vw, 50vw"
+          />
+        </motion.div>
+      </AnimatePresence>
+      <div style={{
+        position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)",
+        display: "flex", gap: 6, zIndex: 2,
+      }}>
+        {images.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            aria-label={`Slide ${i + 1}`}
+            onClick={() => setIndex(i)}
+            style={{
+              width: 6, height: 6, borderRadius: "50%",
+              background: i === index ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)",
+              border: "none", cursor: "pointer", padding: 0,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function ArticleCard({ article, delay }: { article: Article; delay: number }) {
   const [expanded, setExpanded] = useState(false);
+  const images = article.heroImages?.length ? article.heroImages : [article.heroImage];
 
   return (
     <motion.div
@@ -147,15 +227,9 @@ function ArticleCard({ article, delay }: { article: Article; delay: number }) {
       className="card"
       style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}
     >
-      {/* Hero image */}
+      {/* Hero image / slideshow */}
       <div style={{ position: "relative", height: 240, overflow: "hidden", flexShrink: 0 }}>
-        <Image
-          src={article.heroImage}
-          alt=""
-          fill
-          style={{ objectFit: "cover" }}
-          sizes="(max-width: 768px) 100vw, 50vw"
-        />
+        <HeroSlideshow images={images} objectPosition={article.heroImagePosition} />
         <div style={{
           position: "absolute", inset: 0,
           background: "linear-gradient(to top, rgba(5,5,12,0.95) 0%, rgba(5,5,12,0.3) 50%, transparent 100%)",

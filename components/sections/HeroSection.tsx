@@ -119,7 +119,7 @@ export default function HeroSection() {
           <span className="gradient-text">Počni sada.</span>
         </h1>
 
-        {/* Explainer video player */}
+        {/* 1. VSL video — prvo */}
         <motion.div
           initial={{ opacity: 0, y: 20, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -222,31 +222,35 @@ export default function HeroSection() {
           </div>
         </motion.div>
 
+        {/* 2. Email forma — ispod videa */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          style={{ marginBottom: 32 }}
+        >
+          <EmailForm microcopy="Ograničen broj mesta. Prijave se zatvaraju uskoro." />
+        </motion.div>
+
+        {/* 3. Tajmer — ispod forme */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          style={{ marginBottom: 36 }}
+        >
+          <CountdownTimer targetDate={TARGET_DATE} />
+        </motion.div>
+
+        {/* 4. Tekst — na dnu */}
         <p style={{
           fontSize: "clamp(15px, 2vw, 18px)", color: "rgba(255,255,255,0.85)",
-          maxWidth: 600, margin: "0 auto 36px", lineHeight: 1.75, fontWeight: 500,
+          maxWidth: 600, margin: "0 auto", lineHeight: 1.75, fontWeight: 500,
           textShadow: "0 2px 20px rgba(0,0,0,0.5)",
         }}>
           Čak i ako nemaš <strong style={{ color: "#00d4ff" }}>nikakvo prethodno znanje</strong>, naučićeš sve od nule.
           AI influenseri, filmski video, muzika, automatizacija i monetizacija.
         </p>
-
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <EmailForm microcopy="Ograničen broj mesta. Prijave se zatvaraju uskoro." />
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          style={{ marginTop: 48 }}
-        >
-          <CountdownTimer targetDate={TARGET_DATE} />
-        </motion.div>
       </motion.div>
     </section>
   );

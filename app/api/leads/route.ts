@@ -19,11 +19,16 @@ export async function POST(req: NextRequest) {
     // Get location from ipapi using the real visitor IP
     const forwarded = req.headers.get("x-forwarded-for");
     const ip = forwarded ? forwarded.split(",")[0].trim() : req.headers.get("x-real-ip") ?? "";
+    const ipapiKey = process.env.IPAPI_API_KEY;
+    let city: string | null = null;
+    let country: string | null = null;
+    let country_code: string | null = null;
 
-    let city = null, country = null, country_code = null;
     try {
+      const path = ip ? `${ip}/json/` : "json/";
+      const keyParam = ipapiKey ? `?key=${ipapiKey}` : "";
       const geoRes = await fetch(
-        `https://ipapi.co/${ip}/json/?key=nuIOX9gtXs84uKZZ7tkJjNDXV01YUaF5AkfUchVBfhvpXvE5g5`,
+        `https://ipapi.co/${path}${keyParam}`,
         { next: { revalidate: 0 } }
       );
       const geo = await geoRes.json();

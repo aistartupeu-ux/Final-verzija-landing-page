@@ -126,6 +126,74 @@ body {
   z-index: 10;
 }
 
+.section-divider--visible {
+  height: 1px;
+  margin: 0 24px;
+  background: linear-gradient(90deg, transparent 2%, rgba(0,212,255,0.25) 20%, rgba(0,212,255,0.4) 50%, rgba(0,212,255,0.25) 80%, transparent 98%);
+  box-shadow: 0 0 12px rgba(0,212,255,0.15);
+}
+@media (min-width: 768px) {
+  .section-divider--visible { margin: 0 40px; }
+}
+
+/* Problem + Solution — jedinstvena plexus pozadina */
+.problem-solution-bg {
+  position: relative;
+  overflow: hidden;
+}
+
+.problem-solution-bg__image {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url("/pozadina-plexus-2.png");
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  opacity: 0.42;
+}
+
+.problem-solution-bg__image::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(5,5,8,0.4) 0%, rgba(5,5,8,0.55) 50%, rgba(5,5,8,0.65) 100%);
+  pointer-events: none;
+}
+
+@media (min-width: 769px) {
+  .problem-solution-bg__image { background-attachment: fixed; }
+}
+
+/* VideoShowcase → Blog — jedinstvena plexus pozadina */
+.plexus-sections-bg {
+  position: relative;
+  overflow: hidden;
+}
+
+.plexus-sections-bg__image {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url("/pozadina-plexus-sections.png");
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  opacity: 0.4;
+}
+
+.plexus-sections-bg__image::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(5,5,8,0.4) 0%, rgba(5,5,8,0.5) 50%, rgba(5,5,8,0.6) 100%);
+  pointer-events: none;
+}
+
+@media (min-width: 769px) {
+  .plexus-sections-bg__image { background-attachment: fixed; }
+}
+
 /* Animated gradient text */
 @keyframes gradientShift {
   0%   { background-position: 0% 50%; }

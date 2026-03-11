@@ -1,16 +1,17 @@
 "use client";
 
 import { motion, useInView, useReducedMotion } from "framer-motion";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 
-/* 8 unique videos per row, no overlap. Marquee duplicates set for seamless loop. */
-const row1 = ["/examples/v1.mp4", "/examples/v2.mp4", "/examples/v3.mp4", "/examples/v4.mp4", "/examples/v5.mp4", "/examples/v6.mp4", "/examples/v7.mp4", "/examples/v8.mp4"];
-const row2 = ["/examples/v9.mp4", "/examples/v10.mp4", "/examples/v11.mp4", "/examples/v12.mp4", "/examples/v13.mp4", "/examples/v14.mp4", "/examples/v15.mp4", "/examples/v16.mp4"];
+/* Red 1: v11–v17 (bez v15 — .mov nije podržan) | Red 2: v1–v10. Samo videi koji postoje i rade. */
+const row1 = ["/examples/V11.mp4", "/examples/v12.mp4", "/examples/v13.mp4", "/examples/v14.mp4", "/examples/v16.mp4", "/examples/v17.mp4"];
+const row2 = ["/examples/v1.mp4", "/examples/v2.mp4", "/examples/v3.mp4", "/examples/v4.mp4", "/examples/v5.mp4", "/examples/v6.mp4", "/examples/v7.mp4", "/examples/v8.mp4", "/examples/v9.mp4", "/examples/v10.mp4"];
 
 function VideoCard({ src }: { src: string }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     const card = cardRef.current;
@@ -26,6 +27,8 @@ function VideoCard({ src }: { src: string }) {
     io.observe(card);
     return () => io.disconnect();
   }, []);
+
+  if (failed) return null;
 
   return (
     <div
@@ -60,6 +63,7 @@ function VideoCard({ src }: { src: string }) {
         loop
         playsInline
         preload="metadata"
+        onError={() => setFailed(true)}
         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
       />
     </div>

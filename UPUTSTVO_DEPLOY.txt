@@ -1,0 +1,34 @@
+UPUTSTVO ZA DEPLOY / UPDATE LIVE SAJTA
+======================================
+
+1. PROVERA LOKALNO
+   npm run build
+
+2. COMMIT I PUSH
+   git add .
+   git status
+   git commit -m "Update: opis promena"
+   git push origin main
+
+3. VERCEL
+   - Automatski deploy na svaki push
+   - Ili: Vercel Dashboard -> Deployments -> Redeploy
+
+4. ENV VARIJABLE (Vercel Settings -> Environment Variables)
+   Obavezno:
+   - NEXT_PUBLIC_SUPABASE_URL
+   - SUPABASE_SERVICE_ROLE_KEY
+   
+   Opciono:
+   - RESEND_API_KEY (welcome email)
+   - NEXT_PUBLIC_META_PIXEL_ID (fallback: 2347723352398323)
+   - POYO_API_KEY, OPENAI_API_KEY (Studio, Chat)
+
+5. PROVERA NAKON DEPLOYA
+   - Glavna stranica učitava
+   - Test prijava leada
+   - Supabase leads tabela
+   - Meta Events Manager (PageView, Lead)
+
+6. ROLLBACK
+   Vercel -> Deployments -> tri tačke na starom deployu -> Promote to Production

@@ -264,6 +264,10 @@ Nalaze se u Vercel → Settings → Environment Variables:
 | `RESEND_API_KEY` | Resend API ključ za emailove |
 | `OPENAI_API_KEY` | OpenAI ključ za chat asistenta |
 | `POYO_API_KEY` | PoYo AI ključ za generisanje medija |
+| `IPAPI_API_KEY` | ipapi.co ključ za geo (leads + UrgencyNotification) |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Google Analytics 4 ID (G-XXXXXXXXXX) |
+| `NEXT_PUBLIC_META_PIXEL_ID` | Meta/Facebook Pixel ID |
+| `NEXT_PUBLIC_GTM_ID` | Google Tag Manager ID (GTM-XXXXXXX) |
 
 ---
 

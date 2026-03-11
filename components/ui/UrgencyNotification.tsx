@@ -124,9 +124,10 @@ export default function UrgencyNotification() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
 
-    fetch("https://ipapi.co/json/?key=nuIOX9gtXs84uKZZ7tkJjNDXV01YUaF5AkfUchVBfhvpXvE5g5")
+    fetch("/api/geo")
       .then((r) => r.json())
-      .then((data: LocationData) => {
+      .then((data: LocationData & { error?: string }) => {
+        if (data.error) return;
         if (data.city && data.country_code) {
           setLoc(data);
           timer = setTimeout(() => setVisible(true), 3500);

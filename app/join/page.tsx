@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft, Mail, ArrowRight, Loader2, CheckCircle,
   Sparkles, GraduationCap, Users, ShieldCheck, Zap, Award,
@@ -28,18 +29,37 @@ function GoogleIcon() {
   );
 }
 
-export default function JoinPage() {
+function JoinContent() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
   const [focused, setFocused] = useState("");
 
+  // Postavi af_ref cookie kad korisnik dođe preko /join?ref=CODE (affiliate direktni link)
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref && typeof document !== "undefined") {
+      document.cookie = `af_ref=${encodeURIComponent(ref.toUpperCase())}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+    }
+  }, [searchParams]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.includes("@") || !name) return;
     setStatus("loading");
-    await new Promise(r => setTimeout(r, 1500));
+    try {
+      // Sačuvaj u leads za kampanju (sakupljanje podataka)
+      await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, phone: null }),
+      });
+    } catch {
+      // Nastavi čak i ako API ne uspe
+    }
+    await new Promise(r => setTimeout(r, 800));
     localStorage.setItem("ayhype_user", JSON.stringify({ name, email, hasPaid: false }));
     setStatus("success");
   };
@@ -215,5 +235,13 @@ export default function JoinPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#050508" }}>...</div>}>
+      <JoinContent />
+    </Suspense>
   );
 }

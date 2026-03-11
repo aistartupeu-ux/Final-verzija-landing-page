@@ -23,13 +23,23 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
     if (!skipPhone && !phone) return;
     setLoading(true);
     try {
-      await fetch("/api/leads", {
+      const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, phone: skipPhone ? null : phone }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("Leads API error:", err);
+        setLoading(false);
+        return;
+      }
+      if (typeof window !== "undefined" && (window as unknown as { fbq?: (a: string, b: string) => void }).fbq) {
+        (window as unknown as { fbq: (a: string, b: string) => void }).fbq("track", "Lead");
+      }
     } catch {
-      // Silent fail — don't block the user if save fails
+      setLoading(false);
+      return;
     }
     setLoading(false);
     setStep("done");
