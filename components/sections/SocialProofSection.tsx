@@ -4,39 +4,43 @@ import { motion, useInView } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
 import { Eye, Users, Play, BookOpen, Award, Zap } from "lucide-react";
 
-// ── Waitlist localStorage ─────────────────────────────────────────────────────
-const WAITLIST_KEY      = "ayhype_waitlist_count";
-const WAITLIST_TS       = "ayhype_waitlist_ts";
-const SIGNUPS_PER_HOUR  = 2.5;
-const MAX_COUNT         = 749;
+// ── Waitlist: od 533, dnevno 30–250, kroz ceo dan po +1 do +3 ───────────────
+const START_DATE = new Date(2026, 2, 11, 0, 0, 0); // 11. mart 2026
+const START_VALUE = 533;
 
-function getInitialWaitlist(): number {
-  if (typeof window === "undefined") return 487;
-  try {
-    const saved = localStorage.getItem(WAITLIST_KEY);
-    const ts    = localStorage.getItem(WAITLIST_TS);
-    if (saved && ts) {
-      const hoursElapsed = (Date.now() - Number(ts)) / 3_600_000;
-      const delta        = Math.floor(hoursElapsed * SIGNUPS_PER_HOUR);
-      const updated      = Math.min(Number(saved) + delta, MAX_COUNT);
-      localStorage.setItem(WAITLIST_KEY, String(updated));
-      localStorage.setItem(WAITLIST_TS,  String(Date.now()));
-      return updated;
-    }
-    const base = 483 + Math.floor(Math.random() * 9);
-    localStorage.setItem(WAITLIST_KEY, String(base));
-    localStorage.setItem(WAITLIST_TS,  String(Date.now()));
-    return base;
-  } catch {
-    return 487;
-  }
+function getDaysSinceStart(d: Date): number {
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const start = new Date(START_DATE.getFullYear(), START_DATE.getMonth(), START_DATE.getDate()).getTime();
+  return Math.floor((day - start) / 86400000);
 }
 
-function saveWaitlist(n: number) {
-  try {
-    localStorage.setItem(WAITLIST_KEY, String(n));
-    localStorage.setItem(WAITLIST_TS,  String(Date.now()));
-  } catch { /* ignore */ }
+/** Dnevni limit: 30–250 ljudi (deterministički po danu) */
+function getDailyLimit(dayIndex: number): number {
+  return 30 + ((dayIndex * 7919 + 31) % 221);
+}
+
+/** Ease-in-out za glatak rast kroz dan */
+function easeInOut(t: number): number {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+function getWaitlistCount(): number {
+  if (typeof window === "undefined") return START_VALUE;
+  const now = new Date();
+  const daysSinceStart = getDaysSinceStart(now);
+  if (daysSinceStart < 0) return START_VALUE;
+
+  let baseAtMidnight = START_VALUE;
+  for (let i = 0; i < daysSinceStart; i++) {
+    baseAtMidnight += getDailyLimit(i);
+  }
+
+  const todayLimit = getDailyLimit(daysSinceStart);
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const progress = easeInOut((now.getTime() - midnight) / 86400000);
+  const todayAdded = Math.floor(progress * todayLimit);
+
+  return baseAtMidnight + todayAdded;
 }
 
 // ── Ticker data ───────────────────────────────────────────────────────────────
@@ -54,32 +58,28 @@ export default function SocialProofSection() {
   const ref    = useRef(null);
   const inView = useInView(ref, { once: true, amount: 0.15 });
 
-  const [waitlist, setWaitlist] = useState(487);
-  const [mounted,  setMounted]  = useState(false);
+  const [waitlist, setWaitlist] = useState(START_VALUE);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setWaitlist(getInitialWaitlist());
+    setWaitlist(getWaitlistCount());
     setMounted(true);
   }, []);
 
-  // Live tick every 25–45s
+  // Osveži svakih 2–4 min da broj raste po +1 do +3 kroz dan
   useEffect(() => {
     if (!mounted) return;
-    let timer: ReturnType<typeof setTimeout>;
+    let t: ReturnType<typeof setTimeout>;
     const tick = () => {
-      setWaitlist(prev => {
-        const next = Math.min(prev + 1, MAX_COUNT);
-        saveWaitlist(next);
-        return next;
-      });
-      timer = setTimeout(tick, 25000 + Math.random() * 20000);
+      setWaitlist(getWaitlistCount());
+      t = setTimeout(tick, 120000 + Math.random() * 120000);
     };
-    timer = setTimeout(tick, 25000 + Math.random() * 20000);
-    return () => clearTimeout(timer);
+    t = setTimeout(tick, 60000 + Math.random() * 60000);
+    return () => clearTimeout(t);
   }, [mounted]);
 
-  // Progress toward 500
-  const progressTarget = 500;
+  // Progress prema sledećoj grupi
+  const progressTarget = 750;
   const progressPct    = Math.min((waitlist / progressTarget) * 100, 100);
 
   // Duplicate for seamless loop
@@ -218,7 +218,7 @@ export default function SocialProofSection() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 12, color: "#555" }}>
             <span>Lista cekanja</span>
-            <span style={{ color: "#00d4ff", fontWeight: 600 }}>{waitlist} / {progressTarget}</span>
+            <span style={{ color: "#00d4ff", fontWeight: 600 }}>{waitlist}</span>
           </div>
           <div style={{ height: 5, borderRadius: 99, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
             <motion.div
@@ -231,9 +231,6 @@ export default function SocialProofSection() {
                 boxShadow: "0 0 10px rgba(0,212,255,0.5)",
               }}
             />
-          </div>
-          <div style={{ marginTop: 8, fontSize: 11, color: "#444", textAlign: "right" }}>
-            {progressTarget - waitlist > 0 ? `jos ${progressTarget - waitlist} mesta do sledece grupe` : "Sva mesta popunjena"}
           </div>
         </motion.div>
 

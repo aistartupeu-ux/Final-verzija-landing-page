@@ -50,10 +50,10 @@ export default function Home() {
           <div className="section-divider section-divider--visible" />
           <HowToEnterSection />
           <div className="section-divider section-divider--visible" />
-          <FinalCTASection />
-          <div className="section-divider section-divider--visible" />
           <FAQSection />
         </div>
+        <div className="section-divider" />
+        <FinalCTASection />
         <div className="section-divider" />
         <AffiliateSection />
       </main>

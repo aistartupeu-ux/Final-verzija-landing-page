@@ -25,6 +25,12 @@ PRAVILA:
 
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: "Chat servis nije konfigurisan. Kontaktirajte administratora." },
+        { status: 503 }
+      );
+    }
     const { messages } = await req.json();
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {

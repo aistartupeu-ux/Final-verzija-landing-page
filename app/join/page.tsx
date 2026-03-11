@@ -50,16 +50,24 @@ function JoinContent() {
     if (!email.includes("@") || !name) return;
     setStatus("loading");
     try {
-      // Sačuvaj u leads za kampanju (sakupljanje podataka)
-      await fetch("/api/leads", {
+      const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, phone: null }),
+        body: JSON.stringify({ email, phone: null, name }),
       });
-    } catch {
-      // Nastavi čak i ako API ne uspe
+      if (res.ok && typeof window !== "undefined" && (window as unknown as { fbq?: (a: string, b: string) => void }).fbq) {
+        (window as unknown as { fbq: (a: string, b: string) => void }).fbq("track", "Lead");
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Greška pri prijavi");
+      }
+    } catch (err) {
+      setStatus("idle");
+      alert(err instanceof Error ? err.message : "Greška pri prijavi. Pokušaj ponovo.");
+      return;
     }
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 600));
     localStorage.setItem("ayhype_user", JSON.stringify({ name, email, hasPaid: false }));
     setStatus("success");
   };

@@ -35,7 +35,7 @@ function Chart({ reduced }: { reduced: boolean }) {
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 28 }}>
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#00d4ff", boxShadow: "0 0 8px rgba(0,212,255,0.5)" }} />
-        <h4 style={{ fontSize: 18, fontWeight: 700 }}>Nedeljni napredak kroz AI sistem</h4>
+        <h4 style={{ fontSize: 18, fontWeight: 700 }}>Tvoj napredak uz AI sistem</h4>
       </div>
 
       <div style={{ display: "flex", alignItems: "flex-end", gap: 5, height: 190, padding: "0 4px" }}>

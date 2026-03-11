@@ -11,7 +11,7 @@ const faqs = [
   },
   {
     q: "Na kom jeziku je sadržaj?",
-    a: "Ceo kurs je na srpskom jeziku. Svi materijali, videi i zajednica su u potpunosti lokalizovani za Balkan.",
+    a: "Ceo kurs je na srpskohrvatski jezik. Svi materijali, videi i zajednica su u potpunosti lokalizovani za Balkan.",
   },
   {
     q: "Koliko traje kurs i koliko vremena sedmično treba?",

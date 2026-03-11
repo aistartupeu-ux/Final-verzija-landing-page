@@ -85,7 +85,7 @@ export default function HeroSection() {
             objectFit: "cover",
           }}
         >
-          <source src="/hero-trailer.mp4" type="video/mp4" />
+          <source src="/hero-vsl.mp4" type="video/mp4" />
         </video>
         <div style={{ position: "absolute", inset: 0, background: "rgba(5,5,8,0.82)" }} />
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "45%", background: "linear-gradient(to top, #050508 0%, rgba(5,5,8,0.7) 50%, transparent 100%)" }} />
@@ -143,7 +143,7 @@ export default function HeroSection() {
           >
             <video
               ref={explainerRef}
-              src="/explainer-video.mp4"
+              src="/explainer-vsl.mp4"
               playsInline
               preload="none"
               poster="/video-poster.webp"
@@ -230,7 +230,7 @@ export default function HeroSection() {
           transition={{ duration: 0.45, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
           style={{ marginBottom: 32 }}
         >
-          <EmailForm microcopy="Ograničen broj mesta. Prijave se zatvaraju uskoro." />
+          <EmailForm />
         </motion.div>
 
         {/* 3. Tajmer — ispod forme */}

@@ -10,7 +10,7 @@ const supabase = createClient(
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, phone } = body;
+    const { email, phone, name } = body;
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
     const { error } = await supabase.from("leads").insert({
       email,
       phone: phone ?? null,
+      name: name ?? null,
       city,
       country,
       country_code,
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
         await resend.emails.send({
           from: "AI Hype Academy <noreply@aihype-academy.com>",
           to: email,
-          subject: "Dobrodošao u AI Hype Academy! 🚀",
+          subject: name ? `Dobrodošao, ${name}! 🚀` : "Dobrodošao u AI Hype Academy! 🚀",
           html: `
 <!DOCTYPE html>
 <html lang="sr">
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest) {
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td style="font-size:28px;font-weight:800;color:#ffffff;line-height:1.2;padding-bottom:14px">
-                    Prijava uspešna! 🎉
+                    ${name ? `Pozdrav, ${name}! 🎉` : "Prijava uspešna! 🎉"}
                   </td>
                 </tr>
                 <tr>

@@ -14,6 +14,12 @@ const ALLOWED_MODELS = [
 
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.POYO_API_KEY) {
+      return NextResponse.json(
+        { code: 503, error: { message: "AI Studio nije konfigurisan." } },
+        { status: 503 }
+      );
+    }
     const body = await req.json();
     const { model, input } = body;
 

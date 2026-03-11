@@ -32,10 +32,9 @@ function VideoCard({ src }: { src: string }) {
   return (
     <div
       ref={cardRef}
+      className="video-card"
       style={{
         flexShrink: 0,
-        width: 200,
-        height: 356,
         borderRadius: 18,
         overflow: "hidden",
         border: "1px solid rgba(255,255,255,0.07)",
@@ -77,18 +76,50 @@ function VideoCard({ src }: { src: string }) {
   );
 }
 
+const DRAG_CLAMP = 120;
+const DRAG_SNAP_MS = 180;
+
 function VideoRow({ videos, reverse = false, paused = false }: { videos: string[]; reverse?: boolean; paused?: boolean }) {
   const items = [...videos, ...videos];
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const lastX = useRef(0);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    lastX.current = e.touches[0].clientX;
+    setIsDragging(true);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    const dx = e.touches[0].clientX - lastX.current;
+    lastX.current = e.touches[0].clientX;
+    setDragOffset(prev => Math.max(-DRAG_CLAMP, Math.min(DRAG_CLAMP, prev + dx)));
+  };
+
+  const onTouchEnd = () => {
+    setIsDragging(false);
+    setDragOffset(0);
+  };
 
   return (
-    <div style={{
-      overflow: "hidden",
-      contain: "layout paint",
-      margin: "0 24px",
-      maskImage: "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
-      WebkitMaskImage: "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
-    }}>
+    <div
+      style={{
+        overflow: "hidden",
+        contain: "layout paint",
+        margin: "0 24px",
+        maskImage: "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
+        WebkitMaskImage: "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
+        touchAction: "pan-y",
+      }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchEnd}
+    >
       <style>{`
+        .video-card { width: 200px; height: 356px; }
+        @media (max-width: 640px) { .video-card { width: 170px; height: 302px; } }
+        @media (min-width: 641px) and (max-width: 768px) { .video-card { width: 185px; height: 329px; } }
         @keyframes vsrow-l { from { transform: translate3d(0,0,0) } to { transform: translate3d(-50%,0,0) } }
         @keyframes vsrow-r { from { transform: translate3d(-50%,0,0) } to { transform: translate3d(0,0,0) } }
         .vs-track-l, .vs-track-r {
@@ -103,7 +134,19 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
         @media (prefers-reduced-motion: reduce) { .vs-track-l, .vs-track-r { animation: none; } }
       `}</style>
       <div className={`${reverse ? "vs-track-r" : "vs-track-l"}${paused ? " paused" : ""}`}>
-        {items.map((src, i) => <VideoCard key={`${src}-${i}`} src={src} />)}
+        <div
+          style={{
+            display: "flex",
+            width: "max-content",
+            flexShrink: 0,
+            transform: `translate3d(${dragOffset}px, 0, 0)`,
+            transition: !isDragging ? `transform ${DRAG_SNAP_MS}ms ease-out` : "none",
+          }}
+        >
+          {items.map((src, i) => (
+            <VideoCard key={`${src}-${i}`} src={src} />
+          ))}
+        </div>
       </div>
     </div>
   );

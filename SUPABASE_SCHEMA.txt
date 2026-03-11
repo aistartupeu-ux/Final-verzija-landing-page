@@ -9,6 +9,7 @@
 create table if not exists leads (
   id uuid default gen_random_uuid() primary key,
   email text not null,
+  name text,
   phone text,
   city text,
   country text,

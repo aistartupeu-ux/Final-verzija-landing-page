@@ -15,7 +15,8 @@
 7. [Kako promeniti sadržaj na sajtu](#7-kako-promeniti-sadrzaj-na-sajtu)
 8. [Deployment na Vercel](#8-deployment-na-vercel)
 9. [Domen (aihype-academy.com)](#9-domen-aihype-academycom)
-10. [Česta pitanja i problemi](#10-cesta-pitanja-i-problemi)
+10. [Integracije (prelazak u live)](#10-integracije-prelazak-u-live)
+11. [Česta pitanja i problemi](#11-cesta-pitanja-i-problemi)
 
 ---
 
@@ -78,9 +79,12 @@ Svaki put kada neko ostavi email na sajtu, podaci se čuvaju u **Supabase** tabe
 
 Tabela sadrži:
 - `email` — email adresa
+- `name` — ime (sa Join stranice, opciono)
 - `phone` — broj telefona (opciono)
 - `city`, `country` — lokacija (automatski detektovana)
 - `created_at` — kada se prijavil/la
+
+**Napomena:** Ako tabela `leads` nema kolonu `name`, pokreni migraciju iz fajla `supabase-leads-name-migration.sql` u Supabase SQL Editoru.
 
 ### Export leadova u Excel/CSV:
 U Supabase Table Editor, klikni dugme **Export** u gornjem desnom uglu.
@@ -91,7 +95,7 @@ U Supabase Table Editor, klikni dugme **Export** u gornjem desnom uglu.
 
 Svaki lead automatski dobija welcome email sa:
 - Logom AI Hype Academy
-- Porukom dobrodošlice na srpskom
+- Personalizovanom porukom dobrodošlice („Pozdrav, [ime]!“ ako je ime upisano)
 - Listom benefita kursa
 - Linkom nazad na sajt
 
@@ -208,7 +212,7 @@ Svaka sekcija je poseban fajl u folderu `components/sections/`.
 | Blog članci | `components/sections/BlogSection.tsx` |
 
 ### Promena videa na sajtu:
-- **Hero background video:** zameni fajl `public/hero-video.mp4`
+- **Hero background video:** zameni fajl `public/hero-vsl.mp4`
 - **Explainer video:** zameni fajl `public/explainer-video.mp4`
 - **Showcase videi:** zameni fajlove `public/examples/v1.mp4` do `v10.mp4`
 
@@ -266,7 +270,7 @@ Nalaze se u Vercel → Settings → Environment Variables:
 | `POYO_API_KEY` | PoYo AI ključ za generisanje medija |
 | `IPAPI_API_KEY` | ipapi.co ključ za geo (leads + UrgencyNotification) |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Google Analytics 4 ID (G-XXXXXXXXXX) |
-| `NEXT_PUBLIC_META_PIXEL_ID` | Meta/Facebook Pixel ID |
+| `NEXT_PUBLIC_META_PIXEL_ID` | Meta/Facebook Pixel ID (obavezno za Lead tracking na Join stranici) |
 | `NEXT_PUBLIC_GTM_ID` | Google Tag Manager ID (GTM-XXXXXXX) |
 
 ---
@@ -292,7 +296,27 @@ Nalaze se u Vercel → Settings → Environment Variables:
 
 ---
 
-## 10. Česta pitanja i problemi
+## 10. Integracije (prelazak u live)
+
+### Šta je uključeno u produkciju
+- **Welcome email (Resend):** Personalizovan subject i pozdrav sa imenom
+- **Meta Pixel:** Učitava se samo kada je `NEXT_PUBLIC_META_PIXEL_ID` postavljen; na Join stranici šalje Lead event nakon uspešne prijave
+- **Join stranica:** Šalje `name` u API, proverava odgovor i prikazuje grešku ako prijava ne uspe
+- **Chat:** Prijateljska poruka ako `OPENAI_API_KEY` nije postavljen
+- **AI Studio:** Prijateljska poruka ako `POYO_API_KEY` nije postavljen
+- **Video showcase:** Touch swipe na mobilnim uređajima, responsivne kartice
+- **Platforme:** Viewport-fit za notch uređaje, safe-area padding za iOS
+
+### Pre deploya — pokreni Supabase migraciju
+Ako tabela `leads` još nema kolonu `name`, pokreni u Supabase SQL Editoru:
+```sql
+-- fajl: supabase-leads-name-migration.sql
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS name text;
+```
+
+---
+
+## 11. Česta pitanja i problemi
 
 ### "Greška pri registraciji" na affiliate stranici
 **Uzrok:** Supabase RLS (Row Level Security) je uključen na tabelama.
@@ -319,6 +343,8 @@ Chrome keširа DNS agresivno. Reši:
 2. Otvori `components/sections/VideoShowcaseSection.tsx`
 3. Dodaj novi video u niz `row1` ili `row2`
 4. Deployuj: `vercel --prod`
+
+**Video showcase na mobilnom:** Na touch uređajima korisnici mogu vući video kartice prstom levo/desno dok marquee loop ostaje aktivan.
 
 ### Kako promeniti cenu kursa
 Kurs još uvek nema prodajnu stranicu. Kada se lansira, kontaktiraju developera da integriše payment procesor (Stripe ili lokalni).

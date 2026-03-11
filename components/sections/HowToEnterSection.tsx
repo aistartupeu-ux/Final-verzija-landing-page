@@ -70,7 +70,7 @@ export default function HowToEnterSection() {
         </div>
 
         <motion.div initial={{ opacity: 0, y: 15 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.5, delay: 0.6 }} style={{ marginTop: 56 }}>
-          <EmailForm microcopy="Ograničen broj mesta. Prijave se zatvaraju uskoro." />
+          <EmailForm />
         </motion.div>
       </div>
     </section>
