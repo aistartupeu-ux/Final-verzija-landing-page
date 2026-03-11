@@ -40,6 +40,8 @@ export default function Home() {
         <div className="section-divider" />
         <div className="plexus-sections-bg">
           <div className="plexus-sections-bg__image" aria-hidden />
+          <BlogSection />
+          <div className="section-divider section-divider--visible" />
           <VideoShowcaseSection />
           <div className="section-divider section-divider--visible" />
           <SocialProofSection />
@@ -48,11 +50,9 @@ export default function Home() {
           <div className="section-divider section-divider--visible" />
           <HowToEnterSection />
           <div className="section-divider section-divider--visible" />
-          <FAQSection />
-          <div className="section-divider section-divider--visible" />
           <FinalCTASection />
           <div className="section-divider section-divider--visible" />
-          <BlogSection />
+          <FAQSection />
         </div>
         <div className="section-divider" />
         <AffiliateSection />

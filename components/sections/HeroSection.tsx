@@ -85,7 +85,7 @@ export default function HeroSection() {
             objectFit: "cover",
           }}
         >
-          <source src="/hero-srbija.mp4?v=2" type="video/mp4" />
+          <source src="/hero-trailer.mp4" type="video/mp4" />
         </video>
         <div style={{ position: "absolute", inset: 0, background: "rgba(5,5,8,0.82)" }} />
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "45%", background: "linear-gradient(to top, #050508 0%, rgba(5,5,8,0.7) 50%, transparent 100%)" }} />

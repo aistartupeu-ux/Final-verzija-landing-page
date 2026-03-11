@@ -53,7 +53,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </>
         )}
         <link rel="preload" href="/icon.png" as="image" />
-        <link rel="preload" href="/hero-srbija.mp4?v=2" as="video" type="video/mp4" />
+        <link rel="preload" href="/hero-trailer.mp4" as="video" type="video/mp4" />
       </head>
       <body className={inter.variable} style={{ fontFamily: "var(--font-inter), Inter, system-ui, sans-serif", overflowX: "hidden", maxWidth: "100vw" }}>
         <TrackingScripts />
