@@ -20,7 +20,7 @@ export default function AffiliateLinksPage() {
     }
   }, []);
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://ayhypeacademy.com";
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://aihype-academy.com";
   const code = affiliate?.affiliateCode ?? "";
 
   const links = [

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import TrackingScripts from "@/components/layout/TrackingScripts";
 
 const inter = Inter({ subsets: ["latin", "latin-ext"], variable: "--font-inter" });
 
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
     siteName: "AI Hype Academy",
     images: [
       {
-        url: "/og-image.png",
+        url: "https://aihype-academy.com/og-image.png",
         width: 1080,
         height: 1080,
         alt: "AI Hype Academy",
@@ -33,7 +34,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "AI Hype Academy | Izgradi AI karijeru",
     description: "Kompletan sistem za kreiranje AI influensera i filmskih videa za monetizaciju.",
-    images: ["/og-image.png"],
+    images: ["https://aihype-academy.com/og-image.png"],
   },
 };
 
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link rel="preload" href="/hero-video.mp4" as="video" type="video/mp4" />
       </head>
       <body className={inter.variable} style={{ fontFamily: "var(--font-inter), Inter, system-ui, sans-serif", overflowX: "hidden", maxWidth: "100vw" }}>
+        <TrackingScripts />
         <div style={{ overflowX: "hidden", maxWidth: "100vw" }}>
           {children}
         </div>
