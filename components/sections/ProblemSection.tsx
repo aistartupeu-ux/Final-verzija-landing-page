@@ -33,11 +33,10 @@ function Chart({ reduced }: { reduced: boolean }) {
       boxShadow: "0 4px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.02)",
       contain: "layout style",
     }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 28 }}>
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#00d4ff", boxShadow: "0 0 8px rgba(0,212,255,0.5)" }} />
-        <h4 style={{ fontSize: 18, fontWeight: 700 }}>Rast Znanja</h4>
+        <h4 style={{ fontSize: 18, fontWeight: 700 }}>Nedeljni napredak kroz AI sistem</h4>
       </div>
-      <p style={{ fontSize: 12, color: "#00d4ff", textAlign: "center", marginBottom: 28, opacity: 0.8 }}>Nedeljni napredak kroz AI sistem</p>
 
       <div style={{ display: "flex", alignItems: "flex-end", gap: 5, height: 190, padding: "0 4px" }}>
         {data.map((v, i) => (
@@ -105,13 +104,15 @@ export default function ProblemSection() {
               <span style={{ fontSize: 11, fontWeight: 600, color: "#ef4444", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>Problem</span>
             </div>
 
-            <h2 style={{ fontSize: "clamp(30px, 5vw, 50px)", fontWeight: 800, lineHeight: 1.1, marginBottom: 20 }}>
-              Tržište je u fazi <span style={{ color: "#00d4ff" }}>buke.</span>
+            <h2 style={{ fontSize: "clamp(26px, 4vw, 42px)", fontWeight: 800, lineHeight: 1.1, marginBottom: 20 }}>
+              Svi pričaju o <span style={{ color: "#00d4ff", fontWeight: 800 }}>AI-ju.</span> Malo ko zna kako da ga pretvori u novac.
             </h2>
-            <p style={{ fontSize: 15, color: "#8a8a9a", lineHeight: 1.8, marginBottom: 28, maxWidth: 480 }}>
-              Svi pričaju o AI-u. Malo ko razume. Još manje ljudi zna kako da pretvori AI u konkretnu zaradu. Između haosa tutorial-a, kurseva bez strukture i influensera koji prodaju magle... gde se nalazi stvarna vrednost?
+            <p style={{ fontSize: 15, color: "#8a8a9a", lineHeight: 1.7, marginBottom: 28, maxWidth: 480 }}>
+              Internet je prepun tutorijala, alata i kurseva.
+              <br />
+              Ali bez sistema sve to ostaje samo još jedna informacija.
             </p>
-            <p style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 24, lineHeight: 1.4 }}>
+            <p style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 24, lineHeight: 1.4 }}>
               AI nije problem. Problem je što nemaš sistem koji zarađuje.
             </p>
 

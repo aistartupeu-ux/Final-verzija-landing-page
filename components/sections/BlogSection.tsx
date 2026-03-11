@@ -29,8 +29,8 @@ const articles: Article[] = [
       bg: "rgba(168,85,247,0.07)",
       border: "rgba(168,85,247,0.18)",
     },
-    heroImage: "/blog-trile-2.png",
-    heroImages: ["/blog-trile-2.png", "/blog-trile-3.png", "/blog-trile-4.png", "/blog-trile-5.png"],
+    heroImage: "/blog-trile-1.png",
+    heroImages: ["/blog-trile-1.png", "/blog-trile-2.png", "/blog-trile-3.png", "/blog-trile-4.png", "/blog-trile-5.png", "/blog-trile-6.png", "/blog-trile-7.png", "/blog-trile-8.png"],
     heroImagePosition: "center 25%",
     title: (
       <>
@@ -332,7 +332,7 @@ export default function BlogSection() {
             <span style={{ fontSize: 11, fontWeight: 600, color: "#aaa", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>Ko stoji iza AI Hype Akademije</span>
           </div>
           <h2 style={{ fontSize: "clamp(26px, 4vw, 42px)", fontWeight: 800, lineHeight: 1.15 }}>
-            Šta se dešava u <span style={{ color: "#00d4ff" }}>AI svetu?</span>
+            Muzika, video i <span style={{ color: "#00d4ff" }}>AI eksperti</span>
           </h2>
         </motion.div>
 

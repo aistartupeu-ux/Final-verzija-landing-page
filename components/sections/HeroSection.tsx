@@ -7,7 +7,8 @@ import Image from "next/image";
 import CountdownTimer from "@/components/ui/CountdownTimer";
 import EmailForm from "@/components/ui/EmailForm";
 
-const TARGET_DATE = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
+// 31. mart 23:59:59 (poslednji dan prijava)
+const TARGET_DATE = new Date(2026, 2, 31, 23, 59, 59);
 
 export default function HeroSection() {
   const bgVideoRef = useRef<HTMLVideoElement>(null);
@@ -84,7 +85,7 @@ export default function HeroSection() {
             objectFit: "cover",
           }}
         >
-          <source src="/hero-video.mp4" type="video/mp4" />
+          <source src="/hero-srbija.mp4?v=2" type="video/mp4" />
         </video>
         <div style={{ position: "absolute", inset: 0, background: "rgba(5,5,8,0.82)" }} />
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "45%", background: "linear-gradient(to top, #050508 0%, rgba(5,5,8,0.7) 50%, transparent 100%)" }} />
