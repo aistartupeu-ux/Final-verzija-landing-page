@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Menu, X } from "lucide-react";
 import Image from "next/image";
 
-const NAV_SECTIONS = ["program", "rezultati", "kako-funkcionise"];
+const NAV_SECTIONS = ["blog", "kako-funkcionise"];
 
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
@@ -67,8 +67,7 @@ export default function Header() {
 
         <nav style={{ display: "flex", alignItems: "center", gap: 32 }} className="hide-mobile">
           {[
-            { href: "#program", label: "Program", id: "program" },
-            { href: "#rezultati", label: "Rezultati", id: "rezultati" },
+            { href: "#blog", label: "O nama", id: "blog" },
             { href: "#kako-funkcionise", label: "Kako funkcioniše", id: "kako-funkcionise" },
           ].map(link => (
             <a key={link.id} href={link.href} style={{
@@ -97,8 +96,7 @@ export default function Header() {
 
       {open && (
         <div className="show-mobile" style={{ background: "rgba(5,5,8,0.95)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(0,212,255,0.08)", padding: "20px 24px", flexDirection: "column" }}>
-          <a href="#program" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 15, color: "#8a8a9a", textDecoration: "none", padding: "10px 0" }}>Program</a>
-          <a href="#rezultati" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 15, color: "#8a8a9a", textDecoration: "none", padding: "10px 0" }}>Rezultati</a>
+          <a href="#blog" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 15, color: "#8a8a9a", textDecoration: "none", padding: "10px 0" }}>O nama</a>
           <a href="#kako-funkcionise" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 15, color: "#8a8a9a", textDecoration: "none", padding: "10px 0" }}>Kako funkcioniše</a>
           <button onClick={jump} className="glow-btn" style={{ width: "100%", marginTop: 12, borderRadius: 10 }}>Join The Hype</button>
         </div>

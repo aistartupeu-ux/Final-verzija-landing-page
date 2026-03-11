@@ -33,7 +33,10 @@ const articles: Article[] = [
     heroImages: ["/blog-trile-2.png", "/blog-trile-3.png", "/blog-trile-4.png", "/blog-trile-5.png"],
     heroImagePosition: "center 25%",
     title: (
-      <>Trile: muzičar, osnivač <span style={{ color: "#a855f7" }}>AI Hype Akademije</span></>
+      <>
+        <a href="https://www.instagram.com/trileofficial?igsh=MXVud3U3bWJsdXMxdQ==" target="_blank" rel="noopener noreferrer" style={{ display: "block", color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={e => { e.currentTarget.style.color = "#a855f7"; }} onMouseLeave={e => { e.currentTarget.style.color = "inherit"; }}>Trile</a>
+        <span style={{ display: "block", fontSize: "0.85em", fontWeight: 600, color: "#a855f7", marginTop: 4 }}>Muzičar, osnivač AI Hype Akademije</span>
+      </>
     ),
     date: "2026",
     intro: (
@@ -69,7 +72,10 @@ const articles: Article[] = [
     heroImage: "/blog-rok-kadoic.png",
     heroImagePosition: "center 5%",
     title: (
-      <>Rok Kadoič: reditelj, kreativni producent <span style={{ color: "#22c55e" }}>AI Hype Akademije</span></>
+      <>
+        <a href="https://www.instagram.com/rok_kadoic?igsh=eW1weW81N3Rhbjkw" target="_blank" rel="noopener noreferrer" style={{ display: "block", color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={e => { e.currentTarget.style.color = "#22c55e"; }} onMouseLeave={e => { e.currentTarget.style.color = "inherit"; }}>Rok Kadoič</a>
+        <span style={{ display: "block", fontSize: "0.85em", fontWeight: 600, color: "#22c55e", marginTop: 4 }}>Reditelj, kreativni producent AI Hype Akademije</span>
+      </>
     ),
     date: "2026",
     intro: (
@@ -308,7 +314,7 @@ export default function BlogSection() {
   const inView = useInView(ref, { once: true, amount: 0.1 });
 
   return (
-    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "80px 24px 100px" }}>
+    <section id="blog" ref={ref} style={{ position: "relative", zIndex: 10, padding: "80px 24px 100px" }}>
       <div className="section-container">
 
         <motion.div
@@ -323,7 +329,7 @@ export default function BlogSection() {
             borderRadius: 50, padding: "6px 16px", marginBottom: 18,
           }}>
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#00d4ff", boxShadow: "0 0 6px #00d4ff" }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#aaa", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>Blog & Vesti</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#aaa", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>Ko stoji iza AI Hype Akademije</span>
           </div>
           <h2 style={{ fontSize: "clamp(26px, 4vw, 42px)", fontWeight: 800, lineHeight: 1.15 }}>
             Šta se dešava u <span style={{ color: "#00d4ff" }}>AI svetu?</span>
