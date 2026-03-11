@@ -2,6 +2,7 @@
 
 import { motion, useInView, useReducedMotion } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
+import Image from "next/image";
 import { Sparkles } from "lucide-react";
 
 /* Red 1: v11–v17 (bez v15 — .mov nije podržan) | Red 2: v1–v10. Samo videi koji postoje i rade. */
@@ -16,19 +17,17 @@ function VideoCard({ src }: { src: string }) {
   useEffect(() => {
     const card = cardRef.current;
     const video = videoRef.current;
-    if (!card || !video) return;
+    if (!card || !video || failed) return;
     const io = new IntersectionObserver(
       ([e]) => {
         if (e.isIntersecting) video.play().catch(() => {});
         else video.pause();
       },
-      { threshold: 0.2, rootMargin: "40px" }
+      { threshold: 0.3, rootMargin: "80px" }
     );
     io.observe(card);
     return () => io.disconnect();
-  }, []);
-
-  if (failed) return null;
+  }, [failed]);
 
   return (
     <div
@@ -42,8 +41,10 @@ function VideoCard({ src }: { src: string }) {
         border: "1px solid rgba(255,255,255,0.07)",
         marginRight: 12,
         position: "relative",
+        contain: "layout",
         transition: "transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease",
         cursor: "default",
+        background: "rgba(5,5,12,0.6)",
       }}
       onMouseEnter={e => {
         e.currentTarget.style.transform = "scale(1.03) translateZ(0)";
@@ -56,16 +57,22 @@ function VideoCard({ src }: { src: string }) {
         e.currentTarget.style.boxShadow = "none";
       }}
     >
-      <video
-        ref={videoRef}
-        src={src}
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        onError={() => setFailed(true)}
-        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-      />
+      {failed ? (
+        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <Image src="/logo.png" alt="AI Hype Academy" width={120} height={40} style={{ width: "auto", height: "auto", maxWidth: "100%", opacity: 0.5 }} />
+        </div>
+      ) : (
+        <video
+          ref={videoRef}
+          src={src}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          onError={() => setFailed(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+      )}
     </div>
   );
 }
@@ -76,16 +83,23 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
   return (
     <div style={{
       overflow: "hidden",
+      contain: "layout paint",
+      margin: "0 24px",
       maskImage: "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
       WebkitMaskImage: "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
     }}>
       <style>{`
         @keyframes vsrow-l { from { transform: translate3d(0,0,0) } to { transform: translate3d(-50%,0,0) } }
         @keyframes vsrow-r { from { transform: translate3d(-50%,0,0) } to { transform: translate3d(0,0,0) } }
-        .vs-track-l { display: flex; width: max-content; animation: vsrow-l 44s linear infinite; transform: translateZ(0); }
-        .vs-track-l:hover, .vs-track-l.paused { animation-play-state: paused; }
-        .vs-track-r { display: flex; width: max-content; animation: vsrow-r 40s linear infinite; transform: translateZ(0); }
-        .vs-track-r:hover, .vs-track-r.paused { animation-play-state: paused; }
+        .vs-track-l, .vs-track-r {
+          display: flex; width: max-content;
+          backface-visibility: hidden;
+          transform: translate3d(0,0,0);
+          will-change: transform;
+        }
+        .vs-track-l { animation: vsrow-l 44s linear infinite; }
+        .vs-track-r { animation: vsrow-r 40s linear infinite; }
+        .vs-track-l:hover, .vs-track-l.paused, .vs-track-r:hover, .vs-track-r.paused { animation-play-state: paused; }
         @media (prefers-reduced-motion: reduce) { .vs-track-l, .vs-track-r { animation: none; } }
       `}</style>
       <div className={`${reverse ? "vs-track-r" : "vs-track-l"}${paused ? " paused" : ""}`}>
@@ -103,7 +117,7 @@ export default function VideoShowcaseSection() {
   const t = { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const };
 
   return (
-    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "100px 0", overflow: "hidden", contain: "layout style" }}>
+    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "100px 0", overflow: "hidden", contain: "layout style paint" }}>
       {/* Ambient glow */}
       <div style={{
         position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",

@@ -2,30 +2,11 @@
 
 ## [Unreleased] – 2026-03-11
 
-### Hero sekcija
-- Hero video zamenjen sa **SRBIJA TRAILER.mp4** (1:19) – fajl `hero-srbija.mp4`
-- Dodat cache-buster `?v=2` na video URL radi osvežavanja u pregledaču
-
-### Countdown timer
-- Fiksirano ciljno vreme: **31. mart 2026. 23:59:59** (poslednji dan prijava)
-- Ranije: računao 21 dana od učitavanja stranice
-
-### Problem sekcija
-- **Naslov (h2):** "Tržište je u fazi buke." → "Svi pričaju o **AI-ju.** Malo ko zna kako da ga pretvori u novac." (AI-ju istaknuto plavom bojom)
-- **Paragraf:** Zamenjen sa "Internet je prepun tutorijala, alata i kurseva. Ali bez sistema sve to ostaje samo još jedna informacija."
-- **Font:** h2 smanjen na `clamp(26px, 4vw, 42px)`, bold tekst sa 18px na 16px
-- **Chart (Rast Znanja):** Uklonjen podnaslov, naslov "Rast Znanja" → "Nedeljni napredak kroz AI sistem"
-
-### Blog sekcija – Trile kartica
-- Zamenjene hero slike sa 8 novih fotografija (`blog-trile-1.png` – `blog-trile-8.png`)
-- Slide animacija prolazi kroz svih 8 slika
-
-### Tehnički napomene
-- `hero-srbija.mp4` (~188MB) dodat u `.gitignore` zbog GitHub limit 100MB – za produkciju ručno uploadovati u `public/`
-
----
-
-## [Prethodno] – 2026-03
+### VideoShowcase sekcija
+- Logo fallback umesto praznog placeholder-a kada video ne učita
+- Margin 24px na ivicama – prazno uz rubove stranice
+- Proširen fade (6%–94%) za glatke ivice
+- `will-change: transform` za kontinuiranu rotaciju videa
 
 ### Header
 - Uklonjeni linkovi "Program" i "Rezultati"
