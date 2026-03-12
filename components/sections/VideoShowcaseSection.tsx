@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useInView, useReducedMotion } from "framer-motion";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, memo } from "react";
 import Image from "next/image";
 import { Sparkles } from "lucide-react";
 
@@ -9,15 +9,37 @@ import { Sparkles } from "lucide-react";
 const row1 = ["/examples/V11.mp4", "/examples/v12.mp4", "/examples/v13.mp4", "/examples/v14.mp4", "/examples/v16.mp4", "/examples/v17.mp4"];
 const row2 = ["/examples/v1.mp4", "/examples/v2.mp4", "/examples/v3.mp4", "/examples/v4.mp4", "/examples/v5.mp4", "/examples/v6.mp4", "/examples/v7.mp4", "/examples/v8.mp4", "/examples/v9.mp4", "/examples/v10.mp4"];
 
-function VideoCard({ src }: { src: string }) {
+const LogoFallback = () => (
+  <div style={{
+    width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+    background: "linear-gradient(135deg, rgba(15,15,28,0.95) 0%, rgba(25,20,45,0.9) 100%)",
+  }}>
+    <Image src="/logo.png" alt="AI Hype Academy" width={100} height={34} loading="lazy" decoding="async" style={{ width: "auto", height: "auto", maxWidth: "80%", opacity: 0.7 }} />
+  </div>
+);
+
+const VideoCard = memo(function VideoCard({ src }: { src: string }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    const io = new IntersectionObserver(
+      ([e]) => setInView(e.isIntersecting),
+      { rootMargin: "200px", threshold: 0 }
+    );
+    io.observe(card);
+    return () => io.disconnect();
+  }, []);
 
   useEffect(() => {
     const card = cardRef.current;
     const video = videoRef.current;
-    if (!card || !video || failed) return;
+    if (!card || !video || failed || !inView) return;
     const io = new IntersectionObserver(
       ([e]) => {
         if (e.isIntersecting) video.play().catch(() => {});
@@ -27,7 +49,9 @@ function VideoCard({ src }: { src: string }) {
     );
     io.observe(card);
     return () => io.disconnect();
-  }, [failed]);
+  }, [failed, inView]);
+
+  const shouldLoadVideo = inView && !failed;
 
   return (
     <div
@@ -40,10 +64,11 @@ function VideoCard({ src }: { src: string }) {
         border: "1px solid rgba(255,255,255,0.07)",
         marginRight: 12,
         position: "relative",
-        contain: "layout",
+        contain: "layout paint",
+        isolation: "isolate",
         transition: "transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease",
         cursor: "default",
-        background: "rgba(5,5,12,0.6)",
+        background: "transparent",
       }}
       onMouseEnter={e => {
         e.currentTarget.style.transform = "scale(1.03) translateZ(0)";
@@ -56,11 +81,8 @@ function VideoCard({ src }: { src: string }) {
         e.currentTarget.style.boxShadow = "none";
       }}
     >
-      {failed ? (
-        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <Image src="/logo.png" alt="AI Hype Academy" width={120} height={40} style={{ width: "auto", height: "auto", maxWidth: "100%", opacity: 0.5 }} />
-        </div>
-      ) : (
+      {!shouldLoadVideo || !loaded ? <LogoFallback /> : null}
+      {shouldLoadVideo && (
         <video
           ref={videoRef}
           src={src}
@@ -69,47 +91,65 @@ function VideoCard({ src }: { src: string }) {
           playsInline
           preload="metadata"
           onError={() => setFailed(true)}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          onLoadedData={() => setLoaded(true)}
+          style={{
+            width: "100%", height: "100%", objectFit: "cover", display: "block",
+            position: "absolute", inset: 0,
+            opacity: loaded ? 1 : 0,
+            transition: "opacity 0.25s ease",
+          }}
         />
       )}
     </div>
   );
-}
+});
 
-const DRAG_CLAMP = 120;
-const DRAG_SNAP_MS = 180;
+const DRAG_SNAP_MS = 220;
 
 function VideoRow({ videos, reverse = false, paused = false }: { videos: string[]; reverse?: boolean; paused?: boolean }) {
   const items = [...videos, ...videos];
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const lastX = useRef(0);
 
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    setIsMobile(mq.matches);
+    const fn = () => setIsMobile(mq.matches);
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, []);
+
   const onTouchStart = (e: React.TouchEvent) => {
+    if (!isMobile) return;
     lastX.current = e.touches[0].clientX;
     setIsDragging(true);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
+    if (!isMobile) return;
     const dx = e.touches[0].clientX - lastX.current;
     lastX.current = e.touches[0].clientX;
-    setDragOffset(prev => Math.max(-DRAG_CLAMP, Math.min(DRAG_CLAMP, prev + dx)));
+    setDragOffset(prev => prev + dx);
   };
 
   const onTouchEnd = () => {
+    if (!isMobile) return;
     setIsDragging(false);
     setDragOffset(0);
   };
 
   return (
     <div
+      className="video-showcase-row"
       style={{
         overflow: "hidden",
         contain: "layout paint",
         margin: "0 24px",
         maskImage: "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
         WebkitMaskImage: "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
-        touchAction: "pan-y",
+        touchAction: isMobile ? "pan-y" : "auto",
       }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -120,6 +160,18 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
         .video-card { width: 200px; height: 356px; }
         @media (max-width: 640px) { .video-card { width: 170px; height: 302px; } }
         @media (min-width: 641px) and (max-width: 768px) { .video-card { width: 185px; height: 329px; } }
+        /* PC/desktop: edge-to-edge, filled to screen edges */
+        @media (min-width: 769px) {
+          .video-showcase-section .video-showcase-row {
+            width: 100vw !important;
+            max-width: 100vw !important;
+            margin-left: calc(50% - 50vw) !important;
+            margin-right: calc(50% - 50vw) !important;
+            box-sizing: border-box !important;
+            mask-image: linear-gradient(90deg, transparent 0%, black 2%, black 98%, transparent 100%) !important;
+            -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 2%, black 98%, transparent 100%) !important;
+          }
+        }
         @keyframes vsrow-l { from { transform: translate3d(0,0,0) } to { transform: translate3d(-50%,0,0) } }
         @keyframes vsrow-r { from { transform: translate3d(-50%,0,0) } to { transform: translate3d(0,0,0) } }
         .vs-track-l, .vs-track-r {
@@ -139,7 +191,7 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
             display: "flex",
             width: "max-content",
             flexShrink: 0,
-            transform: `translate3d(${dragOffset}px, 0, 0)`,
+            transform: `translate3d(${isMobile ? dragOffset : 0}px, 0, 0)`,
             transition: !isDragging ? `transform ${DRAG_SNAP_MS}ms ease-out` : "none",
           }}
         >
@@ -160,7 +212,7 @@ export default function VideoShowcaseSection() {
   const t = { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const };
 
   return (
-    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "100px 0", overflow: "hidden", contain: "layout style paint" }}>
+    <section ref={ref} className="video-showcase-section" style={{ position: "relative", zIndex: 10, padding: "100px 0", overflow: "hidden", contain: "layout style paint" }}>
       {/* Ambient glow */}
       <div style={{
         position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
