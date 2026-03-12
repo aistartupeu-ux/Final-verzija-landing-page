@@ -8,19 +8,27 @@ export default function MobileCTABar() {
 
   useEffect(() => {
     let prev = false;
+    let raf = 0;
     const onScroll = () => {
-      const scrollY = window.scrollY;
-      const finalCTA = document.getElementById("final-cta");
-      const finalTop = finalCTA ? finalCTA.getBoundingClientRect().top + scrollY : Infinity;
-      const now = scrollY > 600 && scrollY < finalTop - 200;
-      if (now !== prev) {
-        prev = now;
-        setVisible(now);
-      }
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        const scrollY = window.scrollY;
+        const finalCTA = document.getElementById("final-cta");
+        const finalTop = finalCTA ? finalCTA.getBoundingClientRect().top + scrollY : Infinity;
+        const now = scrollY > 600 && scrollY < finalTop - 200;
+        if (now !== prev) {
+          prev = now;
+          setVisible(now);
+        }
+        raf = 0;
+      });
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   const jump = () => {

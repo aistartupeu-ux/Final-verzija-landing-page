@@ -8,6 +8,23 @@ import { Eye, Users, Play, BookOpen, Award, Zap } from "lucide-react";
 const START_DATE = new Date(2026, 2, 11, 0, 0, 0); // 11. mart 2026
 const START_VALUE = 533;
 
+// ── Progress bar: krece malo vise od pola (58%), puni se do zadnjeg sata/minuta/sekunde ──
+const COUNTDOWN_END = new Date(2026, 2, 31, 23, 59, 59); // isti kao Hero countdown
+const BAR_START_PCT = 58;
+
+function getBarProgress(): number {
+  if (typeof window === "undefined") return BAR_START_PCT;
+  const now = Date.now();
+  const start = START_DATE.getTime();
+  const end = COUNTDOWN_END.getTime();
+  if (now >= end) return 100;
+  if (now < start) return BAR_START_PCT;
+  const total = end - start;
+  const elapsed = now - start;
+  const raw = elapsed / total;
+  return BAR_START_PCT + (100 - BAR_START_PCT) * raw;
+}
+
 function getDaysSinceStart(d: Date): number {
   const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const start = new Date(START_DATE.getFullYear(), START_DATE.getMonth(), START_DATE.getDate()).getTime();
@@ -59,6 +76,7 @@ export default function SocialProofSection() {
   const inView = useInView(ref, { once: true, amount: 0.15 });
 
   const [waitlist, setWaitlist] = useState(START_VALUE);
+  const [barProgress, setBarProgress] = useState(BAR_START_PCT);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -78,9 +96,12 @@ export default function SocialProofSection() {
     return () => clearTimeout(t);
   }, [mounted]);
 
-  // Progress prema sledećoj grupi
-  const progressTarget = 750;
-  const progressPct    = Math.min((waitlist / progressTarget) * 100, 100);
+  // Progress bar: osvežava svake sekunde (do zadnjeg sata, minuta, sekunde → 100%)
+  useEffect(() => {
+    setBarProgress(getBarProgress());
+    const i = setInterval(() => setBarProgress(getBarProgress()), 1000);
+    return () => clearInterval(i);
+  }, []);
 
   // Duplicate for seamless loop
   const tickItems = [...ticks, ...ticks, ...ticks];
@@ -209,7 +230,7 @@ export default function SocialProofSection() {
           osoba ceka na kurs
         </motion.div>
 
-        {/* Progress bar */}
+        {/* Progress bar — aktivira se dok brojke rastu, krece od 58%, puni do zadnjeg sata/minuta/sekunde */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -222,15 +243,27 @@ export default function SocialProofSection() {
           </div>
           <div style={{ height: 5, borderRadius: 99, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
             <motion.div
-              initial={{ width: 0 }}
-              animate={inView ? { width: `${progressPct}%` } : {}}
-              transition={{ duration: 1.2, delay: 0.6, ease: "easeOut" }}
+              initial={{ width: `${BAR_START_PCT}%` }}
+              animate={inView ? { width: `${barProgress}%` } : { width: `${BAR_START_PCT}%` }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
               style={{
                 height: "100%", borderRadius: 99,
                 background: "linear-gradient(90deg, #00d4ff, #8b5cf6)",
                 boxShadow: "0 0 10px rgba(0,212,255,0.5)",
+                position: "relative",
+                overflow: "hidden",
               }}
-            />
+            >
+              <motion.div
+                animate={{ opacity: [0.1, 0.35, 0.1] }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                style={{
+                  position: "absolute", inset: 0, borderRadius: 99,
+                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)",
+                  pointerEvents: "none",
+                }}
+              />
+            </motion.div>
           </div>
         </motion.div>
 

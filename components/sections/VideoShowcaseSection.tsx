@@ -28,12 +28,20 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
   useEffect(() => {
     const card = cardRef.current;
     if (!card) return;
+    let enterT: ReturnType<typeof setTimeout>;
     const io = new IntersectionObserver(
-      ([e]) => setInView(e.isIntersecting),
+      ([e]) => {
+        if (e.isIntersecting) {
+          enterT = setTimeout(() => setInView(true), 180);
+        } else {
+          clearTimeout(enterT);
+          setInView(false);
+        }
+      },
       { rootMargin: "200px", threshold: 0 }
     );
     io.observe(card);
-    return () => io.disconnect();
+    return () => { clearTimeout(enterT); io.disconnect(); };
   }, []);
 
   useEffect(() => {

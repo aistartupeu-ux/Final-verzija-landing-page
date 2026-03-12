@@ -8,15 +8,23 @@ export default function ScrollProgress() {
   useEffect(() => {
     const bar = barRef.current;
     if (!bar) return;
+    let raf = 0;
     const onScroll = () => {
-      const el = document.documentElement;
-      const scrolled = el.scrollTop || document.body.scrollTop;
-      const total = el.scrollHeight - el.clientHeight;
-      bar.style.width = total > 0 ? `${(scrolled / total) * 100}%` : "0%";
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        const el = document.documentElement;
+        const scrolled = el.scrollTop || document.body.scrollTop;
+        const total = el.scrollHeight - el.clientHeight;
+        bar.style.width = total > 0 ? `${(scrolled / total) * 100}%` : "0%";
+        raf = 0;
+      });
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   return (
