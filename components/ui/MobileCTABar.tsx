@@ -63,9 +63,6 @@ export default function MobileCTABar() {
         >
           Join The Hype <ArrowRight size={16} />
         </button>
-        <p style={{ textAlign: "center", fontSize: 10, color: "#555", marginTop: 6, letterSpacing: "0.03em" }}>
-          Ograničen broj mesta · Bez kreditne kartice
-        </p>
       </div>
     </>
   );
