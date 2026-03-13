@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
+import { trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
 import PhoneInput, { type Value } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 
@@ -25,10 +26,19 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
     setLoading(true);
     setError(null);
     try {
+      const sourceData = getLeadSourceData();
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, phone: (skipPhone || !phone) ? null : phone }),
+        body: JSON.stringify({
+          email,
+          phone: (skipPhone || !phone) ? null : phone,
+          utm_source: sourceData.utm_source,
+          utm_medium: sourceData.utm_medium,
+          utm_campaign: sourceData.utm_campaign,
+          affiliate_code: sourceData.affiliate_code,
+          source_tag: sourceData.source_tag,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -40,8 +50,10 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
       if (typeof window !== "undefined" && (window as unknown as { fbq?: (a: string, b: string) => void }).fbq) {
         (window as unknown as { fbq: (a: string, b: string) => void }).fbq("track", "Lead");
       }
+      trackAffiliateLeadOnSubmit({ email, phone: (skipPhone || !phone) ? null : phone });
       setLoading(false);
       setStep("done");
+      setTimeout(() => { window.location.href = "/special/offer"; }, 2000);
     } catch {
       setError("Greška u konekciji. Proverite internet i pokušajte ponovo.");
       setLoading(false);

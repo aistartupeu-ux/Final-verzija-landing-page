@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
 import {
   ArrowLeft, Mail, ArrowRight, Loader2, CheckCircle,
   Sparkles, GraduationCap, Users, ShieldCheck, Zap, Award,
@@ -50,10 +51,20 @@ function JoinContent() {
     if (!email.includes("@") || !name) return;
     setStatus("loading");
     try {
+      const sourceData = getLeadSourceData();
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, phone: null, name }),
+        body: JSON.stringify({
+          email,
+          phone: null,
+          name,
+          utm_source: sourceData.utm_source,
+          utm_medium: sourceData.utm_medium,
+          utm_campaign: sourceData.utm_campaign,
+          affiliate_code: sourceData.affiliate_code,
+          source_tag: sourceData.source_tag,
+        }),
       });
       if (res.ok && typeof window !== "undefined" && (window as unknown as { fbq?: (a: string, b: string) => void }).fbq) {
         (window as unknown as { fbq: (a: string, b: string) => void }).fbq("track", "Lead");
@@ -62,6 +73,7 @@ function JoinContent() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Greška pri prijavi");
       }
+      trackAffiliateLeadOnSubmit({ email, phone: null });
     } catch (err) {
       setStatus("idle");
       alert(err instanceof Error ? err.message : "Greška pri prijavi. Pokušaj ponovo.");

@@ -8,33 +8,33 @@ const supabase = supabaseUrl && supabaseKey
   ? createClient(supabaseUrl, supabaseKey)
   : null;
 
+const COOKIE_NAME = "special_access";
+const COOKIE_MAX_AGE = 60 * 60 * 24; // 24h
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
       email,
       phone,
-      name,
       utm_source,
       utm_medium,
       utm_campaign,
-      affiliate_code: bodyAffiliate,
+      affiliate_code,
       source_tag,
     } = body;
 
-    if (!email) {
+    if (!email || !email.includes("@")) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
     if (!supabase) {
-      console.error("Leads API: Supabase not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel.");
       return NextResponse.json(
         { error: "Database not configured" },
         { status: 503 }
       );
     }
 
-    // Get location from ipapi using the real visitor IP
     const forwarded = req.headers.get("x-forwarded-for");
     const ip = forwarded ? forwarded.split(",")[0].trim() : req.headers.get("x-real-ip") ?? "";
     const ipapiKey = process.env.IPAPI_API_KEY;
@@ -54,12 +54,12 @@ export async function POST(req: NextRequest) {
       country = geo.country_name ?? null;
       country_code = geo.country_code ?? null;
     } catch {
-      // Location is optional
+      // optional
     }
 
     const { error } = await supabase.from("leads").insert({
       email,
-      phone: phone ?? null,
+      phone: phone && String(phone).trim() ? String(phone).trim() : null,
       city,
       country,
       country_code,
@@ -67,48 +67,34 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) {
-      console.error("Supabase insert error:", JSON.stringify({
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-      }));
+      console.error("Special access Supabase error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-
-    const cookieStore = await cookies();
-    const affiliateCode = bodyAffiliate ?? cookieStore.get("af_ref")?.value ?? null;
 
     // Leads by Source Sheet: webhook za Meta / affiliate tracking
     const leadsSourceWebhook = process.env.LEADS_SOURCE_WEBHOOK_URL;
     if (leadsSourceWebhook) {
-      const payload = {
-        date: new Date().toISOString(),
-        email,
-        phone: phone ?? "",
-        name: name ?? "",
-        source_tag: source_tag ?? (affiliateCode ? "affiliate" : "direct"),
-        utm_source: utm_source ?? "",
-        utm_medium: utm_medium ?? "",
-        utm_campaign: utm_campaign ?? "",
-        affiliate_code: affiliateCode ?? "",
-      };
       try {
-        const ctrl = new AbortController();
-        const timeoutId = setTimeout(() => ctrl.abort(), 8000);
         await fetch(leadsSourceWebhook, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          signal: ctrl.signal,
+          body: JSON.stringify({
+            date: new Date().toISOString(),
+            email,
+            phone: phone ?? "",
+            name: "",
+            source_tag: source_tag ?? (affiliate_code ? "affiliate" : "direct"),
+            utm_source: utm_source ?? "",
+            utm_medium: utm_medium ?? "",
+            utm_campaign: utm_campaign ?? "",
+            affiliate_code: affiliate_code ?? "",
+          }),
         });
-        clearTimeout(timeoutId);
       } catch (e) {
         console.error("Leads Source webhook error:", e);
       }
     }
 
-    // HighLevel: pošalji lead u webhook (trigger za kontakt + welcome email)
     const ghlWebhook = process.env.GHL_WEBHOOK_URL;
     if (ghlWebhook) {
       try {
@@ -117,12 +103,11 @@ export async function POST(req: NextRequest) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email,
-            firstName: name?.split(" ")[0] ?? name ?? "",
-            lastName: name?.split(" ").slice(1).join(" ") ?? "",
-            name: name ?? "",
+            firstName: "",
+            lastName: "",
+            name: "",
             phone: phone ?? "",
-            source: affiliateCode ? "affiliate" : "AI Hype Academy",
-            affiliate_code: affiliateCode ?? "",
+            source: "Special Offer",
             city: city ?? "",
             country: country ?? "",
           }),
@@ -132,20 +117,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Welcome email šalje samo HighLevel preko webhook-a – Resend isključen da ne bi bilo duplo
-
-    // Cookie za pristup special offer stranici
-    cookieStore.set("special_access", "1", {
+    const cookieStore = await cookies();
+    cookieStore.set(COOKIE_NAME, "1", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24,
+      maxAge: COOKIE_MAX_AGE,
       path: "/",
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Lead API error:", err);
+    console.error("Special access API error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
