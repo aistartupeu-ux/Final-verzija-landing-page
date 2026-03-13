@@ -61,10 +61,16 @@ export async function appendLeadsToSheet(row: LeadsSourceRow): Promise<boolean> 
       ],
     ];
 
-    const sheetName = process.env.LEADS_SHEET_NAME || "Sheet1";
+    let sheetName = process.env.LEADS_SHEET_NAME;
+    if (!sheetName) {
+      const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+      const firstSheet = meta.data.sheets?.[0]?.properties?.title;
+      sheetName = firstSheet || "Sheet1";
+    }
+    const range = `'${sheetName}'!A:I`;
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: `${sheetName}!A:I`,
+      range,
       valueInputOption: "USER_ENTERED",
       insertDataOption: "INSERT_ROWS",
       requestBody: { values },
