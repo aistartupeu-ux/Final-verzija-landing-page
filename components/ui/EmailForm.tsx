@@ -11,16 +11,19 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
   const [phone, setPhone] = useState<Value | undefined>();
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const submitEmail = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.includes("@")) return;
+    setError(null);
     setStep("phone");
   };
 
   const submitPhone = async (e: React.FormEvent, skipPhone = false) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/leads", {
         method: "POST",
@@ -30,18 +33,20 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         console.error("Leads API error:", err);
+        setError("Došlo je do greške. Pokušajte ponovo ili nas kontaktirajte.");
         setLoading(false);
         return;
       }
       if (typeof window !== "undefined" && (window as unknown as { fbq?: (a: string, b: string) => void }).fbq) {
         (window as unknown as { fbq: (a: string, b: string) => void }).fbq("track", "Lead");
       }
+      setLoading(false);
+      setStep("done");
     } catch {
+      setError("Greška u konekciji. Proverite internet i pokušajte ponovo.");
       setLoading(false);
       return;
     }
-    setLoading(false);
-    setStep("done");
   };
 
   if (step === "done") {
@@ -55,7 +60,7 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
         }}>
           <CheckCircle size={18} color="#22c55e" />
           <span style={{ color: "#22c55e", fontWeight: 600, fontSize: 14 }}>
-            Uspešno! Bićeš obavešten/a kada se kurs otvori.
+            Uspešno ste se prijavili! Bićeš obavešten/a kada se kurs otvori.
           </span>
         </div>
       </div>
@@ -105,7 +110,12 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
             </button>
           </div>
         </form>
-        <p style={{ textAlign: "center", fontSize: 12, color: "#555", marginTop: 12 }}>
+        {error && (
+          <p style={{ textAlign: "center", fontSize: 13, color: "#ef4444", marginTop: 12 }}>
+            {error}
+          </p>
+        )}
+        <p style={{ textAlign: "center", fontSize: 12, color: "#555", marginTop: error ? 8 : 12 }}>
           Opciono: unesite broj za SMS obaveštenje.{" "}
           <button
             onClick={e => submitPhone(e as unknown as React.FormEvent, true)}
