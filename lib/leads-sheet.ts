@@ -25,14 +25,24 @@ export type LeadsSourceRow = {
 export async function appendLeadsToSheet(row: LeadsSourceRow): Promise<boolean> {
   const sheetId = process.env.LEADS_SHEET_ID;
   const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!sheetId || !json) return false;
+  if (!sheetId || !json) {
+    if (!sheetId) console.error("Leads Sheet: LEADS_SHEET_ID env nije postavljen");
+    if (!json) console.error("Leads Sheet: GOOGLE_SERVICE_ACCOUNT_JSON env nije postavljen");
+    return false;
+  }
 
   try {
     const creds = JSON.parse(json) as { client_email?: string; private_key?: string };
-    if (!creds.client_email || !creds.private_key) return false;
+    if (!creds.client_email || !creds.private_key) {
+      console.error("Leads Sheet: missing client_email or private_key in JSON");
+      return false;
+    }
+    // Vercel env može da zameni \n sa pravim newline — vrati ako treba
+    const privateKey = String(creds.private_key).replace(/\\n/g, "\n");
+    const credentials = { ...creds, private_key: privateKey };
 
     const auth = new google.auth.GoogleAuth({
-      credentials: creds,
+      credentials: credentials,
       scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
 
@@ -61,7 +71,8 @@ export async function appendLeadsToSheet(row: LeadsSourceRow): Promise<boolean> 
     });
     return true;
   } catch (e) {
-    console.error("Leads Sheet append error:", e);
+    const err = e as { message?: string; code?: number };
+    console.error("Leads Sheet append error:", err?.message || err, err);
     return false;
   }
 }

@@ -230,3 +230,16 @@ Redeploy aplikacije da učita nove env varijable.
 ### Korak 5: Test
 
 Submituj formu — red bi trebalo da se odmah pojavi u Sheet-u. Nema Make-a, sve radi direktno iz API-ja.
+
+### Ne upisuje? Troubleshooting direktnog Sheet-a
+
+0. **Brza provera** — otvori `https://tvoj-domen.com/api/leads/sheet-status` u browseru. Vraća da li je konfiguracija OK ili šta nedostaje.
+1. **Proveri Vercel env** — da li su `LEADS_SHEET_ID` i `GOOGLE_SERVICE_ACCOUNT_JSON` zaista dodati? Redeploy nakon dodavanja.
+2. **Vercel Logs** — Deployments → poslednji deploy → **Functions** → otvori `/api/leads` → **Logs**. Traži "Leads Sheet" poruke:
+   - "LEADS_SHEET_ID env nije postavljen" → dodaj env
+   - "GOOGLE_SERVICE_ACCOUNT_JSON env nije postavljen" → dodaj env
+   - "missing client_email or private_key" → JSON nije validan, proveri da si kopirao ceo fajl
+   - "Leads Sheet append error: ..." → vidi tačnu grešku ispod
+3. **403 / Permission denied** → Sheet nije share-ovan sa `client_email` iz JSON-a. Share → unesi taj email → Editor.
+4. **404 / Not found** → pogrešan `LEADS_SHEET_ID`. Kopiraj iz URL-a između `/d/` i `/edit`.
+5. **Sheet name** → ako prvi tab nije "Sheet1", dodaj env `LEADS_SHEET_NAME` = tačan naziv (npr. "Leads by Source").
