@@ -51,7 +51,6 @@ export async function POST(req: NextRequest) {
     const { error } = await supabase.from("leads").insert({
       email,
       phone: phone ?? null,
-      name: name ?? null,
       city,
       country,
       country_code,
