@@ -59,7 +59,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (error) {
-      console.error("Supabase insert error:", error);
+      console.error("Supabase insert error:", JSON.stringify({
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      }));
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
