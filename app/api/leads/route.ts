@@ -54,6 +54,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // HighLevel: pošalji lead u webhook (trigger za kontakt + welcome email)
+    const ghlWebhook = process.env.GHL_WEBHOOK_URL;
+    if (ghlWebhook) {
+      try {
+        await fetch(ghlWebhook, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            firstName: name?.split(" ")[0] ?? name ?? "",
+            lastName: name?.split(" ").slice(1).join(" ") ?? "",
+            name: name ?? "",
+            phone: phone ?? "",
+            source: "AI Hype Academy",
+            city: city ?? "",
+            country: country ?? "",
+          }),
+        });
+      } catch (e) {
+        console.error("HighLevel webhook error:", e);
+      }
+    }
+
     // Send welcome email via Resend
     if (process.env.RESEND_API_KEY) {
       try {

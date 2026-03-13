@@ -20,13 +20,12 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
 
   const submitPhone = async (e: React.FormEvent, skipPhone = false) => {
     e.preventDefault();
-    if (!skipPhone && !phone) return;
     setLoading(true);
     try {
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, phone: skipPhone ? null : phone }),
+        body: JSON.stringify({ email, phone: (skipPhone || !phone) ? null : phone }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -98,7 +97,7 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
                 placeholder="Broj telefona"
               />
             </div>
-            <button type="submit" disabled={loading || !phone} className="ef-btn" style={{ opacity: !phone ? 0.5 : 1 }}>
+            <button type="submit" disabled={loading} className="ef-btn">
               {loading
                 ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
                 : <>Završi <ArrowRight size={15} /></>
