@@ -59,8 +59,12 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
           animation: "fadeInUp 0.4s ease forwards",
         }}>
           <CheckCircle size={18} color="#22c55e" />
-          <span style={{ color: "#22c55e", fontWeight: 600, fontSize: 14 }}>
-            Uspešno ste se prijavili! Bićeš obavešten/a kada se kurs otvori.
+          <span style={{ color: "#22c55e", fontWeight: 600, fontSize: 14, lineHeight: 1.4 }}>
+            Uspešno ste se prijavili!
+            <br />
+            Na email koji ste uneli uskoro stiže poruka sa potvrdom i više informacija.
+            <br />
+            Bićete obavešteni čim se kurs otvori.
           </span>
         </div>
       </div>
