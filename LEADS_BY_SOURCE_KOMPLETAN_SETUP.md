@@ -7,10 +7,10 @@ Korak po korak: šta je urađeno u kodu i šta TI treba da uradiš.
 ## ŠTA JE URAĐENO U KODU (već spremno)
 
 - UTM parametri se čuvaju u cookie kad posetilac uđe (facebook, instagram, affiliate ref)
-- Svi leadovi (EmailForm, Join, Special) šalju `source_tag`, UTM i `affiliate_code` u API
-- `/api/leads` i `/api/special/access` šalju podatke na Make webhook ako je `LEADS_SOURCE_WEBHOOK_URL` podešena
-
-**Nema dodatnih izmena u kodu — samo deploy i setup ispod.**
+- Svi leadovi šalju `source_tag`, UTM i `affiliate_code` u API
+- **Dva načina** upisa u Sheet:
+  1. **Make webhook** (ako je `LEADS_SOURCE_WEBHOOK_URL` podešena)
+  2. **Direktno u Google Sheet** (ako su `LEADS_SHEET_ID` + `GOOGLE_SERVICE_ACCOUNT_JSON` podešeni) — radi bez Make
 
 ---
 
@@ -120,8 +120,51 @@ Korak po korak: šta je urađeno u kodu i šta TI treba da uradiš.
 
 **Ako ne radi:**
 - Proveri Make History — da li se scenario uopšte pokreće? Ako NE → problem u Vercel env ili deploy
-- Ako se scenario pokreće ali Sheet je prazan → u History klikni na run, otvori Google Sheets modul, vidi da li piše greška
-- Probaj ručno: u Postman ili sl. pošalji POST na Make webhook URL sa JSON body iz LEADS_BY_SOURCE_SETUP.md (sekcija "Ručni test webhooka")
+- Ako se scenario pokreće ali Sheet je prazan → vidi **FIX ISPOD**
+
+---
+
+## FIX: Scenario radi ali se NIŠTA NE UPISUJE u Sheet
+
+Make prima podatke, ali Google Sheets modul ne dobija ispravno mapiranje. Probaj ovo:
+
+### Rešenje A: Dodaj Parse JSON modul između Webhook i Google Sheets
+
+1. U Make scenariju: **obriši** trenutnu vezu između Webhook i Google Sheets (klikni na liniju i Delete)
+2. Klikni **+** ispod Webhook modula
+3. Pretraži: **JSON**
+4. Izaberi **Parse JSON**
+5. U polje **JSON string** klikni i iz Mapping panela probaj **jednu** od ovih vrednosti:
+   - `{{1.body}}` — ako webhook stavlja body u `body`
+   - `{{1}}` — ako je ceo output string
+   - `{{toString(1)}}` — alternativno
+6. Klikni **OK** — Parse JSON je sada modul **[2]**
+7. Klikni **+** ispod Parse JSON modula
+8. Dodaj ponovo **Google Sheets → Add a row**
+9. U **Values** mapiraj iz modula **[2]** (Parse JSON):
+   - A → `{{2.date}}`  B → `{{2.email}}`  C → `{{2.phone}}`
+   - D → `{{2.name}}`  E → `{{2.source_tag}}`  F → `{{2.utm_source}}`
+   - G → `{{2.utm_medium}}`  H → `{{2.utm_campaign}}`  I → `{{2.affiliate_code}}`
+10. Save, Toggle ON, test ponovo
+
+### Rešenje B: Probaj `1.body.xxx` umesto `1.xxx`
+
+Ako ne želiš Parse JSON, u Google Sheets modulu u Values zameni:
+- `{{1.date}}` → `{{1.body.date}}`
+- `{{1.email}}` → `{{1.body.email}}`
+- itd. za sva polja
+
+Save, test.
+
+### Rešenje C: Proveri output Webhook modula
+
+1. Make → Scenarios → tvoj scenario → **History**
+2. Klikni na poslednji run (zeleni krug)
+3. Klikni na **Webhook** modul
+4. Pogledaj **Output** — koja je tačna putanja do `date` i `email`?
+   - Ako vidiš `body` → `date`, `email`… → koristi `1.body.date`
+   - Ako vidiš direktno `date`, `email` → trebalo bi `1.date`, proveri da li Google Sheets ima grešku (crveni X)
+5. Ako Google Sheets modul ima **crveni X** — otvori ga, vidi error poruku (npr. permission, wrong sheet name)
 
 ---
 
@@ -136,10 +179,54 @@ Korak po korak: šta je urađeno u kodu i šta TI treba da uradiš.
 
 ---
 
-## Redosled radnji
+## Redosled radnji (Make)
 
 1. Google Sheet  
 2. Make (connections + scenario + Data structure + Values)  
-3. Vercel env  
+3. Vercel env (`LEADS_SOURCE_WEBHOOK_URL`)  
 4. Deploy  
 5. Test  
+
+---
+
+## ALTERNATIVA: Direktan upis BEZ Make (kad Make ne radi)
+
+Ako Make i dalje ne upisuje u Sheet, koristi direktan Google Sheets API.
+
+### Korak 1: Google Cloud — Service Account
+
+1. Otvori [Google Cloud Console](https://console.cloud.google.com)
+2. Kreiraj projekat (ili izaberi postojeći)
+3. **APIs & Services** → **Library** → pretraži **Google Sheets API** → **Enable**
+4. **APIs & Services** → **Credentials** → **Create Credentials** → **Service account**
+5. Unesi ime (npr. "Leads Sheet"), klikni **Create**
+6. Role: **Editor** (ili ostavi prazno), **Done**
+7. Klikni na kreirani service account
+8. **Keys** tab → **Add key** → **Create new key** → **JSON** → Download
+9. Otvori JSON fajl — trebaće ti `client_email` i `private_key`
+
+### Korak 2: Podeli Sheet sa service account-om
+
+1. Otvori svoj Google Sheet "Leads by Source"
+2. Klikni **Share**
+3. U polje za email unesi `client_email` iz JSON-a (npr. `leads-sheet@project.iam.gserviceaccount.com`)
+4. Pristup: **Editor**
+5. Klikni **Send**
+
+### Korak 3: Vercel env
+
+1. **LEADS_SHEET_ID** — iz URL-a Sheet-a:  
+   `https://docs.google.com/spreadsheets/d/OVDE_ID_ID_ID_ID_ID/edit`  
+   Kopiraj deo između `/d/` i `/edit`
+2. **GOOGLE_SERVICE_ACCOUNT_JSON** — otvori JSON fajl, kopiraj CELU sadržinu (od `{` do `}`) i zalepi kao vrednost
+   - U Vercel: **Value** polje — zalepi ceo JSON u jednom redu (može biti dugačak)
+   - Ako ne radi: minifikuj JSON (ukloni sve prelome redova) pre zalepke
+   - Opciono: **LEADS_SHEET_NAME** = ime lista ako nije "Sheet1"
+
+### Korak 4: Deploy
+
+Redeploy aplikacije da učita nove env varijable.
+
+### Korak 5: Test
+
+Submituj formu — red bi trebalo da se odmah pojavi u Sheet-u. Nema Make-a, sve radi direktno iz API-ja.

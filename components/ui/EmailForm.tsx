@@ -53,7 +53,8 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
       trackAffiliateLeadOnSubmit({ email, phone: (skipPhone || !phone) ? null : phone });
       setLoading(false);
       setStep("done");
-      setTimeout(() => { window.location.href = "/special/offer"; }, 2000);
+      const specialEnabled = process.env.NEXT_PUBLIC_SPECIAL_OFFER_ENABLED === "true";
+      setTimeout(() => { window.location.href = specialEnabled ? "/special/offer" : "/"; }, 2000);
     } catch {
       setError("Greška u konekciji. Proverite internet i pokušajte ponovo.");
       setLoading(false);

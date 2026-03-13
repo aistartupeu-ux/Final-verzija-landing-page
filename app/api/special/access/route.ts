@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { appendLeadsToSheet } from "@/lib/leads-sheet";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -94,6 +95,19 @@ export async function POST(req: NextRequest) {
         console.error("Leads Source webhook error:", e);
       }
     }
+
+    // Leads by Source: direktan upis u Google Sheet (bez Make)
+    await appendLeadsToSheet({
+      date: new Date().toISOString(),
+      email,
+      phone: phone ?? "",
+      name: "",
+      source_tag: source_tag ?? (affiliate_code ? "affiliate" : "direct"),
+      utm_source: utm_source ?? "",
+      utm_medium: utm_medium ?? "",
+      utm_campaign: utm_campaign ?? "",
+      affiliate_code: affiliate_code ?? "",
+    });
 
     const ghlWebhook = process.env.GHL_WEBHOOK_URL;
     if (ghlWebhook) {
