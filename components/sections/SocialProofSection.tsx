@@ -4,7 +4,7 @@ import { motion, useInView } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
 import { Eye, Users, Play, BookOpen, Award, Zap } from "lucide-react";
 
-// ── Waitlist: od 533, dnevno 30–250, kroz ceo dan po +1 do +3 ───────────────
+// ── Waitlist: od 533, max 50 dnevno, kroz ceo dan po +1 do +3 ───────────────
 const START_DATE = new Date(2026, 2, 11, 0, 0, 0); // 11. mart 2026
 const START_VALUE = 533;
 
@@ -31,9 +31,9 @@ function getDaysSinceStart(d: Date): number {
   return Math.floor((day - start) / 86400000);
 }
 
-/** Dnevni limit: 30–250 ljudi (deterministički po danu) */
+/** Dnevni limit: max 50 ljudi (deterministički po danu) */
 function getDailyLimit(dayIndex: number): number {
-  return 30 + ((dayIndex * 7919 + 31) % 221);
+  return 35 + ((dayIndex * 7919 + 31) % 16);
 }
 
 /** Ease-in-out za glatak rast kroz dan */
