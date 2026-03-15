@@ -4,7 +4,7 @@ import Script from "next/script";
  * Učitava tracking skripte za kampanju kada su env varijable postavljene.
  * Dodaj u Vercel: NEXT_PUBLIC_GA_MEASUREMENT_ID, NEXT_PUBLIC_META_PIXEL_ID, NEXT_PUBLIC_GTM_ID
  */
-const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "2108218823244373";
+const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "2347723352398323";
 
 export default function TrackingScripts() {
   const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;

@@ -36,7 +36,7 @@ export default function ScrollProgress() {
         height: "100%", width: "0%",
         background: "linear-gradient(90deg, #00d4ff, #a855f7)",
         boxShadow: "0 0 8px rgba(0,212,255,0.7)",
-        transition: "width 0.06s ease-out",
+        transition: "width 0.04s linear",
       }} />
     </div>
   );

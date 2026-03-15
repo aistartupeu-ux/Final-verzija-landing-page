@@ -266,7 +266,6 @@ Nalaze se u Vercel → Settings → Environment Variables:
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Javni Supabase ključ |
 | `SUPABASE_SERVICE_ROLE_KEY` | Privatni Supabase ključ (ne deliti!) |
 | `RESEND_API_KEY` | Resend API ključ za emailove |
-| `OPENAI_API_KEY` | OpenAI ključ za chat asistenta |
 | `POYO_API_KEY` | PoYo AI ključ za generisanje medija |
 | `IPAPI_API_KEY` | ipapi.co ključ za geo |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Google Analytics 4 ID |
@@ -301,7 +300,7 @@ Nalaze se u Vercel → Settings → Environment Variables:
 1. Pokreni u Supabase SQL Editoru ako leads nema kolonu name:
    ALTER TABLE leads ADD COLUMN IF NOT EXISTS name text;
 2. Proveri da je NEXT_PUBLIC_META_PIXEL_ID postavljen u Vercel (za Lead tracking na Join).
-3. Integracije: Welcome email personalizovan, Join šalje name i Lead event, Chat/AI Studio prijateljske greške, Video showcase touch swipe na mobilnom.
+3. Integracije: Welcome email personalizovan, Join šalje name i Lead event, AI Studio prijateljske greške, Video showcase touch swipe na mobilnom.
 
 ---
 

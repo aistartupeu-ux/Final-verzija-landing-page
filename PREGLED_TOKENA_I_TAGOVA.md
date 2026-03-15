@@ -8,7 +8,6 @@
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ Koristi se | Javni ključ za klijentski Supabase (lib/supabase.ts) |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ Koristi se | Server-side — leads API, affiliate, conversion, ref/[code] |
 | `RESEND_API_KEY` | ✅ Opciono | Email obaveštenja nakon prijave na leads |
-| `OPENAI_API_KEY` | ✅ Obavezno | Chat asistent (app/api/chat) |
 | `POYO_API_KEY` | ✅ Obavezno | AI generisanje slika/videa/muzike |
 | `IPAPI_API_KEY` | ✅ **NOVO** | Geo lokacija (leads + UrgencyNotification). Pre: hardkodovan u kodu — sada iz env. **Dodaj u Vercel.** Besplatno: https://ipapi.co/signup/ (30k req/dan) |
 

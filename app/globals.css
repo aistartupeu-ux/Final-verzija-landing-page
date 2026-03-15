@@ -16,11 +16,22 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
-  scroll-behavior: smooth;
+  /* auto = manje lag-a pri brzom skrolu (smooth interpolacija opterećuje main thread) */
+  scroll-behavior: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
   max-width: 100%;
+}
+
+/* Desktop-only: uvek prikaži desktop nav, sakrij mobilni meni */
+body.desktop-only .hide-mobile { display: flex !important; }
+body.desktop-only .show-mobile { display: none !important; }
+
+/* Smanji repaint pri skrolu — sekcije van viewporta se ne crtaju detaljno */
+main section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
 }
 
 body {
@@ -162,9 +173,8 @@ body {
   pointer-events: none;
 }
 
-@media (min-width: 769px) {
-  .problem-solution-bg__image { background-attachment: fixed; }
-}
+/* Bez background-attachment:fixed — izbegava repaint na svaki scroll, manje lag-a */
+/* @media (min-width: 769px) { .problem-solution-bg__image { background-attachment: fixed; } } */
 
 /* VideoShowcase → Blog — jedinstvena plexus pozadina */
 .plexus-sections-bg {
@@ -191,9 +201,8 @@ body {
   pointer-events: none;
 }
 
-@media (min-width: 769px) {
-  .plexus-sections-bg__image { background-attachment: fixed; }
-}
+/* Bez fixed — manje lag-a pri skrolu */
+/* @media (min-width: 769px) { .plexus-sections-bg__image { background-attachment: fixed; } } */
 
 /* Animated gradient text */
 @keyframes gradientShift {
@@ -243,7 +252,6 @@ body {
 /* Shared keyframes — defined once here, used across components */
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes chatIn { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes dot { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
 @keyframes toastIn { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 @keyframes live-ping { 0% { transform: scale(1); opacity: 0.9; } 70% { transform: scale(2.2); opacity: 0; } 100% { transform: scale(2.2); opacity: 0; } }

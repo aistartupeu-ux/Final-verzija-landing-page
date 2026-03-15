@@ -1,10 +1,8 @@
 import dynamic from "next/dynamic";
 
 import NetworkBackground from "@/components/ui/NetworkBackground";
-import ChatBubble from "@/components/ui/ChatBubble";
 import ScrollProgress from "@/components/ui/ScrollProgress";
 import { SpotlightCursor } from "@/components/ui/spotlight-cursor";
-import MobileCTABar from "@/components/ui/MobileCTABar";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import HeroSection from "@/components/sections/HeroSection";
@@ -58,8 +56,7 @@ export default function Home() {
         <AffiliateSection />
       </main>
       <Footer />
-      <ChatBubble />
-      <MobileCTABar />
+      {/* Desktop-only: mobile CTA bar skriven */}
     </div>
   );
 }

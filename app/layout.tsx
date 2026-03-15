@@ -46,7 +46,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="sr">
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
+        <meta name="viewport" content="width=1280, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
         {supabaseOrigin && (
           <>
             <link rel="dns-prefetch" href={supabaseOrigin} />
@@ -56,7 +56,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link rel="preload" href="/icon.png" as="image" />
         <link rel="preload" href="/hero-vsl.mp4" as="video" type="video/mp4" />
       </head>
-      <body className={inter.variable} style={{ fontFamily: "var(--font-inter), Inter, system-ui, sans-serif", overflowX: "hidden", maxWidth: "100vw" }}>
+      <body className={`${inter.variable} desktop-only`} style={{ fontFamily: "var(--font-inter), Inter, system-ui, sans-serif", overflowX: "hidden", maxWidth: "100vw" }}>
         <TrackingScripts />
         <AffiliateTracker />
         <div style={{ overflowX: "hidden", maxWidth: "100vw" }}>

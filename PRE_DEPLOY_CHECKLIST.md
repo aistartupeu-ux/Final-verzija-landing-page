@@ -69,14 +69,13 @@
 
 - Bez ključa ipapi.co radi sa ograničenim brojem poziva
 
-### AI API (Poyo, OpenAI)
+### AI API (Poyo)
 
 | Varijabla | Gde | Opis |
 |-----------|-----|------|
 | `POYO_API_KEY` | /api/ai/generate, /api/ai/music, /api/ai/status | Poyo AI za slike/video/muziku |
-| `OPENAI_API_KEY` | /api/chat | OpenAI za chat |
 
-- Dashboard Studio zavisi od ovih ključeva.
+- Dashboard Studio zavisi od POYO_API_KEY.
 
 ---
 
@@ -92,7 +91,7 @@
 | Affiliate conversion | ✅ | POST /api/affiliate/conversion |
 | Affiliate login/register | ✅ | Zahteva Supabase |
 | Blog section | ✅ | Trile, Rok, Milivojka |
-| Dashboard Studio | ✅ | Zavisi od POYO/OPENAI ključeva |
+| Dashboard Studio | ✅ | Zavisi od POYO_API_KEY |
 
 ---
 
@@ -105,7 +104,7 @@
 2. **Opciono (za punu funkcionalnost):**
    - `RESEND_API_KEY` – dobrodošli email
    - `NEXT_PUBLIC_META_PIXEL_ID` – ako želiš drugi pixel
-   - `POYO_API_KEY`, `OPENAI_API_KEY` – za Studio
+   - `POYO_API_KEY` – za Studio
    - `IPAPI_API_KEY` – za bolji geo
 
 3. **Supabase migracija** – pokreni `SUPABASE_SCHEMA.txt` ako još nije.

@@ -27,10 +27,11 @@ export default function NetworkBackground() {
     let H = 0;
     let scrollY = 0;
 
-    const isMobile = window.innerWidth < 768;
+    /* Desktop-only verzija: tretiraj kao desktop za manje čvorova i manji lag pri skrolu */
+    const isMobile = false;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const DPR = isMobile ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
-    const NODE_COUNT = reduced ? 18 : isMobile ? 40 : 85;
+    const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+    const NODE_COUNT = reduced ? 18 : 58;
     const CONNECT = isMobile ? 130 : 160;
     const CONNECT_SQ = CONNECT * CONNECT;
     const MOUSE_R = 180;
@@ -76,11 +77,10 @@ export default function NetworkBackground() {
       mouse.current.y = e.clientY;
     };
 
-    const onScroll = () => { scrollY = window.scrollY; };
-
     const onResize = () => { resize(); create(); };
 
     const draw = () => {
+      scrollY = window.scrollY;
       ctx.clearRect(0, 0, W, H);
 
       const mx = mouse.current.x;
@@ -227,20 +227,19 @@ export default function NetworkBackground() {
 
     window.addEventListener("resize", onResize, { passive: true });
     window.addEventListener("mousemove", onMM, { passive: true });
-    window.addEventListener("scroll", onScroll, { passive: true });
+    /* scrollY se čita u draw() svaki frame — bez scroll listenera manje posla pri brzom skrolu */
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("mousemove", onMM);
-      window.removeEventListener("scroll", onScroll);
     };
   }, []);
 
   return (
     <canvas
       ref={canvasRef}
-      style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }}
+      style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0, willChange: "transform" }}
     />
   );
 }

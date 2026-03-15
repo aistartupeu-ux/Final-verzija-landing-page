@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, Loader2, Gift } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Gift, Check } from "lucide-react";
 import { initAffiliateTracking, trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
 import NetworkBackground from "@/components/ui/NetworkBackground";
 
@@ -18,6 +18,10 @@ function SpecialGateContent() {
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  // Redirect posle submita isključen za demo na localhostu. Da uključiš: REDIRECT_AFTER_SUBMIT = true
+  const REDIRECT_AFTER_SUBMIT = false;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,10 +48,14 @@ function SpecialGateContent() {
         throw new Error(err.error || "Greška pri prijavi");
       }
       trackAffiliateLeadOnSubmit({ email, phone: phone.trim() || null });
-      window.location.href = "/special/offer";
-      return;
+      if (REDIRECT_AFTER_SUBMIT) {
+        window.location.href = "/special/offer";
+        return;
+      }
+      setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Greška. Pokušaj ponovo.");
+    } finally {
       setLoading(false);
     }
   };
@@ -159,6 +167,47 @@ function SpecialGateContent() {
               </span>
             </div>
 
+            {submitted ? (
+              <>
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: "50%",
+                    background: "rgba(34,197,94,0.15)",
+                    border: "1px solid rgba(34,197,94,0.3)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 20px",
+                  }}
+                >
+                  <Check size={28} color="#22c55e" />
+                </div>
+                <h2
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 700,
+                    textAlign: "center",
+                    marginBottom: 8,
+                    color: "#fff",
+                  }}
+                >
+                  Uspešno!
+                </h2>
+                <p
+                  style={{
+                    fontSize: 14,
+                    color: "#888",
+                    textAlign: "center",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Hvala. Tvoji podaci su sačuvani.
+                </p>
+              </>
+            ) : (
+              <>
             <h1
               style={{
                 fontSize: 26,
@@ -255,6 +304,8 @@ function SpecialGateContent() {
                 )}
               </button>
             </form>
+              </>
+            )}
           </div>
         </div>
       </div>

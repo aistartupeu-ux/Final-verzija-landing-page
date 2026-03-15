@@ -31,9 +31,6 @@
 - Provera `res.ok` — prikazuje grešku ako API ne uspe
 - Meta Pixel Lead tracking nakon uspešnog submit-a
 
-### Chat API (`/api/chat`)
-- Prijateljska poruka ako `OPENAI_API_KEY` nije postavljen
-
 ### AI Studio API (`/api/ai/generate`)
 - Prijateljska poruka ako `POYO_API_KEY` nije postavljen
 
@@ -85,7 +82,6 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS name text;
 |------|---------|
 | `app/join/page.tsx` | API error handling, Meta Lead, šalje name |
 | `app/api/leads/route.ts` | Prima name, personalizovan email |
-| `app/api/chat/route.ts` | Check za OPENAI_API_KEY |
 | `app/api/ai/generate/route.ts` | Check za POYO_API_KEY |
 | `components/layout/TrackingScripts.tsx` | Meta Pixel samo iz env |
 | `components/sections/VideoShowcaseSection.tsx` | Touch swipe (mobil), full bleed (PC), lazy load, logo fallback, optimizacija |
@@ -103,6 +99,5 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS name text;
 - [ ] Pokrenuta Supabase migracija za `name` kolonu
 - [ ] `NEXT_PUBLIC_META_PIXEL_ID` postavljen u Vercel
 - [ ] `RESEND_API_KEY` postavljen (welcome email)
-- [ ] `OPENAI_API_KEY` postavljen (chat)
 - [ ] `POYO_API_KEY` postavljen (AI Studio)
 - [ ] `vercel --prod` za deploy

@@ -22,7 +22,7 @@ UPUTSTVO ZA DEPLOY / UPDATE LIVE SAJTA
    Opciono:
    - RESEND_API_KEY (welcome email)
    - NEXT_PUBLIC_META_PIXEL_ID (fallback: 2347723352398323)
-   - POYO_API_KEY, OPENAI_API_KEY (Studio, Chat)
+   - POYO_API_KEY (Studio)
 
 5. PROVERA NAKON DEPLOYA
    - Glavna stranica učitava

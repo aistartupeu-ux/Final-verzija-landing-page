@@ -266,7 +266,6 @@ Nalaze se u Vercel → Settings → Environment Variables:
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Javni Supabase ključ |
 | `SUPABASE_SERVICE_ROLE_KEY` | Privatni Supabase ključ (ne deliti!) |
 | `RESEND_API_KEY` | Resend API ključ za emailove |
-| `OPENAI_API_KEY` | OpenAI ključ za chat asistenta |
 | `POYO_API_KEY` | PoYo AI ključ za generisanje medija |
 | `IPAPI_API_KEY` | ipapi.co ključ za geo (leads + UrgencyNotification) |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Google Analytics 4 ID (G-XXXXXXXXXX) |
@@ -302,7 +301,6 @@ Nalaze se u Vercel → Settings → Environment Variables:
 - **Welcome email (Resend):** Personalizovan subject i pozdrav sa imenom
 - **Meta Pixel:** Učitava se samo kada je `NEXT_PUBLIC_META_PIXEL_ID` postavljen; na Join stranici šalje Lead event nakon uspešne prijave
 - **Join stranica:** Šalje `name` u API, proverava odgovor i prikazuje grešku ako prijava ne uspe
-- **Chat:** Prijateljska poruka ako `OPENAI_API_KEY` nije postavljen
 - **AI Studio:** Prijateljska poruka ako `POYO_API_KEY` nije postavljen
 - **Video showcase:** Touch swipe na mobilnim uređajima, responsivne kartice
 - **Platforme:** Viewport-fit za notch uređaje, safe-area padding za iOS

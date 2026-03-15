@@ -2,6 +2,37 @@
 
 Poseban Sheet za pregled leadova sa oznakom izvora (Meta/Facebook/Instagram, affiliate, direktan).
 
+---
+
+## Šta tačno označava — Leads by Source sheet i tag "affiliate"
+
+### Šta je "Leads by Source" sheet?
+
+**Leads by Source** (ili "Leads source" sheet) je **jedan** Google Sheet u koji idu **svi** leadovi sa sajta — bez obzira odakle su došli (direktno, sa Facebooka, sa affiliate linka, itd.). Svaki red = jedan lead (jedan submit forme).  
+
+**Namena:** Na jednom mestu vidiš sve leadove i u istoj tabeli vidiš **iz kog kanala** je ko došao — zato postoji kolona **source_tag** (oznaka izvora). Nije za samo affiliate; affiliate leadovi su samo jedan od tipova koji se tu beleže.
+
+**Razlika od Affiliate Sheet-a:**  
+- **Leads by Source** = svi leadovi (affiliate + Facebook + Instagram + direktni + …), sa oznakom izvora u koloni `source_tag`.  
+- **Affiliate Sheet** (AFFILIATE_SHEET_ID) = samo klikovi i leadovi koji su došli **preko affiliate linka**; ništa drugo se tamo ne upisuje.
+
+---
+
+### Šta znači tag "affiliate" (source_tag = affiliate)?
+
+**Tag "affiliate"** znači: **lead je došao preko affiliate linka**.
+
+Konkretno u kodu:
+- Kad neko otvori link sa **?ref=CODE** ili **/ref/CODE**, sajt mu postavi cookie **af_ref** (na 30 dana).
+- Kad ta ista osoba **submituje formu** (email, Join, Special), sajt proveri: da li postoji cookie **af_ref**?
+  - Ako **da** → u Leads by Source (i u webhook payload) stavi **source_tag = "affiliate"** i u kolonu **affiliate_code** upiše taj kod (npr. DAMIJAN123).
+  - Ako **ne** → source_tag bude npr. **"direct"** (ako nema ni UTM), ili **"facebook"** / **"instagram"** ako je došao sa UTM parametrima.
+
+**Rečenica:**  
+`source_tag = affiliate` = „Ovaj lead je submituovao formu **posle** što je ušao na sajt preko nekog affiliate linka“ (link sa ref kodom). U istom redu će u koloni **affiliate_code** stajati tačan kod (npr. NIKOLA777) da znaš koji je affiliate doveo tog leada.
+
+---
+
 ## Šta se šalje
 
 Kada neko submituje lead (homepage, Join, Special gate), API šalje webhook sa:

@@ -14,19 +14,19 @@ export const metadata: Metadata = {
 };
 
 /**
- * Special offer stranice (/special, /special/offer) su sačuvane ali NE aktivne.
- * Da ih uključiš: u Vercel → Environment Variables dodaj
- *   NEXT_PUBLIC_SPECIAL_OFFER_ENABLED = true
- * pa redeploy.
+ * Special offer stranice (/special, /special/offer):
+ * - Na localhostu (npm run dev) uvek vidljive.
+ * - Na produkciji vidljive samo ako je NEXT_PUBLIC_SPECIAL_OFFER_ENABLED = true u Vercel.
  */
-const SPECIAL_ENABLED = process.env.NEXT_PUBLIC_SPECIAL_OFFER_ENABLED === "true";
+const isDev = process.env.NODE_ENV === "development";
+const specialEnabled = process.env.NEXT_PUBLIC_SPECIAL_OFFER_ENABLED === "true";
 
 export default function SpecialLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  if (!SPECIAL_ENABLED) {
+  if (!isDev && !specialEnabled) {
     redirect("/");
   }
   return <div className={spaceGrotesk.variable}>{children}</div>;

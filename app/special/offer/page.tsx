@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { Sparkles, Zap, Gift, Check } from "lucide-react";
+import { ShineBorder } from "@/components/ui/shine-border";
 
 const COOKIE_NAME = "special_access";
 
@@ -50,21 +51,18 @@ const faqs = [
 ];
 
 export default async function SpecialOfferPage() {
+  const isDev = process.env.NODE_ENV === "development";
   const cookieStore = await cookies();
   const hasAccess = cookieStore.has(COOKIE_NAME);
 
-  if (!hasAccess) {
+  if (!isDev && !hasAccess) {
     redirect("/special");
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: COLORS.bg,
-        color: COLORS.text,
-      }}
-    >
+    <div className="problem-solution-bg" style={{ position: "relative", minHeight: "100vh" }}>
+      <div className="problem-solution-bg__image" aria-hidden />
+      <div style={{ position: "relative", zIndex: 1, minHeight: "100vh", color: COLORS.text }}>
       {/* Sekcija 1 — Hero / offer block */}
       <section
         style={{
@@ -82,22 +80,29 @@ export default async function SpecialOfferPage() {
           }}
         >
           <style>{`
+            @keyframes offerCtaPulse {
+              0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(163,255,18,0.25); }
+              50% { transform: scale(1.02); box-shadow: 0 0 24px 2px rgba(163,255,18,0.35); }
+            }
+            .special-cta {
+              animation: offerCtaPulse 2.8s ease-in-out infinite;
+            }
+            .special-cta:hover { background: #8FE000 !important; animation: none; }
             @media (max-width: 768px) {
-              .offer-card { width: 92% !important; max-width: none !important; }
+              .special-offer-card-wrap { max-width: 92% !important; width: 92% !important; }
             }
           `}</style>
-          <div
-            className="offer-card"
-            style={{
-              width: "100%",
-              maxWidth: 520,
-              margin: "0 auto",
-              background: COLORS.surface,
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: 20,
-              padding: "48px 40px",
-            }}
-          >
+          <div className="special-offer-card-wrap" style={{ width: "100%", maxWidth: "min(48vw, 560px)" }}>
+            <ShineBorder
+              borderWidth={2}
+              duration={4}
+              contentClassName="border border-[#262B36] text-sm antialiased text-white"
+              contentStyle={{
+                background: COLORS.surface,
+                border: `1px solid ${COLORS.border}`,
+                padding: "48px 40px",
+              }}
+            >
             {/* Badge */}
             <div
               style={{
@@ -210,9 +215,6 @@ export default async function SpecialOfferPage() {
             </ul>
 
             {/* CTA */}
-            <style>{`
-              .special-cta:hover { background: #8FE000 !important; }
-            `}</style>
             <a
               href="/join"
               className="special-cta"
@@ -247,6 +249,7 @@ export default async function SpecialOfferPage() {
             >
               Sigurna kupovina • Ograničen pre-sale pristup
             </p>
+            </ShineBorder>
           </div>
         </div>
       </section>
@@ -393,6 +396,7 @@ export default async function SpecialOfferPage() {
         >
           ← Nazad na sajt
         </Link>
+      </div>
       </div>
     </div>
   );

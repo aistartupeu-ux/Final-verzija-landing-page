@@ -58,7 +58,6 @@ git push origin main
 | `RESEND_API_KEY` | Ne | Welcome email |
 | `NEXT_PUBLIC_META_PIXEL_ID` | Ne | Fallback 2347723352398323 |
 | `POYO_API_KEY` | Ne | Dashboard Studio |
-| `OPENAI_API_KEY` | Ne | Chat API |
 
 3. Ako dodaješ nove varijable: **Save** → **Redeploy** da se primene.
 

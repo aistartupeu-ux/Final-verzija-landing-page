@@ -51,11 +51,10 @@ export default function Header() {
       style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
         width: "100%",
-        background: scrolled ? "rgba(5,5,8,0.92)" : "transparent",
-        backdropFilter: scrolled ? "blur(20px)" : "none",
-        WebkitBackdropFilter: scrolled ? "blur(20px)" : "none",
+        /* Čista pozadina umesto blur — blur opterećuje pri skrolu */
+        background: scrolled ? "rgba(5,5,8,0.98)" : "transparent",
         borderBottom: scrolled ? "1px solid rgba(0,212,255,0.08)" : "1px solid transparent",
-        transition: "all 0.35s ease",
+        transition: "background 0.2s ease, border-color 0.2s ease",
         transform: "translateZ(0)",
         willChange: "transform",
       }}
@@ -95,7 +94,7 @@ export default function Header() {
       </div>
 
       {open && (
-        <div className="show-mobile" style={{ background: "rgba(5,5,8,0.95)", backdropFilter: "blur(20px)", borderTop: "1px solid rgba(0,212,255,0.08)", padding: "20px 24px", flexDirection: "column" }}>
+        <div className="show-mobile" style={{ background: "rgba(5,5,8,0.98)", borderTop: "1px solid rgba(0,212,255,0.08)", padding: "20px 24px", flexDirection: "column" }}>
           <a href="#blog" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 15, color: "#8a8a9a", textDecoration: "none", padding: "10px 0" }}>O nama</a>
           <a href="#kako-funkcionise" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 15, color: "#8a8a9a", textDecoration: "none", padding: "10px 0" }}>Kako funkcioniše</a>
           <button onClick={jump} className="glow-btn" style={{ width: "100%", marginTop: 12, borderRadius: 10 }}>Join The Hype</button>

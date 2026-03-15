@@ -9,7 +9,7 @@ const START_DATE = new Date(2026, 2, 11, 0, 0, 0); // 11. mart 2026
 const START_VALUE = 533;
 
 // ── Progress bar: krece malo vise od pola (58%), puni se do zadnjeg sata/minuta/sekunde ──
-const COUNTDOWN_END = new Date(2026, 2, 31, 23, 59, 59); // isti kao Hero countdown
+const COUNTDOWN_END = new Date(2026, 3, 15, 0, 0, 0); // 15. april 00:00 — kurs se otvara, isti kao Hero
 const BAR_START_PCT = 58;
 
 function getBarProgress(): number {
