@@ -30,7 +30,12 @@ const useSpotlightEffect = (config: SpotlightConfig) => {
       canvas.height = window.innerHeight;
     };
 
+    let lastMove = 0;
+    const THROTTLE_MS = 80;
     const handleMouseMove = (event: MouseEvent) => {
+      const now = Date.now();
+      if (now - lastMove < THROTTLE_MS) return;
+      lastMove = now;
       mouseX = event.clientX;
       mouseY = event.clientY;
     };

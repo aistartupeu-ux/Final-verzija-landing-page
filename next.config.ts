@@ -27,7 +27,7 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/:path*.mp4",
-        headers: [{ key: "Cache-Control", value: "public, max-age=86400" }],
+        headers: [{ key: "Cache-Control", value: "public, max-age=604800, immutable" }],
       },
     ];
   },

@@ -54,7 +54,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </>
         )}
         <link rel="preload" href="/icon.png" as="image" />
-        <link rel="preload" href="/hero-vsl.mp4" as="video" type="video/mp4" />
+        {/* Hero video se učitava u HeroSection kad je u viewportu — ne konkurisati sa LCP */}
       </head>
       <body className={`${inter.variable} desktop-only`} style={{ fontFamily: "var(--font-inter), Inter, system-ui, sans-serif", overflowX: "hidden", maxWidth: "100vw" }}>
         <TrackingScripts />

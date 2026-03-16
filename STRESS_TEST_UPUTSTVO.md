@@ -63,6 +63,17 @@ ab -n 1000 -c 50 https://tvoj-domen.vercel.app/
 
 ---
 
-## 5. Napomena za produkciju
+## 5. Optimizacije na sajtu (da bolje izdrži load)
+
+- **Hero video** — učitava se tek kad je hero u viewportu (`preload="none"` + poster), bez preload u `<head>`.
+- **NetworkBackground** — manje čvorova (34 umesto 58) i kraća veza (140px) da smanji CPU pri skrolu.
+- **SpotlightCursor** — mousemove throttling (80 ms) da smanji opterećenje.
+- **VideoShowcaseSection** — manji rootMargin (80px) i duži delay (320 ms) pre učitavanja videa da se ne učitava previše odjednom.
+- **Cache** — MP4 fajlovi keširani 7 dana (`max-age=604800`).
+- **API** — rate limit na `/api/leads` i `/api/affiliate/track`; GHL/Sheet u pozadini (brz odgovor).
+
+---
+
+## 6. Napomena za produkciju
 
 Stress test na **live domen** stvara pravi saobraćaj. Koristi umeren broj VU (npr. 50–100) ili koristi Loader.io sa ograničenim testom da ne preopteretiš Vercel/Supabase.

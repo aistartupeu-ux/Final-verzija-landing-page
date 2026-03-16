@@ -32,13 +32,13 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
     const io = new IntersectionObserver(
       ([e]) => {
         if (e.isIntersecting) {
-          enterT = setTimeout(() => setInView(true), 180);
+          enterT = setTimeout(() => setInView(true), 320);
         } else {
           clearTimeout(enterT);
           setInView(false);
         }
       },
-      { rootMargin: "200px", threshold: 0 }
+      { rootMargin: "80px", threshold: 0 }
     );
     io.observe(card);
     return () => { clearTimeout(enterT); io.disconnect(); };

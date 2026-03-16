@@ -4,9 +4,9 @@ import { motion, useInView } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
 import { Eye, Users, Play, BookOpen, Award, Zap } from "lucide-react";
 
-// ── Waitlist: od 533, max 50 dnevno, kroz ceo dan po +1 do +3 ───────────────
+// ── Waitlist: startujemo od ~1200 ljudi, max ~50 dnevno, kroz ceo dan po +1 do +3 ──
 const START_DATE = new Date(2026, 2, 11, 0, 0, 0); // 11. mart 2026
-const START_VALUE = 533;
+const START_VALUE = 1200;
 
 // ── Progress bar: krece malo vise od pola (58%), puni se do zadnjeg sata/minuta/sekunde ──
 const COUNTDOWN_END = new Date(2026, 3, 15, 0, 0, 0); // 15. april 00:00 — kurs se otvara, isti kao Hero

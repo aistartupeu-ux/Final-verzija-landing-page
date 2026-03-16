@@ -43,12 +43,25 @@ export default function HeroSection() {
     const video = bgVideoRef.current;
     const section = sectionRef.current;
     if (!video || !section) return;
-    const io = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) video.play().catch(() => {});
-      else video.pause();
-    }, { threshold: 0.1, rootMargin: "50px" });
+    const onCanPlay = () => video.play().catch(() => {});
+    video.addEventListener("canplay", onCanPlay, { once: true });
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          video.preload = "auto";
+          video.load();
+          if (video.readyState >= 2) video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      },
+      { threshold: 0.05, rootMargin: "80px" }
+    );
     io.observe(section);
-    return () => io.disconnect();
+    return () => {
+      video.removeEventListener("canplay", onCanPlay);
+      io.disconnect();
+    };
   }, []);
 
   const togglePlay = () => {
@@ -75,7 +88,12 @@ export default function HeroSection() {
       <div style={{ position: "absolute", inset: 0, zIndex: 0, overflow: "hidden", contain: "layout style paint" }}>
         <video
           ref={bgVideoRef}
-          autoPlay muted loop playsInline preload="auto"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="none"
+          poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%2305080c' width='1' height='1'/%3E%3C/svg%3E"
           style={{
             position: "absolute",
             top: "50%", left: "50%",

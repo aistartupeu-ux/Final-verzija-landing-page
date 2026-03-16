@@ -31,8 +31,8 @@ export default function NetworkBackground() {
     const isMobile = false;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
-    const NODE_COUNT = reduced ? 18 : 58;
-    const CONNECT = isMobile ? 130 : 160;
+    const NODE_COUNT = reduced ? 14 : 34;
+    const CONNECT = isMobile ? 120 : 140;
     const CONNECT_SQ = CONNECT * CONNECT;
     const MOUSE_R = 180;
     const MOUSE_R_SQ = MOUSE_R * MOUSE_R;
