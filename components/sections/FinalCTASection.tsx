@@ -9,7 +9,7 @@ export default function FinalCTASection() {
   const inView = useInView(ref, { once: true, amount: 0.2 });
 
   return (
-    <section ref={ref} id="final-cta" style={{ position: "relative", zIndex: 10, padding: "140px 24px", textAlign: "center", overflow: "hidden" }}>
+    <section ref={ref} id="final-cta" style={{ position: "relative", zIndex: 10, padding: "140px 24px", textAlign: "center", overflow: "hidden", contentVisibility: "auto", containIntrinsicSize: "auto 500px" }}>
       {/* Dramatic background glow */}
       <div style={{
         position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",

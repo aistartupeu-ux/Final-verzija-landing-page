@@ -85,7 +85,7 @@ export default function FAQSection() {
   const inView = useInView(ref, { once: true, amount: 0.1 });
 
   return (
-    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "100px 24px" }}>
+    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "100px 24px", contentVisibility: "auto", containIntrinsicSize: "auto 550px" }}>
       <div className="section-container" style={{ maxWidth: 720 }}>
         <motion.div
           initial={{ opacity: 0, y: 24 }}

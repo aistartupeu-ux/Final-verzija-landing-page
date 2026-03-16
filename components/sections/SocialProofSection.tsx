@@ -122,7 +122,7 @@ export default function SocialProofSection() {
   const tickItems = [...ticks, ...ticks, ...ticks];
 
   return (
-    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "80px 0 100px", overflow: "hidden" }}>
+    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "80px 0 100px", overflow: "hidden", contentVisibility: "auto", containIntrinsicSize: "auto 600px" }}>
 
       {/* ── TICKER TAPE ──────────────────────────────────────────────────── */}
       <motion.div

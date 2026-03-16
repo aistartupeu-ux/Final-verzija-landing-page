@@ -176,10 +176,11 @@ body {
 /* Bez background-attachment:fixed — izbegava repaint na svaki scroll, manje lag-a */
 /* @media (min-width: 769px) { .problem-solution-bg__image { background-attachment: fixed; } } */
 
-/* VideoShowcase → Blog — jedinstvena plexus pozadina */
+/* VideoShowcase → Blog — jedinstvena plexus pozadina; contain smanjuje repaint pri skrolu */
 .plexus-sections-bg {
   position: relative;
   overflow: hidden;
+  contain: layout style paint;
 }
 
 .plexus-sections-bg__image {

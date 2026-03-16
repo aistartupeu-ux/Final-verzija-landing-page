@@ -17,7 +17,7 @@ export default function HowToEnterSection() {
   const inView = useInView(ref, { once: true, amount: 0.1 });
 
   return (
-    <section ref={ref} id="kako-funkcionise" style={{ position: "relative", zIndex: 10, padding: "120px 24px", textAlign: "center" }}>
+    <section ref={ref} id="kako-funkcionise" style={{ position: "relative", zIndex: 10, padding: "120px 24px", textAlign: "center", contentVisibility: "auto", containIntrinsicSize: "auto 650px" }}>
       <div className="section-container" style={{ maxWidth: 720 }}>
         <motion.div initial={{ opacity: 0, y: 25 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.7 }}>
           <div style={{

@@ -314,7 +314,7 @@ export default function BlogSection() {
   const inView = useInView(ref, { once: true, amount: 0.1 });
 
   return (
-    <section id="blog" ref={ref} style={{ position: "relative", zIndex: 10, padding: "80px 24px 100px" }}>
+    <section id="blog" ref={ref} style={{ position: "relative", zIndex: 10, padding: "80px 24px 100px", contentVisibility: "auto", containIntrinsicSize: "auto 700px" }}>
       <div className="section-container">
 
         <motion.div

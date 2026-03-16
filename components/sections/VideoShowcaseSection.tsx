@@ -74,19 +74,17 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
         position: "relative",
         contain: "layout paint",
         isolation: "isolate",
-        transition: "transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease",
+        transition: "transform 0.25s ease, border-color 0.25s ease",
         cursor: "default",
         background: "transparent",
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.transform = "scale(1.03) translateZ(0)";
+        e.currentTarget.style.transform = "scale(1.02) translateZ(0)";
         e.currentTarget.style.borderColor = "rgba(0,212,255,0.35)";
-        e.currentTarget.style.boxShadow = "0 0 30px rgba(0,212,255,0.12)";
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = "scale(1) translateZ(0)";
         e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
-        e.currentTarget.style.boxShadow = "none";
       }}
     >
       {!shouldLoadVideo || !loaded ? <LogoFallback /> : null}
@@ -186,10 +184,11 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
           display: flex; width: max-content;
           backface-visibility: hidden;
           transform: translate3d(0,0,0);
-          will-change: transform;
         }
-        .vs-track-l { animation: vsrow-l 44s linear infinite; }
-        .vs-track-r { animation: vsrow-r 40s linear infinite; }
+        .video-showcase-section.video-showcase-inview .vs-track-l,
+        .video-showcase-section.video-showcase-inview .vs-track-r { will-change: transform; }
+        .vs-track-l { animation: vsrow-l 48s linear infinite; }
+        .vs-track-r { animation: vsrow-r 44s linear infinite; }
         .vs-track-l:hover, .vs-track-l.paused, .vs-track-r:hover, .vs-track-r.paused { animation-play-state: paused; }
         @media (prefers-reduced-motion: reduce) { .vs-track-l, .vs-track-r { animation: none; } }
       `}</style>
@@ -220,7 +219,14 @@ export default function VideoShowcaseSection() {
   const t = { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const };
 
   return (
-    <section ref={ref} className="video-showcase-section" style={{ position: "relative", zIndex: 10, padding: "100px 0", overflow: "hidden", contain: "layout style paint" }}>
+    <section
+      ref={ref}
+      className={`video-showcase-section${inView ? " video-showcase-inview" : ""}`}
+      style={{
+        position: "relative", zIndex: 10, padding: "100px 0", overflow: "hidden", contain: "layout style paint",
+        contentVisibility: "auto", containIntrinsicSize: "auto 1100px",
+      }}
+    >
       {/* Ambient glow */}
       <div style={{
         position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",

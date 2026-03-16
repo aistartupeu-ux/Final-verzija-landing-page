@@ -20,7 +20,7 @@ export default function ForWhoSection() {
   const inView = useInView(ref, { once: true, amount: 0.1 });
 
   return (
-    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "100px 24px", textAlign: "center" }}>
+    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "100px 24px", textAlign: "center", contentVisibility: "auto", containIntrinsicSize: "auto 700px" }}>
       <div className="section-container" style={{ maxWidth: 1000 }}>
         <motion.div initial={{ opacity: 0, y: 25 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.7 }}>
           <div style={{
