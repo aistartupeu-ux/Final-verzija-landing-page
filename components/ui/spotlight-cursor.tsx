@@ -22,8 +22,11 @@ const useSpotlightEffect = (config: SpotlightConfig) => {
     if (!ctx) return;
 
     let animationFrameId: number;
-    let mouseX = -1000;
-    let mouseY = -1000;
+    // Target pozicija (update na mousemove) + current pozicija (lerp svaki frame)
+    let targetX = -1000;
+    let targetY = -1000;
+    let curX = -1000;
+    let curY = -1000;
 
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
@@ -31,18 +34,18 @@ const useSpotlightEffect = (config: SpotlightConfig) => {
     };
 
     let lastMove = 0;
-    const THROTTLE_MS = 80;
+    const THROTTLE_MS = 50;
     const handleMouseMove = (event: MouseEvent) => {
       const now = Date.now();
       if (now - lastMove < THROTTLE_MS) return;
       lastMove = now;
-      mouseX = event.clientX;
-      mouseY = event.clientY;
+      targetX = event.clientX;
+      targetY = event.clientY;
     };
 
     const handleMouseLeave = () => {
-      mouseX = -1000;
-      mouseY = -1000;
+      targetX = -1000;
+      targetY = -1000;
     };
 
     const hexToRgb = (hex: string) => {
@@ -56,10 +59,17 @@ const useSpotlightEffect = (config: SpotlightConfig) => {
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      if (mouseX !== -1000 && mouseY !== -1000) {
+      // Smoothing: približi current poziciju targetu svaki frame.
+      // Veći smoothing => brže prati (manje "lag"), manji => mekše.
+      const smoothing = Math.max(0.04, Math.min(0.25, config.smoothing ?? 0.12));
+      curX += (targetX - curX) * smoothing;
+      curY += (targetY - curY) * smoothing;
+
+      // Ako je "van ekrana" (mouseleave), nemoj crtati.
+      if (targetX !== -1000 && targetY !== -1000) {
         const gradient = ctx.createRadialGradient(
-          mouseX, mouseY, 0,
-          mouseX, mouseY, config.radius ?? 200
+          curX, curY, 0,
+          curX, curY, config.radius ?? 200
         );
         const rgbColor = hexToRgb(config.color ?? '#ffffff');
         gradient.addColorStop(0, `rgba(${rgbColor}, ${config.brightness ?? 0.15})`);
