@@ -31,9 +31,11 @@ function getDaysSinceStart(d: Date): number {
   return Math.floor((day - start) / 86400000);
 }
 
-/** Dnevni limit: max 50 ljudi (deterministički po danu) */
+/** Dnevni limit: max 40 ljudi (deterministički po danu) */
 function getDailyLimit(dayIndex: number): number {
-  return 35 + ((dayIndex * 7919 + 31) % 16);
+  const base = 25;      // minimalno 25
+  const spread = 16;    // 25–40 ljudi dnevno
+  return base + ((dayIndex * 7919 + 31) % spread);
 }
 
 /** Ease-in-out za glatak rast kroz dan */
@@ -57,7 +59,20 @@ function getWaitlistCount(): number {
   const progress = easeInOut((now.getTime() - midnight) / 86400000);
   const todayAdded = Math.floor(progress * todayLimit);
 
-  return baseAtMidnight + todayAdded;
+  const computed = baseAtMidnight + todayAdded;
+
+  // Ne dozvoljavamo da broj ide unazad u ovom browseru:
+  // upoređujemo sa lokalno sačuvanim maksimumom i uvek vraćamo veću vrednost.
+  try {
+    const key = "aha_waitlist_max_v1";
+    const storedRaw = window.localStorage.getItem(key);
+    const stored = storedRaw ? parseInt(storedRaw, 10) : NaN;
+    const safe = Number.isFinite(stored) ? Math.max(computed, stored) : computed;
+    window.localStorage.setItem(key, String(safe));
+    return safe;
+  } catch {
+    return computed;
+  }
 }
 
 // ── Ticker data ───────────────────────────────────────────────────────────────
