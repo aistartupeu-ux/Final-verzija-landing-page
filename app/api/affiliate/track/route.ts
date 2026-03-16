@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { appendAffiliateClickToSheet, appendAffiliateLeadToSheet, isAffiliateSheetConfigured } from "@/lib/affiliate-sheet";
 
+// Jednostavan rate limit za affiliate track endpoint.
+const AFF_RATE_LIMIT_WINDOW_MS = 60_000;
+const AFF_RATE_LIMIT_MAX_REQUESTS = 60;
+
+type AffRateEntry = { count: number; resetAt: number };
+const affRateMap = new Map<string, AffRateEntry>();
+
+function isAffiliateRateLimited(ip: string | null): boolean {
+  if (!ip) return false;
+  const now = Date.now();
+  const current = affRateMap.get(ip);
+  if (!current || current.resetAt < now) {
+    affRateMap.set(ip, { count: 1, resetAt: now + AFF_RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  current.count += 1;
+  if (current.count > AFF_RATE_LIMIT_MAX_REQUESTS) return true;
+  return false;
+}
+
 const MAKE_WEBHOOK = process.env.MAKE_WEBHOOK_URL;
 const supabase =
   process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -35,6 +55,12 @@ export async function POST(req: NextRequest) {
 
     const now = new Date().toISOString();
 
+    const forwarded = req.headers.get("x-forwarded-for");
+    const ip = forwarded ? forwarded.split(",")[0].trim() : req.headers.get("x-real-ip") ?? null;
+    if (isAffiliateRateLimited(ip)) {
+      return NextResponse.json({ ok: false, error: "Too many requests" }, { status: 429 });
+    }
+
     if (event_type === "click") {
       if (!visitor_id) return NextResponse.json({ ok: false }, { status: 400 });
       const clickedAt = created_at ?? now;
@@ -48,27 +74,7 @@ export async function POST(req: NextRequest) {
         clicked_at: clickedAt,
       };
 
-      let makeOk = true;
-      if (MAKE_WEBHOOK) {
-        const r = await fetch(MAKE_WEBHOOK, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        makeOk = r.ok;
-      }
-
-      if (useSheet) {
-        await appendAffiliateClickToSheet({
-          clicked_at: clickedAt,
-          affiliate_code: acode,
-          visitor_id,
-          page_url: page_url ?? null,
-          utm_source: utm_source ?? null,
-          utm_campaign: utm_campaign ?? null,
-        });
-      }
-
+      // Glavni deo: zapiši click u Supabase (za dashboard).
       if (supabase) {
         const { data: affiliate } = await supabase
           .from("affiliates")
@@ -77,8 +83,6 @@ export async function POST(req: NextRequest) {
           .eq("status", "active")
           .single();
         if (affiliate?.id) {
-          const forwarded = req.headers.get("x-forwarded-for");
-          const ip = forwarded ? forwarded.split(",")[0].trim() : req.headers.get("x-real-ip") ?? null;
           await supabase.from("affiliate_clicks").insert({
             affiliate_id: affiliate.id,
             ip_address: ip,
@@ -88,7 +92,33 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      return NextResponse.json({ ok: makeOk });
+      // Sporedne integracije (Make + Sheet) šaljemo u pozadini da ne blokiraju korisnika.
+      (async () => {
+        try {
+          if (MAKE_WEBHOOK) {
+            await fetch(MAKE_WEBHOOK, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+          }
+
+          if (useSheet) {
+            await appendAffiliateClickToSheet({
+              clicked_at: clickedAt,
+              affiliate_code: acode,
+              visitor_id,
+              page_url: page_url ?? null,
+              utm_source: utm_source ?? null,
+              utm_campaign: utm_campaign ?? null,
+            });
+          }
+        } catch (err) {
+          console.error("Affiliate click side-effect error:", err);
+        }
+      })();
+
+      return NextResponse.json({ ok: true });
     }
 
     if (event_type === "lead") {
@@ -107,31 +137,36 @@ export async function POST(req: NextRequest) {
         created_at: leadCreatedAt,
       };
 
-      let makeOk = true;
-      if (MAKE_WEBHOOK) {
-        const r = await fetch(MAKE_WEBHOOK, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        makeOk = r.ok;
-      }
+      // Make + Sheet šaljemo u pozadini — lead endpoint odgovara odmah.
+      (async () => {
+        try {
+          if (MAKE_WEBHOOK) {
+            await fetch(MAKE_WEBHOOK, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+          }
 
-      if (useSheet) {
-        await appendAffiliateLeadToSheet({
-          created_at: leadCreatedAt,
-          email: leadEmail,
-          phone: phone ?? null,
-          affiliate_code: acode,
-          visitor_id: visitor_id ?? null,
-          page_url: page_url ?? null,
-          utm_source: utm_source ?? null,
-          utm_campaign: utm_campaign ?? null,
-          status: "new",
-        });
-      }
+          if (useSheet) {
+            await appendAffiliateLeadToSheet({
+              created_at: leadCreatedAt,
+              email: leadEmail,
+              phone: phone ?? null,
+              affiliate_code: acode,
+              visitor_id: visitor_id ?? null,
+              page_url: page_url ?? null,
+              utm_source: utm_source ?? null,
+              utm_campaign: utm_campaign ?? null,
+              status: "new",
+            });
+          }
+        } catch (err) {
+          console.error("Affiliate lead side-effect error:", err);
+        }
+      })();
 
-      return NextResponse.json({ ok: makeOk });
+      return NextResponse.json({ ok: true });
     }
 
     return NextResponse.json({ ok: false }, { status: 400 });
