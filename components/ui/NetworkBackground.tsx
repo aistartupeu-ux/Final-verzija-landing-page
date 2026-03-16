@@ -31,8 +31,8 @@ export default function NetworkBackground() {
     const isMobile = false;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
-    const NODE_COUNT = reduced ? 14 : 34;
-    const CONNECT = isMobile ? 120 : 140;
+    const NODE_COUNT = reduced ? 12 : 24;
+    const CONNECT = isMobile ? 120 : 145;
     const CONNECT_SQ = CONNECT * CONNECT;
     const MOUSE_R = 180;
     const MOUSE_R_SQ = MOUSE_R * MOUSE_R;
@@ -80,6 +80,11 @@ export default function NetworkBackground() {
     const onResize = () => { resize(); create(); };
 
     const draw = () => {
+      if (typeof document !== "undefined" && document.hidden) {
+        raf = 0;
+        return;
+      }
+
       scrollY = window.scrollY;
       ctx.clearRect(0, 0, W, H);
 
@@ -223,14 +228,19 @@ export default function NetworkBackground() {
     resize();
     create();
     scrollY = window.scrollY;
-    draw();
+
+    const onVisibility = () => {
+      if (!document.hidden && raf === 0) raf = requestAnimationFrame(draw);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    raf = requestAnimationFrame(draw);
 
     window.addEventListener("resize", onResize, { passive: true });
     window.addEventListener("mousemove", onMM, { passive: true });
-    /* scrollY se čita u draw() svaki frame — bez scroll listenera manje posla pri brzom skrolu */
 
     return () => {
       cancelAnimationFrame(raf);
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("mousemove", onMM);
     };

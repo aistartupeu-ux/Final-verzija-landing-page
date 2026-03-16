@@ -8,9 +8,19 @@ const AFF_RATE_LIMIT_MAX_REQUESTS = 60;
 
 type AffRateEntry = { count: number; resetAt: number };
 const affRateMap = new Map<string, AffRateEntry>();
+const AFF_RATE_MAP_MAX_SIZE = 3000;
+
+function cleanupAffExpired(): void {
+  if (affRateMap.size < AFF_RATE_MAP_MAX_SIZE) return;
+  const now = Date.now();
+  for (const [key, entry] of affRateMap.entries()) {
+    if (entry.resetAt < now) affRateMap.delete(key);
+  }
+}
 
 function isAffiliateRateLimited(ip: string | null): boolean {
   if (!ip) return false;
+  cleanupAffExpired();
   const now = Date.now();
   const current = affRateMap.get(ip);
   if (!current || current.resetAt < now) {

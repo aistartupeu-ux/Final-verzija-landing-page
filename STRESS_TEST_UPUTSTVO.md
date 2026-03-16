@@ -66,11 +66,12 @@ ab -n 1000 -c 50 https://tvoj-domen.vercel.app/
 ## 5. Optimizacije na sajtu (da bolje izdrži load)
 
 - **Hero video** — učitava se tek kad je hero u viewportu (`preload="none"` + poster), bez preload u `<head>`.
-- **NetworkBackground** — manje čvorova (34 umesto 58) i kraća veza (140px) da smanji CPU pri skrolu.
-- **SpotlightCursor** — mousemove throttling (80 ms) da smanji opterećenje.
-- **VideoShowcaseSection** — manji rootMargin (80px) i duži delay (320 ms) pre učitavanja videa da se ne učitava previše odjednom.
-- **Cache** — MP4 fajlovi keširani 7 dana (`max-age=604800`).
-- **API** — rate limit na `/api/leads` i `/api/affiliate/track`; GHL/Sheet u pozadini (brz odgovor).
+- **NetworkBackground** — 24 čvora (12 ako je prefers-reduced-motion), veza 145px; animacija se pauzira kad je tab u pozadini (`document.hidden`).
+- **SpotlightCursor** — crta se samo dok je miš aktivan; petlja se zaustavlja kad je kursor miran ~150 ms ili na mouseleave; pravilno uklanjanje listenera (bez curenja memorije).
+- **VideoShowcaseSection** — manji rootMargin i delay pre učitavanja videa; `prefers-reduced-motion` isključuje auto-animaciju.
+- **ScrollProgress** — traka preko `transform: scaleX()` (bez layout thrashing).
+- **Cache** — MP4 7 dana (`max-age=604800`), webp/avatari 1 godina; slike preko Next Image sa AVIF/WebP i dugim cache TTL.
+- **API** — rate limit na `/api/leads` (20/min) i `/api/affiliate/track` (60/min); rate mape se čiste od isteklih unosa kad pređu prag (ograničena memorija na serveru). Sheet upisi se **await**-uju da se završe pre odgovora (Vercel ne gasi funkciju pre vremena).
 
 ---
 

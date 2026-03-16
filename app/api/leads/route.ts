@@ -10,9 +10,19 @@ const RATE_LIMIT_MAX_REQUESTS = 20; // po IP u okviru prozora
 
 type RateEntry = { count: number; resetAt: number };
 const rateMap = new Map<string, RateEntry>();
+const RATE_MAP_MAX_SIZE = 2000; // očisti istekle da mapa ne raste u beskonačnost
+
+function cleanupExpiredRateEntries(): void {
+  if (rateMap.size < RATE_MAP_MAX_SIZE) return;
+  const now = Date.now();
+  for (const [key, entry] of rateMap.entries()) {
+    if (entry.resetAt < now) rateMap.delete(key);
+  }
+}
 
 function isRateLimited(ip: string | null): boolean {
   if (!ip) return false;
+  cleanupExpiredRateEntries();
   const now = Date.now();
   const current = rateMap.get(ip);
   if (!current || current.resetAt < now) {

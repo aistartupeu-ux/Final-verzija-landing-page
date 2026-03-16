@@ -15,7 +15,8 @@ export default function ScrollProgress() {
         const el = document.documentElement;
         const scrolled = el.scrollTop || document.body.scrollTop;
         const total = el.scrollHeight - el.clientHeight;
-        bar.style.width = total > 0 ? `${(scrolled / total) * 100}%` : "0%";
+        const pct = total > 0 ? scrolled / total : 0;
+        bar.style.transform = `scaleX(${pct})`;
         raf = 0;
       });
     };
@@ -33,10 +34,12 @@ export default function ScrollProgress() {
       height: 2, background: "transparent", pointerEvents: "none",
     }}>
       <div ref={barRef} style={{
-        height: "100%", width: "0%",
+        height: "100%", width: "100%",
+        transformOrigin: "left",
+        transform: "scaleX(0)",
         background: "linear-gradient(90deg, #00d4ff, #a855f7)",
         boxShadow: "0 0 8px rgba(0,212,255,0.7)",
-        transition: "width 0.04s linear",
+        willChange: "transform",
       }} />
     </div>
   );

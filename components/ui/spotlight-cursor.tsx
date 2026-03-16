@@ -56,41 +56,58 @@ const useSpotlightEffect = (config: SpotlightConfig) => {
       return `${r},${g},${b}`;
     };
 
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let lastMouseTime = 0;
+    const IDLE_STOP_MS = 150; // kad se cur približi targetu i nema pomeranja, zaustavi petlju
 
-      // Smoothing: približi current poziciju targetu svaki frame.
-      // Veći smoothing => brže prati (manje "lag"), manji => mekše.
+    const draw = () => {
       const smoothing = Math.max(0.04, Math.min(0.25, config.smoothing ?? 0.12));
       curX += (targetX - curX) * smoothing;
       curY += (targetY - curY) * smoothing;
 
-      // Ako je "van ekrana" (mouseleave), nemoj crtati.
-      if (targetX !== -1000 && targetY !== -1000) {
-        const gradient = ctx.createRadialGradient(
-          curX, curY, 0,
-          curX, curY, config.radius ?? 200
-        );
-        const rgbColor = hexToRgb(config.color ?? '#ffffff');
-        gradient.addColorStop(0, `rgba(${rgbColor}, ${config.brightness ?? 0.15})`);
-        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      const nearTarget = Math.abs(curX - targetX) < 2 && Math.abs(curY - targetY) < 2;
+      const idle = nearTarget && (Date.now() - lastMouseTime > IDLE_STOP_MS);
 
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (targetX === -1000 && targetY === -1000) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        animationFrameId = 0;
+        return;
       }
 
-      animationFrameId = requestAnimationFrame(draw);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const gradient = ctx.createRadialGradient(
+        curX, curY, 0,
+        curX, curY, config.radius ?? 200
+      );
+      const rgbColor = hexToRgb(config.color ?? '#ffffff');
+      gradient.addColorStop(0, `rgba(${rgbColor}, ${config.brightness ?? 0.15})`);
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (idle) animationFrameId = 0;
+      else animationFrameId = requestAnimationFrame(draw);
+    };
+
+    const scheduleDraw = () => {
+      lastMouseTime = Date.now();
+      if (animationFrameId === 0) animationFrameId = requestAnimationFrame(draw);
+    };
+
+    const handleMousemove = (e: MouseEvent) => {
+      handleMouseMove(e);
+      scheduleDraw();
     };
 
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMousemove);
     window.addEventListener('mouseleave', handleMouseLeave);
-    animationFrameId = requestAnimationFrame(draw);
+    animationFrameId = 0;
+    scheduleDraw();
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
-      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousemove', handleMousemove);
       window.removeEventListener('mouseleave', handleMouseLeave);
       cancelAnimationFrame(animationFrameId);
     };
