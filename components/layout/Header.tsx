@@ -94,10 +94,10 @@ export default function Header() {
       </div>
 
       {open && (
-        <div className="show-mobile" style={{ background: "rgba(5,5,8,0.98)", borderTop: "1px solid rgba(0,212,255,0.08)", padding: "20px 24px", flexDirection: "column" }}>
-          <a href="#blog" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 15, color: "#8a8a9a", textDecoration: "none", padding: "10px 0" }}>O nama</a>
-          <a href="#kako-funkcionise" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 15, color: "#8a8a9a", textDecoration: "none", padding: "10px 0" }}>Kako funkcioniše</a>
-          <button onClick={jump} className="glow-btn" style={{ width: "100%", marginTop: 12, borderRadius: 10 }}>Join The Hype</button>
+        <div className="show-mobile" style={{ background: "rgba(5,5,8,0.98)", borderTop: "1px solid rgba(0,212,255,0.08)", padding: "20px 24px", flexDirection: "column", fontFamily: "inherit" }}>
+          <a href="#blog" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 14, color: "#8a8a9a", textDecoration: "none", padding: "10px 0", fontFamily: "inherit" }}>O nama</a>
+          <a href="#kako-funkcionise" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 14, color: "#8a8a9a", textDecoration: "none", padding: "10px 0", fontFamily: "inherit" }}>Kako funkcioniše</a>
+          <button onClick={jump} className="glow-btn" style={{ width: "100%", marginTop: 12, borderRadius: 10, fontFamily: "inherit" }}>Join The Hype</button>
         </div>
       )}
 
