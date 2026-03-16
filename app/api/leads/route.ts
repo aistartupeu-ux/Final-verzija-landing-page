@@ -166,14 +166,12 @@ export async function POST(req: NextRequest) {
       utm_campaign: utm_campaign ?? "",
       affiliate_code: affiliateCode ?? "",
     };
-    // Sheet upis ne blokira odgovor — ako zakaže, lead je već u bazi.
-    (async () => {
-      try {
-        await appendLeadsToSheet(row);
-      } catch (e) {
-        console.error("Leads Sheet append error:", e);
-      }
-    })();
+    // Na Vercel-u moramo await — inače funkcija se ugasi pre nego Sheet upis stigne.
+    try {
+      await appendLeadsToSheet(row);
+    } catch (e) {
+      console.error("Leads Sheet append error:", e);
+    }
 
     // HighLevel: pošalji lead u jedan workflow (welcome + affiliate logika)
     const ghlWebhook = process.env.GHL_WEBHOOK_URL;

@@ -92,31 +92,35 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Sporedne integracije (Make + Sheet) šaljemo u pozadini da ne blokiraju korisnika.
-      (async () => {
-        try {
-          if (MAKE_WEBHOOK) {
+      // Make u pozadini; Sheet MORA await — inače na Vercel-u se funkcija ugasi pre nego što upis stigne.
+      if (MAKE_WEBHOOK) {
+        (async () => {
+          try {
             await fetch(MAKE_WEBHOOK, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
             });
+          } catch (err) {
+            console.error("Affiliate click Make error:", err);
           }
+        })();
+      }
 
-          if (useSheet) {
-            await appendAffiliateClickToSheet({
-              clicked_at: clickedAt,
-              affiliate_code: acode,
-              visitor_id,
-              page_url: page_url ?? null,
-              utm_source: utm_source ?? null,
-              utm_campaign: utm_campaign ?? null,
-            });
-          }
+      if (useSheet) {
+        try {
+          await appendAffiliateClickToSheet({
+            clicked_at: clickedAt,
+            affiliate_code: acode,
+            visitor_id,
+            page_url: page_url ?? null,
+            utm_source: utm_source ?? null,
+            utm_campaign: utm_campaign ?? null,
+          });
         } catch (err) {
-          console.error("Affiliate click side-effect error:", err);
+          console.error("Affiliate click Sheet error:", err);
         }
-      })();
+      }
 
       return NextResponse.json({ ok: true });
     }
@@ -137,34 +141,37 @@ export async function POST(req: NextRequest) {
         created_at: leadCreatedAt,
       };
 
-      // Make + Sheet šaljemo u pozadini — lead endpoint odgovara odmah.
-      (async () => {
-        try {
-          if (MAKE_WEBHOOK) {
+      if (MAKE_WEBHOOK) {
+        (async () => {
+          try {
             await fetch(MAKE_WEBHOOK, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
             });
+          } catch (err) {
+            console.error("Affiliate lead Make error:", err);
           }
+        })();
+      }
 
-          if (useSheet) {
-            await appendAffiliateLeadToSheet({
-              created_at: leadCreatedAt,
-              email: leadEmail,
-              phone: phone ?? null,
-              affiliate_code: acode,
-              visitor_id: visitor_id ?? null,
-              page_url: page_url ?? null,
-              utm_source: utm_source ?? null,
-              utm_campaign: utm_campaign ?? null,
-              status: "new",
-            });
-          }
+      if (useSheet) {
+        try {
+          await appendAffiliateLeadToSheet({
+            created_at: leadCreatedAt,
+            email: leadEmail,
+            phone: phone ?? null,
+            affiliate_code: acode,
+            visitor_id: visitor_id ?? null,
+            page_url: page_url ?? null,
+            utm_source: utm_source ?? null,
+            utm_campaign: utm_campaign ?? null,
+            status: "new",
+          });
         } catch (err) {
-          console.error("Affiliate lead side-effect error:", err);
+          console.error("Affiliate lead Sheet error:", err);
         }
-      })();
+      }
 
       return NextResponse.json({ ok: true });
     }
