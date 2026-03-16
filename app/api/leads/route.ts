@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
     };
     await appendLeadsToSheet(row);
 
-    // HighLevel: pošalji lead u webhook (trigger za kontakt + welcome email)
+    // HighLevel: pošalji lead u jedan workflow (welcome + affiliate logika)
     const ghlWebhook = process.env.GHL_WEBHOOK_URL;
     if (ghlWebhook) {
       try {

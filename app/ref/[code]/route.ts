@@ -11,12 +11,14 @@ export async function GET(
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  const upperCode = code.toUpperCase();
+  // Kod čuvamo canonical kao lowercase (npr. "damijan01"),
+  // da bi se uvek poklapao sa kodovima u Sheet-u i GHL-u.
   const redirectUrl = new URL("/", req.url);
-  redirectUrl.searchParams.set("ref", upperCode);
+  const normalizedCode = code.trim().toLowerCase();
+  redirectUrl.searchParams.set("ref", normalizedCode);
 
   const response = NextResponse.redirect(redirectUrl);
-  response.cookies.set("af_ref", upperCode, {
+  response.cookies.set("af_ref", normalizedCode, {
     maxAge: 60 * 60 * 24 * 30,
     path: "/",
     sameSite: "lax",

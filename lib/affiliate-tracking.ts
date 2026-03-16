@@ -30,7 +30,9 @@ export function initAffiliateTracking(): void {
   if (typeof window === "undefined") return;
   if (!getCookie("af_vid")) setCookie("af_vid", randomId(), 30);
   const ref = getParam("ref") || getParam("utm_campaign");
-  if (ref) setCookie("af_ref", ref.toUpperCase().trim(), 30);
+  // Čuvamo affiliate kod tačno onako kako je u linku (bez forsiranja UPPERCASE),
+  // da se poklapa sa kodovima koje definišeš u Sheet-u i u GHL-u.
+  if (ref) setCookie("af_ref", ref.trim().toLowerCase(), 30);
   const utmSource = getParam("utm_source");
   const utmMedium = getParam("utm_medium");
   const utmCampaign = getParam("utm_campaign");

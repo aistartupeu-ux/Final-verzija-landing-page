@@ -48,6 +48,20 @@ export type AffiliateLeadRow = {
   status: string;
 };
 
+export type AffiliateConversionRow = {
+  created_at: string;
+  email: string;
+  phone: string | null;
+  affiliate_code: string;
+  order_amount: number;
+  currency: string;
+  order_id: string | null;
+  conversion_type: string;
+  commission_rate: number | null;
+  commission_amount: number | null;
+  status: string;
+};
+
 export async function appendAffiliateClickToSheet(row: AffiliateClickRow): Promise<boolean> {
   const sheetId = process.env.AFFILIATE_SHEET_ID;
   if (!sheetId) {
@@ -147,6 +161,61 @@ export async function appendAffiliateLeadToSheet(row: AffiliateLeadRow): Promise
   } catch (e) {
     const err = e as { message?: string };
     console.error("Affiliate Sheet Leads error:", err?.message || e);
+    return false;
+  }
+}
+
+export async function appendAffiliateConversionToSheet(row: AffiliateConversionRow): Promise<boolean> {
+  const sheetId = process.env.AFFILIATE_SHEET_ID;
+  if (!sheetId) {
+    console.error("Affiliate Sheet: AFFILIATE_SHEET_ID nije postavljen");
+    return false;
+  }
+  const auth = getAuth();
+  if (!auth) {
+    console.error("Affiliate Sheet: GOOGLE_SERVICE_ACCOUNT_JSON nije ispravan");
+    return false;
+  }
+
+  const sheetName = process.env.AFFILIATE_SHEET_CONVERSIONS_NAME || "Conversions";
+  const values = [[
+    row.created_at,
+    row.email,
+    row.phone ?? "",
+    row.affiliate_code,
+    row.order_amount,
+    row.currency,
+    row.order_id ?? "",
+    row.conversion_type,
+    row.commission_rate ?? "",
+    row.commission_amount ?? "",
+    row.status,
+  ]];
+
+  try {
+    const sheets = google.sheets({ version: "v4", auth });
+    const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+    const hasSheet = meta.data.sheets?.some((s) => s.properties?.title === sheetName);
+    if (!hasSheet) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: sheetId,
+        requestBody: {
+          requests: [{ addSheet: { properties: { title: sheetName } } }],
+        },
+      });
+    }
+    const range = `'${sheetName}'!A:K`;
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: sheetId,
+      range,
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values },
+    });
+    return true;
+  } catch (e) {
+    const err = e as { message?: string };
+    console.error("Affiliate Sheet Conversions error:", err?.message || e);
     return false;
   }
 }

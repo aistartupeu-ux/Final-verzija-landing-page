@@ -6,8 +6,8 @@ export function generateAffiliateCode(name: string): string {
     .replace(/[^a-z0-9]/g, "")
     .slice(0, 6)
     .padEnd(4, "x");
-  const suffix = randomBytes(3).toString("hex").toUpperCase();
-  return `${base}${suffix}`.toUpperCase();
+  const suffix = randomBytes(3).toString("hex").toLowerCase();
+  return `${base}${suffix}`.toLowerCase();
 }
 
 export function hashPassword(password: string): string {

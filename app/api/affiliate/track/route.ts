@@ -26,7 +26,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { event_type, affiliate_code, visitor_id, email, phone, page_url, utm_source, utm_campaign, created_at } = body;
 
-    const acode = (affiliate_code ?? "").toString().trim().toUpperCase();
+    // Kod tretiramo kao case-insensitive, ali ga čuvamo u canonical obliku: lowercase.
+    // To se poklapa sa kodovima poput "damijan01".
+    const acode = (affiliate_code ?? "").toString().trim().toLowerCase();
     if (!acode) {
       return NextResponse.json({ ok: false, error: "affiliate_code required" }, { status: 400 });
     }
