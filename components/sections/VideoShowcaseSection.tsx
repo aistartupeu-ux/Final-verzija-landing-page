@@ -5,9 +5,29 @@ import { useRef, useEffect, useState, memo } from "react";
 import Image from "next/image";
 import { Sparkles } from "lucide-react";
 
-/* Red 1: v11–v17 (bez v15 — .mov nije podržan) | Red 2: v1–v10. Samo videi koji postoje i rade. */
-const row1 = ["/examples/V11.mp4", "/examples/v12.mp4", "/examples/v13.mp4", "/examples/v14.mp4", "/examples/v16.mp4", "/examples/v17.mp4"];
-const row2 = ["/examples/v1.mp4", "/examples/v2.mp4", "/examples/v3.mp4", "/examples/v4.mp4", "/examples/v5.mp4", "/examples/v6.mp4", "/examples/v7.mp4", "/examples/v8.mp4", "/examples/v9.mp4", "/examples/v10.mp4"];
+/* Row 1: V11 + v12–v17 (bez v15) | Row 2: v1–v10 (optimizovani) */
+const row1 = [
+  "/examples/V11.mp4",
+  "/examples/v12.mp4",
+  "/examples/v13.mp4",
+  "/examples/v14.mp4",
+  "/examples/v16.mp4",
+  "/examples/v17.mp4",
+];
+
+// Redosled po tvom spisku
+const row2 = [
+  "/examples/v9.mp4",
+  "/examples/v1.mp4",
+  "/examples/v2.mp4",
+  "/examples/v3.mp4",
+  "/examples/v4.mp4",
+  "/examples/v6.mp4",
+  "/examples/v5.mp4",
+  "/examples/v10.mp4",
+  "/examples/v8.mp4",
+  "/examples/v7.mp4",
+];
 
 const LogoFallback = () => (
   <div style={{
@@ -118,6 +138,8 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
   const [isDragging, setIsDragging] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const lastX = useRef(0);
+  const pendingOffset = useRef(0);
+  const rafRef = useRef<number | 0>(0);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
@@ -137,13 +159,23 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
     if (!isMobile) return;
     const dx = e.touches[0].clientX - lastX.current;
     lastX.current = e.touches[0].clientX;
-    setDragOffset(prev => prev + dx);
+    pendingOffset.current += dx;
+    if (rafRef.current) return;
+    rafRef.current = requestAnimationFrame(() => {
+      setDragOffset(pendingOffset.current);
+      rafRef.current = 0;
+    });
   };
 
   const onTouchEnd = () => {
     if (!isMobile) return;
     setIsDragging(false);
+    pendingOffset.current = 0;
     setDragOffset(0);
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
   };
 
   return (

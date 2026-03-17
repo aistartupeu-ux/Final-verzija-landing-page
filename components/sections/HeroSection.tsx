@@ -18,6 +18,8 @@ export default function HeroSection() {
   const [hovering, setHovering] = useState(false);
 
   useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (window.matchMedia("(pointer: coarse)").matches) return;
     const video = bgVideoRef.current;
     const section = sectionRef.current;
     if (!video || !section) return;

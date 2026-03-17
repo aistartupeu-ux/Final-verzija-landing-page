@@ -1,8 +1,7 @@
 import dynamic from "next/dynamic";
 
-import NetworkBackground from "@/components/ui/NetworkBackground";
 import ScrollProgress from "@/components/ui/ScrollProgress";
-import { SpotlightCursor } from "@/components/ui/spotlight-cursor";
+import EffectsGate from "@/components/ui/EffectsGate";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import HeroSection from "@/components/sections/HeroSection";
@@ -23,8 +22,7 @@ export default function Home() {
   return (
     <div style={{ position: "relative", minHeight: "100vh" }}>
       <ScrollProgress />
-      <SpotlightCursor />
-      <NetworkBackground />
+      <EffectsGate />
       <Header />
       <main style={{ position: "relative", zIndex: 1 }}>
         <HeroSection />

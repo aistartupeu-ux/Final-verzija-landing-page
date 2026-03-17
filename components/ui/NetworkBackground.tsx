@@ -30,8 +30,10 @@ export default function NetworkBackground() {
     /* Desktop-only verzija: tretiraj kao desktop za manje čvorova i manji lag pri skrolu */
     const isMobile = false;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    const saveData = typeof navigator !== "undefined" && "connection" in navigator && !!(navigator as any).connection?.saveData;
     const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
-    const NODE_COUNT = reduced ? 12 : 24;
+    const NODE_COUNT = reduced || saveData ? 10 : coarse ? 16 : 24;
     const CONNECT = isMobile ? 120 : 145;
     const CONNECT_SQ = CONNECT * CONNECT;
     const MOUSE_R = 180;
@@ -75,15 +77,38 @@ export default function NetworkBackground() {
     const onMM = (e: MouseEvent) => {
       mouse.current.x = e.clientX;
       mouse.current.y = e.clientY;
+      markActivity();
     };
 
     const onResize = () => { resize(); create(); };
 
-    const draw = () => {
+    let lastActivity = Date.now();
+    let lastScroll = window.scrollY;
+    let lastFrame = 0;
+    const FPS_CAP = 30;
+
+    const markActivity = () => {
+      lastActivity = Date.now();
+      if (raf === 0) raf = requestAnimationFrame(draw);
+    };
+
+    const onScroll = () => {
+      markActivity();
+    };
+
+    const draw = (t?: number) => {
       if (typeof document !== "undefined" && document.hidden) {
         raf = 0;
         return;
       }
+
+      // Cap work on lower-end devices / heavy pages
+      const nowT = typeof t === "number" ? t : performance.now();
+      if (nowT - lastFrame < 1000 / FPS_CAP) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+      lastFrame = nowT;
 
       scrollY = window.scrollY;
       ctx.clearRect(0, 0, W, H);
@@ -123,7 +148,6 @@ export default function NetworkBackground() {
 
       ctx.lineCap = "round";
       ctx.beginPath();
-      const checked = new Set<string>();
 
       for (const i of visible) {
         const a = nodes[i];
@@ -137,10 +161,6 @@ export default function NetworkBackground() {
             if (!cell) continue;
             for (const j of cell) {
               if (j <= i) continue;
-              const pairKey = i < j ? `${i}-${j}` : `${j}-${i}`;
-              if (checked.has(pairKey)) continue;
-              checked.add(pairKey);
-
               const b = nodes[j];
               const ddx = a.x - b.x;
               const ddy = ay - (b.y - scrollY);
@@ -159,7 +179,7 @@ export default function NetworkBackground() {
       ctx.stroke();
 
       // Mouse-proximity bright lines
-      if (mx > 0) {
+      if (!coarse && !reduced && mx > 0) {
         ctx.beginPath();
         for (const i of visible) {
           const a = nodes[i];
@@ -205,7 +225,7 @@ export default function NetworkBackground() {
       ctx.fill();
 
       // Bright nodes near mouse
-      if (mx > 0) {
+      if (!coarse && !reduced && mx > 0) {
         ctx.fillStyle = "rgba(0,212,255,0.6)";
         ctx.beginPath();
         for (const i of visible) {
@@ -222,6 +242,14 @@ export default function NetworkBackground() {
         ctx.fill();
       }
 
+      // Stop animating when user is idle (big win for scroll jank on low-end)
+      const idle = Date.now() - lastActivity > 250 && Math.abs(window.scrollY - lastScroll) < 1;
+      lastScroll = window.scrollY;
+      if (idle) {
+        raf = 0;
+        return;
+      }
+
       raf = requestAnimationFrame(draw);
     };
 
@@ -233,16 +261,19 @@ export default function NetworkBackground() {
       if (!document.hidden && raf === 0) raf = requestAnimationFrame(draw);
     };
     document.addEventListener("visibilitychange", onVisibility);
-    raf = requestAnimationFrame(draw);
+    raf = 0;
+    markActivity();
 
     window.addEventListener("resize", onResize, { passive: true });
     window.addEventListener("mousemove", onMM, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
 
     return () => {
       cancelAnimationFrame(raf);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("mousemove", onMM);
+      window.removeEventListener("scroll", onScroll);
     };
   }, []);
 
