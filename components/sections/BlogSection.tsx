@@ -70,6 +70,7 @@ const articles: Article[] = [
       border: "rgba(34,197,94,0.18)",
     },
     heroImage: "/blog-rok-kadoic.png",
+    heroImages: ["/blog-rok-kadoic.png", "/blog-rok-2.webp", "/blog-rok-3.webp", "/blog-rok-4.jpg", "/blog-rok-5.jpg"],
     heroImagePosition: "center 5%",
     title: (
       <>
