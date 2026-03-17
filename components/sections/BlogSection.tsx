@@ -31,10 +31,9 @@ const articles: Article[] = [
       border: "rgba(168,85,247,0.18)",
     },
     heroImage: "/blog-trile-1.png",
-    heroImages: ["/blog-trile-1.png", "/blog-trile-2.png", "/blog-trile-3.png", "/blog-trile-4b.jpg", "/blog-trile-5.png", "/blog-trile-6.png", "/blog-trile-7.png", "/blog-trile-8.png"],
+    heroImages: ["/blog-trile-2.png", "/blog-trile-3.png", "/blog-trile-4b.jpg", "/blog-trile-5.png", "/blog-trile-6.png", "/blog-trile-7.png", "/blog-trile-8.png"],
     heroImagePosition: "center 25%",
     heroImagePositions: [
-      "center 25%", // blog-trile-1.png
       "center 25%", // blog-trile-2.png
       "center 25%", // blog-trile-3.png
       "center 60%", // blog-trile-4b.jpg (spustiti još ~15%)
@@ -81,14 +80,11 @@ const articles: Article[] = [
       border: "rgba(34,197,94,0.18)",
     },
     heroImage: "/blog-rok-kadoic.png",
-    heroImages: ["/blog-rok-kadoic.png", "/blog-rok-2.webp", "/blog-rok-3.webp", "/blog-rok-4-up.webp", "/blog-rok-5.jpg"],
+    heroImages: ["/blog-rok-kadoic.png", "/blog-rok-3.webp"],
     heroImagePosition: "center 5%",
     heroImagePositions: [
       "center 5%",   // blog-rok-kadoic.png
-      "center 35%",  // blog-rok-2.webp (podići kadar gore ~30%)
       "center 35%",  // blog-rok-3.webp
-      "center 35%",  // blog-rok-4-up.webp (podići kadar gore ~10%)
-      "center 58%",  // blog-rok-5.jpg (spustiti kadar dole +10%)
     ],
     title: (
       <>
@@ -185,7 +181,7 @@ function HeroSlideshow({ images, alt, objectPosition, objectPositions }: { image
 
   useEffect(() => {
     if (images.length <= 1 || prefersReducedMotion || isHovered) return;
-    const id = setInterval(() => setIndex(i => (i + 1) % images.length), 4500);
+    const id = setInterval(() => setIndex(i => (i + 1) % images.length), 3200);
     return () => clearInterval(id);
   }, [images.length, prefersReducedMotion, isHovered]);
 
