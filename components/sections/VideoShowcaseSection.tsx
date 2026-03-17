@@ -4,6 +4,7 @@ import { motion, useInView, useReducedMotion } from "framer-motion";
 import { useRef, useEffect, useState, memo } from "react";
 import Image from "next/image";
 import { Sparkles } from "lucide-react";
+import { useLowEndDevice } from "@/components/ui/useLowEndDevice";
 
 /* Row 1: V11 + v12–v17 (bez v15) | Row 2: v1–v10 (optimizovani) */
 const row1 = [
@@ -38,7 +39,7 @@ const LogoFallback = () => (
   </div>
 );
 
-const VideoCard = memo(function VideoCard({ src }: { src: string }) {
+const VideoCard = memo(function VideoCard({ src, disableVideo }: { src: string; disableVideo?: boolean }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
@@ -79,7 +80,7 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
     return () => io.disconnect();
   }, [failed, inView]);
 
-  const shouldLoadVideo = inView && !failed;
+  const shouldLoadVideo = !disableVideo && inView && !failed;
 
   return (
     <div
@@ -235,7 +236,7 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
           }}
         >
           {items.map((src, i) => (
-            <VideoCard key={`${src}-${i}`} src={src} />
+            <VideoCard key={`${src}-${i}`} src={src} disableVideo={paused} />
           ))}
         </div>
       </div>
@@ -245,9 +246,10 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
 
 export default function VideoShowcaseSection() {
   const ref = useRef(null);
-  const inView = useInView(ref, { once: true, amount: 0.1 });
+  const inView = useInView(ref, { once: false, amount: 0.1 });
   const reduced = useReducedMotion();
-  const pauseMarquee = reduced || !inView;
+  const lowEnd = useLowEndDevice();
+  const pauseMarquee = reduced || lowEnd || !inView;
   const t = { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const };
 
   return (
