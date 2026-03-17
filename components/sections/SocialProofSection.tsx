@@ -1,9 +1,8 @@
 "use client";
 
-import { motion, useInView, useReducedMotion } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
 import { Eye, Users, Play, BookOpen, Award, Zap } from "lucide-react";
-import { useLowEndDevice } from "@/components/ui/useLowEndDevice";
 
 // ── Waitlist: startujemo od ~1200 ljudi, max ~50 dnevno, kroz ceo dan po +1 do +3 ──
 const START_DATE = new Date(2026, 2, 11, 0, 0, 0); // 11. mart 2026
@@ -89,10 +88,7 @@ const ticks = [
 // ── Main component ────────────────────────────────────────────────────────────
 export default function SocialProofSection() {
   const ref    = useRef(null);
-  const inView = useInView(ref, { once: false, amount: 0.15 });
-  const reduced = useReducedMotion();
-  const lowEnd = useLowEndDevice();
-  const heavyOk = inView && !reduced && !lowEnd;
+  const inView = useInView(ref, { once: true, amount: 0.15 });
 
   const [waitlist, setWaitlist] = useState(START_VALUE);
   const [barProgress, setBarProgress] = useState(BAR_START_PCT);
@@ -118,14 +114,12 @@ export default function SocialProofSection() {
   // Progress bar: osvežava svake sekunde (do zadnjeg sata, minuta, sekunde → 100%)
   useEffect(() => {
     setBarProgress(getBarProgress());
-    // When offscreen / low-end: refresh less frequently to reduce main-thread work.
-    const ms = heavyOk ? 1000 : 10000;
-    const i = setInterval(() => setBarProgress(getBarProgress()), ms);
+    const i = setInterval(() => setBarProgress(getBarProgress()), 1000);
     return () => clearInterval(i);
-  }, [heavyOk]);
+  }, []);
 
   // Duplicate for seamless loop
-  const tickItems = heavyOk ? [...ticks, ...ticks, ...ticks] : ticks;
+  const tickItems = [...ticks, ...ticks, ...ticks];
 
   return (
     <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "80px 0 100px", overflow: "hidden", contentVisibility: "auto", containIntrinsicSize: "auto 600px" }}>
@@ -148,11 +142,9 @@ export default function SocialProofSection() {
       >
         <style>{`
           @keyframes ticker { from { transform: translateX(0) } to { transform: translateX(-33.333%) } }
-          .ticker-track { display: flex; width: max-content; }
-          .ticker-track.ticker-anim { animation: ticker 18s linear infinite; will-change: transform; }
-          @media (prefers-reduced-motion: reduce) { .ticker-track.ticker-anim { animation: none; } }
+          .ticker-track { display: flex; width: max-content; animation: ticker 18s linear infinite; will-change: transform; }
         `}</style>
-        <div className={`ticker-track${heavyOk ? " ticker-anim" : ""}`}>
+        <div className="ticker-track">
           {tickItems.map((t, i) => {
             const Icon = t.icon;
             return (
@@ -185,19 +177,17 @@ export default function SocialProofSection() {
       <div style={{ textAlign: "center", position: "relative", padding: "0 24px" }}>
 
         {/* Breathing glow blob */}
-        {heavyOk ? (
-          <motion.div
-            animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.65, 0.4] }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            style={{
-              position: "absolute", top: "50%", left: "50%",
-              transform: "translate(-50%, -50%)",
-              width: 500, height: 300, borderRadius: "50%",
-              background: "radial-gradient(ellipse, rgba(0,212,255,0.12) 0%, rgba(139,92,246,0.06) 50%, transparent 75%)",
-              pointerEvents: "none", filter: "blur(30px)",
-            }}
-          />
-        ) : null}
+        <motion.div
+          animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.65, 0.4] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          style={{
+            position: "absolute", top: "50%", left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: 500, height: 300, borderRadius: "50%",
+            background: "radial-gradient(ellipse, rgba(0,212,255,0.12) 0%, rgba(139,92,246,0.06) 50%, transparent 75%)",
+            pointerEvents: "none", filter: "blur(30px)",
+          }}
+        />
 
         {/* UZIVO badge */}
         <motion.div
@@ -208,13 +198,11 @@ export default function SocialProofSection() {
         >
           <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 10, height: 10 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", display: "block", position: "relative", zIndex: 1 }} />
-            {heavyOk ? (
-              <motion.span
-                animate={{ scale: [1, 2.2], opacity: [0.6, 0] }}
-                transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
-                style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(34,197,94,0.5)" }}
-              />
-            ) : null}
+            <motion.span
+              animate={{ scale: [1, 2.2], opacity: [0.6, 0] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
+              style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(34,197,94,0.5)" }}
+            />
           </span>
           <span style={{ fontSize: 11, fontWeight: 700, color: "#22c55e", textTransform: "uppercase" as const, letterSpacing: "0.18em" }}>Uzivo</span>
         </motion.div>
