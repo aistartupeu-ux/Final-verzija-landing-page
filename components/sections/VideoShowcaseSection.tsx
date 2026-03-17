@@ -8,7 +8,7 @@ import { useLowEndDevice } from "@/components/ui/useLowEndDevice";
 
 /* Row 1: V11 + v12–v17 (bez v15) | Row 2: v1–v10 (optimizovani) */
 const row1 = [
-  "/examples/V11.mp4",
+  "/examples/v11.mp4",
   "/examples/v12.mp4",
   "/examples/v13.mp4",
   "/examples/v14.mp4",
@@ -80,7 +80,8 @@ const VideoCard = memo(function VideoCard({ src, disableVideo }: { src: string; 
     return () => io.disconnect();
   }, [failed, inView]);
 
-  const shouldLoadVideo = !disableVideo && inView && !failed;
+  const shouldLoadVideo = inView && !failed;
+  const canRenderVideo = shouldLoadVideo && !disableVideo;
 
   return (
     <div
@@ -108,8 +109,8 @@ const VideoCard = memo(function VideoCard({ src, disableVideo }: { src: string; 
         e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
       }}
     >
-      {!shouldLoadVideo || !loaded ? <LogoFallback /> : null}
-      {shouldLoadVideo && (
+      {!canRenderVideo || !loaded ? <LogoFallback /> : null}
+      {canRenderVideo && (
         <video
           ref={videoRef}
           src={src}
@@ -133,7 +134,17 @@ const VideoCard = memo(function VideoCard({ src, disableVideo }: { src: string; 
 
 const DRAG_SNAP_MS = 220;
 
-function VideoRow({ videos, reverse = false, paused = false }: { videos: string[]; reverse?: boolean; paused?: boolean }) {
+function VideoRow({
+  videos,
+  reverse = false,
+  paused = false,
+  disableVideo = false,
+}: {
+  videos: string[];
+  reverse?: boolean;
+  paused?: boolean;
+  disableVideo?: boolean;
+}) {
   const items = [...videos, ...videos];
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -236,7 +247,7 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
           }}
         >
           {items.map((src, i) => (
-            <VideoCard key={`${src}-${i}`} src={src} disableVideo={paused} />
+            <VideoCard key={`${src}-${i}`} src={src} disableVideo={disableVideo} />
           ))}
         </div>
       </div>
@@ -300,7 +311,7 @@ export default function VideoShowcaseSection() {
         transition={{ ...t, delay: 0.15 }}
         style={{ marginBottom: 12 }}
       >
-        <VideoRow videos={row1} paused={pauseMarquee} />
+        <VideoRow videos={row1} paused={pauseMarquee} disableVideo={lowEnd} />
       </motion.div>
 
       {/* Row 2 — scrolls right */}
@@ -309,7 +320,7 @@ export default function VideoShowcaseSection() {
         animate={inView ? { opacity: 1 } : {}}
         transition={{ ...t, delay: 0.3 }}
       >
-        <VideoRow videos={row2} reverse paused={pauseMarquee} />
+        <VideoRow videos={row2} reverse paused={pauseMarquee} disableVideo={lowEnd} />
       </motion.div>
     </section>
   );

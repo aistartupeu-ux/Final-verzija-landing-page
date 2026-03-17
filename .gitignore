@@ -38,7 +38,6 @@ yarn-error.log*
 
 # large videos (GitHub 100MB limit)
 public/examples/v15.mov
-public/examples/V11.mp4
 
 # typescript
 *.tsbuildinfo
