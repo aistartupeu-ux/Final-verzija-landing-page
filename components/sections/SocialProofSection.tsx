@@ -3,7 +3,6 @@
 import { motion, useInView, useReducedMotion } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
 import { Eye, Users, Play, BookOpen, Award, Zap } from "lucide-react";
-import { useLowEndDevice } from "@/components/ui/useLowEndDevice";
 
 // ── Waitlist: startujemo od ~1200 ljudi, max ~50 dnevno, kroz ceo dan po +1 do +3 ──
 const START_DATE = new Date(2026, 2, 11, 0, 0, 0); // 11. mart 2026
@@ -91,8 +90,7 @@ export default function SocialProofSection() {
   const ref    = useRef(null);
   const inView = useInView(ref, { once: false, amount: 0.15 });
   const reduced = useReducedMotion();
-  const lowEnd = useLowEndDevice();
-  const heavyOk = inView && !reduced && !lowEnd;
+  const heavyOk = inView && !reduced;
 
   const [waitlist, setWaitlist] = useState(START_VALUE);
   const [barProgress, setBarProgress] = useState(BAR_START_PCT);
