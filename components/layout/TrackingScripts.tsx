@@ -5,9 +5,10 @@ import Script from "next/script";
  * Dodaj u Vercel: NEXT_PUBLIC_GA_MEASUREMENT_ID, NEXT_PUBLIC_META_PIXEL_ID, NEXT_PUBLIC_GTM_ID
  */
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "2347723352398323";
+const DEFAULT_GA_ID = "G-87RPG6JR4B";
 
 export default function TrackingScripts() {
-  const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+  const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || DEFAULT_GA_ID;
   const metaPixelId = META_PIXEL_ID;
   const gtmId = process.env.NEXT_PUBLIC_GTM_ID;
 
