@@ -7,11 +7,11 @@ import { Plus, Minus } from "lucide-react";
 const faqs = [
   {
     q: "Da li je ovo za potpune početnike?",
-    a: "Da. Kurs je dizajniran od nule. Ne trebaju ti prethodno znanje o AI-u, kodiranju niti filmskoj produkciji. Vodiš se korak po korak od osnova do prvog projekta.",
+    a: "Da. Kurs je dizajniran od nule. Ne treba ti prethodno znanje o AI-u, kodiranju niti filmskoj produkciji. Vodiš se korak po korak od osnova do prvog projekta.",
   },
   {
     q: "Na kom jeziku je sadržaj?",
-    a: "Ceo kurs je na srpskohrvatski jezik. Svi materijali, videi i zajednica su u potpunosti lokalizovani za Balkan.",
+    a: "Ceo kurs je na srpsko-hrvatskom jeziku. Svi materijali, videi i zajednica su u potpunosti lokalizovani za Balkan.",
   },
   {
     q: "Koliko traje kurs i koliko vremena sedmično treba?",
