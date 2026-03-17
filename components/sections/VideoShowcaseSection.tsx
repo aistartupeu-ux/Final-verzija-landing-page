@@ -5,49 +5,6 @@ import { useRef, useEffect, useState, memo } from "react";
 import Image from "next/image";
 import { Sparkles } from "lucide-react";
 
-// Global (module) video playback budget to prevent decoding too many videos at once.
-// This keeps the UI identical while dramatically reducing jank on weaker devices.
-const MAX_ACTIVE_VIDEOS = 3;
-const activeVideos = new Set<HTMLVideoElement>();
-const activeOrder: HTMLVideoElement[] = [];
-
-function rememberActive(v: HTMLVideoElement) {
-  if (!activeVideos.has(v)) activeVideos.add(v);
-  const i = activeOrder.indexOf(v);
-  if (i >= 0) activeOrder.splice(i, 1);
-  activeOrder.push(v);
-}
-
-function pauseVideo(v: HTMLVideoElement) {
-  try { v.pause(); } catch {}
-  activeVideos.delete(v);
-  const i = activeOrder.indexOf(v);
-  if (i >= 0) activeOrder.splice(i, 1);
-}
-
-async function requestPlay(v: HTMLVideoElement) {
-  // If already active, just keep it fresh in LRU.
-  if (activeVideos.has(v)) {
-    rememberActive(v);
-    return;
-  }
-
-  // Evict oldest until we have capacity.
-  while (activeOrder.length >= MAX_ACTIVE_VIDEOS) {
-    const oldest = activeOrder.shift();
-    if (!oldest) break;
-    pauseVideo(oldest);
-  }
-
-  rememberActive(v);
-  try {
-    await v.play();
-  } catch {
-    // Autoplay policies can block; keep it paused but still visible.
-    pauseVideo(v);
-  }
-}
-
 /* Row 1: V11 + v12–v17 (bez v15) | Row 2: v1–v10 (optimizovani) */
 const row1 = [
   "/examples/v11.mp4",
@@ -113,16 +70,13 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
     if (!card || !video || failed || !inView) return;
     const io = new IntersectionObserver(
       ([e]) => {
-        if (e.isIntersecting) requestPlay(video);
-        else pauseVideo(video);
+        if (e.isIntersecting) video.play().catch(() => {});
+        else video.pause();
       },
       { threshold: 0.3, rootMargin: "80px" }
     );
     io.observe(card);
-    return () => {
-      io.disconnect();
-      pauseVideo(video);
-    };
+    return () => io.disconnect();
   }, [failed, inView]);
 
   const shouldLoadVideo = inView && !failed;
