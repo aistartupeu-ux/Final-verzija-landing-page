@@ -11,6 +11,7 @@ interface Article {
   heroImage: string;
   heroImages?: string[];
   heroImagePosition?: string; // npr. "center 30%" da se vidi lik
+  heroImagePositions?: string[]; // opciono: per-slide objectPosition (mora matchovati heroImages)
   overlayLogo?: { src: string; alt: string; subtitle: string; title: string };
   title: React.ReactNode;
   intro: React.ReactNode;
@@ -30,8 +31,18 @@ const articles: Article[] = [
       border: "rgba(168,85,247,0.18)",
     },
     heroImage: "/blog-trile-1.png",
-    heroImages: ["/blog-trile-1.png", "/blog-trile-2.png", "/blog-trile-3.png", "/blog-trile-4.png", "/blog-trile-5.png", "/blog-trile-6.png", "/blog-trile-7.png", "/blog-trile-8.png"],
+    heroImages: ["/blog-trile-1.png", "/blog-trile-2.png", "/blog-trile-3.png", "/blog-trile-4b.jpg", "/blog-trile-5.png", "/blog-trile-6.png", "/blog-trile-7.png", "/blog-trile-8.png"],
     heroImagePosition: "center 25%",
+    heroImagePositions: [
+      "center 25%", // blog-trile-1.png
+      "center 25%", // blog-trile-2.png
+      "center 25%", // blog-trile-3.png
+      "center 60%", // blog-trile-4b.jpg (spustiti još ~15%)
+      "center 25%", // blog-trile-5.png
+      "center 25%", // blog-trile-6.png
+      "center 25%", // blog-trile-7.png
+      "center 25%", // blog-trile-8.png
+    ],
     title: (
       <>
         <a href="https://www.instagram.com/trileofficial?igsh=MXVud3U3bWJsdXMxdQ==" target="_blank" rel="noopener noreferrer" style={{ display: "block", color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={e => { e.currentTarget.style.color = "#a855f7"; }} onMouseLeave={e => { e.currentTarget.style.color = "inherit"; }}>Trile</a>
@@ -70,8 +81,15 @@ const articles: Article[] = [
       border: "rgba(34,197,94,0.18)",
     },
     heroImage: "/blog-rok-kadoic.png",
-    heroImages: ["/blog-rok-kadoic.png", "/blog-rok-2.webp", "/blog-rok-3.webp", "/blog-rok-4.jpg", "/blog-rok-5.jpg"],
+    heroImages: ["/blog-rok-kadoic.png", "/blog-rok-2.webp", "/blog-rok-3.webp", "/blog-rok-4-up.webp", "/blog-rok-5.jpg"],
     heroImagePosition: "center 5%",
+    heroImagePositions: [
+      "center 5%",   // blog-rok-kadoic.png
+      "center 35%",  // blog-rok-2.webp (podići kadar gore ~30%)
+      "center 35%",  // blog-rok-3.webp
+      "center 35%",  // blog-rok-4-up.webp (podići kadar gore ~10%)
+      "center 58%",  // blog-rok-5.jpg (spustiti kadar dole +10%)
+    ],
     title: (
       <>
         <a href="https://www.instagram.com/rok_kadoic?igsh=eW1weW81N3Rhbjkw" target="_blank" rel="noopener noreferrer" style={{ display: "block", color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={e => { e.currentTarget.style.color = "#22c55e"; }} onMouseLeave={e => { e.currentTarget.style.color = "inherit"; }}>Rok Kadoič</a>
@@ -155,11 +173,12 @@ const articles: Article[] = [
   },
 ];
 
-function HeroSlideshow({ images, alt, objectPosition }: { images: string[]; alt?: string; objectPosition?: string }) {
+function HeroSlideshow({ images, alt, objectPosition, objectPositions }: { images: string[]; alt?: string; objectPosition?: string; objectPositions?: string[] }) {
   const [index, setIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const imgStyle = { objectFit: "cover" as const, objectPosition: objectPosition || "center" };
+  const currentObjectPosition = objectPositions?.[index] ?? objectPosition ?? "center";
+  const imgStyle = { objectFit: "cover" as const, objectPosition: currentObjectPosition };
   useEffect(() => {
     setPrefersReducedMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   }, []);
@@ -171,8 +190,9 @@ function HeroSlideshow({ images, alt, objectPosition }: { images: string[]; alt?
   }, [images.length, prefersReducedMotion, isHovered]);
 
   if (images.length === 1) {
+    const oneObjectPosition = objectPositions?.[0] ?? objectPosition ?? "center";
     return (
-      <Image src={images[0]} alt={alt ?? ""} fill style={imgStyle} sizes="(max-width: 768px) 100vw, 50vw" />
+      <Image src={images[0]} alt={alt ?? ""} fill style={{ objectFit: "cover", objectPosition: oneObjectPosition }} sizes="(max-width: 768px) 100vw, 50vw" />
     );
   }
 
@@ -236,7 +256,7 @@ function ArticleCard({ article, delay }: { article: Article; delay: number }) {
     >
       {/* Hero image / slideshow */}
       <div style={{ position: "relative", height: 240, overflow: "hidden", flexShrink: 0 }}>
-        <HeroSlideshow images={images} objectPosition={article.heroImagePosition} />
+        <HeroSlideshow images={images} objectPosition={article.heroImagePosition} objectPositions={article.heroImagePositions} />
         <div style={{
           position: "absolute", inset: 0,
           background: "linear-gradient(to top, rgba(5,5,12,0.95) 0%, rgba(5,5,12,0.3) 50%, transparent 100%)",
