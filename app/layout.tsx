@@ -56,6 +56,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             })(window,document,'script','dataLayer','GTM-NCH883PC');
           `}
         </Script>
+        <meta name="facebook-domain-verification" content="jcv01prpw9hx9y3ftd06dhdgksk3wr" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
         {supabaseOrigin && (
           <>
