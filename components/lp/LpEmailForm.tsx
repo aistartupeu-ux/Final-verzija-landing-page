@@ -49,6 +49,16 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
         (window as unknown as { fbq: (a: string, b: string) => void }).fbq("track", "Lead");
       }
 
+      // Keep existing Google Tag (gtag) event hook.
+      // GA scripts might be disabled, but if GTM/other tag providers define `gtag`,
+      // we still fire the event.
+      if (typeof window !== "undefined" && (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag) {
+        (window as unknown as { gtag: (...args: unknown[]) => void }).gtag("event", "generate_lead", {
+          event_category: "lead",
+          event_label: "waitlist",
+        });
+      }
+
       setDone(true);
       setLoading(false);
     } catch {
