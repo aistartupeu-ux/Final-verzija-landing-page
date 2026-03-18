@@ -48,12 +48,6 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
       if (typeof window !== "undefined" && (window as unknown as { fbq?: (a: string, b: string) => void }).fbq) {
         (window as unknown as { fbq: (a: string, b: string) => void }).fbq("track", "Lead");
       }
-      if (typeof window !== "undefined" && (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag) {
-        (window as unknown as { gtag: (...args: unknown[]) => void }).gtag("event", "generate_lead", {
-          event_category: "lead",
-          event_label: "waitlist",
-        });
-      }
 
       setDone(true);
       setLoading(false);

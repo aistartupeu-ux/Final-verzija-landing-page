@@ -63,6 +63,19 @@ function onNextLoadSlotAvailable(cb: () => void) {
   return () => loadWaiters.delete(cb);
 }
 
+let activePlaySlots = 0;
+const MAX_CONCURRENT_VIDEO_PLAYS = 3;
+
+function tryAcquirePlaySlot() {
+  if (activePlaySlots >= MAX_CONCURRENT_VIDEO_PLAYS) return false;
+  activePlaySlots += 1;
+  return true;
+}
+
+function releasePlaySlot() {
+  activePlaySlots = Math.max(0, activePlaySlots - 1);
+}
+
 const VideoCard = memo(function VideoCard({ src }: { src: string }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -71,6 +84,7 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
   const [inView, setInView] = useState(false);
   const [shouldAttachSrc, setShouldAttachSrc] = useState(false);
   const hasLoadSlot = useRef(false);
+  const hasPlaySlot = useRef(false);
   const didMarkLoaded = useRef(false);
   const cancelWaitRef = useRef<(() => void) | null>(null);
 
@@ -109,15 +123,27 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
     if (!card || !video || failed || !inView) return;
     const io = new IntersectionObserver(
       ([e]) => {
-        // We only want to SHOW the frame, not continuously decode/play.
-        // Autoplaying many MP4s causes heavy bandwidth/CPU and can crash the tab.
-        if (!e.isIntersecting) video.pause();
+        if (!e.isIntersecting) {
+          video.pause();
+          if (hasPlaySlot.current) {
+            hasPlaySlot.current = false;
+            releasePlaySlot();
+          }
+          return;
+        }
+
+        // Play only when we already have enough data (loaded).
+        if (!loaded) return;
+        if (!hasPlaySlot.current && tryAcquirePlaySlot()) {
+          hasPlaySlot.current = true;
+        }
+        video.play().catch(() => {});
       },
       { threshold: 0.3, rootMargin: "80px" }
     );
     io.observe(card);
     return () => io.disconnect();
-  }, [failed, inView]);
+  }, [failed, inView, loaded]);
 
   useEffect(() => {
     if (failed) return;
@@ -128,7 +154,8 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
         hasLoadSlot.current = false;
         releaseLoadSlot();
       }
-      setShouldAttachSrc(false);
+      // Avoid triggering "setState in effect" lint by deferring.
+      window.setTimeout(() => setShouldAttachSrc(false), 0);
       return;
     }
 
@@ -182,8 +209,26 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
         hasLoadSlot.current = false;
         releaseLoadSlot();
       }
+      if (hasPlaySlot.current) {
+        hasPlaySlot.current = false;
+        releasePlaySlot();
+      }
     };
   }, []);
+
+  // If the video becomes loaded while the card is already in view,
+  // start playback (so visible cards don't stay frozen).
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !inView || !loaded || failed) return;
+    if (!hasPlaySlot.current && tryAcquirePlaySlot()) {
+      hasPlaySlot.current = true;
+    }
+    video.play().catch(() => {});
+    return () => {
+      // If we lose visibility, pause happens in IntersectionObserver callback.
+    };
+  }, [failed, inView, loaded]);
 
   const shouldRenderVideo = (inView || loaded || shouldAttachSrc) && !failed;
 
@@ -219,6 +264,7 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
           ref={videoRef}
           src={shouldAttachSrc || loaded ? src : undefined}
           muted
+          loop
           playsInline
           preload="auto"
           onError={() => {

@@ -2,36 +2,18 @@ import Script from "next/script";
 
 /**
  * Učitava tracking skripte za kampanju kada su env varijable postavljene.
- * Dodaj u Vercel: NEXT_PUBLIC_GA_MEASUREMENT_ID, NEXT_PUBLIC_META_PIXEL_ID, NEXT_PUBLIC_GTM_ID
+ * Dodaj u Vercel: NEXT_PUBLIC_META_PIXEL_ID, NEXT_PUBLIC_GTM_ID
  */
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "2347723352398323";
-const DEFAULT_GA_ID = "G-87RPG6JR4B";
 
 export default function TrackingScripts() {
-  const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || DEFAULT_GA_ID;
   const metaPixelId = META_PIXEL_ID;
   const gtmId = process.env.NEXT_PUBLIC_GTM_ID;
 
-  if (!gaId && !metaPixelId && !gtmId) return null;
+  if (!metaPixelId && !gtmId) return null;
 
   return (
     <>
-      {gaId && (
-        <>
-          <Script
-            src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
-            strategy="afterInteractive"
-          />
-          <Script id="ga-init" strategy="afterInteractive">
-            {`
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', '${gaId}', { send_page_view: true });
-            `}
-          </Script>
-        </>
-      )}
       {metaPixelId && (
         <>
           <Script id="meta-pixel" strategy="afterInteractive">
