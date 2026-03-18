@@ -31,16 +31,30 @@ export default function NetworkBackground() {
     const isMobile = false;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const coarse = window.matchMedia("(pointer: coarse)").matches;
-    const saveData = typeof navigator !== "undefined" && "connection" in navigator && !!(navigator as any).connection?.saveData;
+    const saveData =
+      typeof navigator !== "undefined" &&
+      "connection" in navigator &&
+      !!(navigator as unknown as { connection?: { saveData?: boolean } }).connection?.saveData;
+
+    const isLowEnd =
+      typeof navigator !== "undefined" &&
+      ((typeof (navigator as unknown as { deviceMemory?: number }).deviceMemory === "number" &&
+        (navigator as unknown as { deviceMemory: number }).deviceMemory <= 4) ||
+        (typeof (navigator as unknown as { hardwareConcurrency?: number }).hardwareConcurrency === "number" &&
+          (navigator as unknown as { hardwareConcurrency: number }).hardwareConcurrency <= 4) ||
+        ("connection" in navigator &&
+          ["slow-2g", "2g", "3g"].includes(
+            ((navigator as unknown as { connection?: { effectiveType?: string } }).connection?.effectiveType ?? "").toLowerCase()
+          )));
     const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
-    const NODE_COUNT = reduced || saveData ? 10 : coarse ? 16 : 24;
+    const NODE_COUNT = reduced || saveData ? 10 : isLowEnd ? 14 : coarse ? 16 : 24;
     const CONNECT = isMobile ? 120 : 145;
     const CONNECT_SQ = CONNECT * CONNECT;
     const MOUSE_R = 180;
     const MOUSE_R_SQ = MOUSE_R * MOUSE_R;
     const CELL = CONNECT;
 
-    let grid: Map<string, number[]> = new Map();
+    const grid: Map<string, number[]> = new Map();
 
     const resize = () => {
       W = window.innerWidth;
@@ -85,7 +99,7 @@ export default function NetworkBackground() {
     let lastActivity = Date.now();
     let lastScroll = window.scrollY;
     let lastFrame = 0;
-    const FPS_CAP = 30;
+    const FPS_CAP = isLowEnd ? 22 : 30;
 
     const markActivity = () => {
       lastActivity = Date.now();

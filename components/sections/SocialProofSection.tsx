@@ -92,18 +92,14 @@ export default function SocialProofSection() {
   const reduced = useReducedMotion();
   const heavyOk = inView && !reduced;
 
-  const [waitlist, setWaitlist] = useState(START_VALUE);
-  const [barProgress, setBarProgress] = useState(BAR_START_PCT);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setWaitlist(getWaitlistCount());
-    setMounted(true);
-  }, []);
+  const [waitlist, setWaitlist] = useState(() => {
+    if (typeof window === "undefined") return START_VALUE;
+    return getWaitlistCount();
+  });
+  const [barProgress, setBarProgress] = useState(() => getBarProgress());
 
   // Osveži svakih 2–4 min da broj raste po +1 do +3 kroz dan
   useEffect(() => {
-    if (!mounted) return;
     let t: ReturnType<typeof setTimeout>;
     const tick = () => {
       setWaitlist(getWaitlistCount());
@@ -111,15 +107,18 @@ export default function SocialProofSection() {
     };
     t = setTimeout(tick, 60000 + Math.random() * 60000);
     return () => clearTimeout(t);
-  }, [mounted]);
+  }, []);
 
   // Progress bar: osvežava svake sekunde (do zadnjeg sata, minuta, sekunde → 100%)
   useEffect(() => {
-    setBarProgress(getBarProgress());
+    const r = window.setTimeout(() => setBarProgress(getBarProgress()), 0);
     // When offscreen / low-end: refresh less frequently to reduce main-thread work.
     const ms = heavyOk ? 1000 : 10000;
     const i = setInterval(() => setBarProgress(getBarProgress()), ms);
-    return () => clearInterval(i);
+    return () => {
+      window.clearTimeout(r);
+      clearInterval(i);
+    };
   }, [heavyOk]);
 
   // Duplicate for seamless loop

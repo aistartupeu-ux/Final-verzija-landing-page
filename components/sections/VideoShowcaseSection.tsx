@@ -136,14 +136,16 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
   const items = [...videos, ...videos];
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 768px)").matches;
+  });
   const lastX = useRef(0);
   const pendingOffset = useRef(0);
   const rafRef = useRef<number | 0>(0);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
-    setIsMobile(mq.matches);
     const fn = () => setIsMobile(mq.matches);
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);

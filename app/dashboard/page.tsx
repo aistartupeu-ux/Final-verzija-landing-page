@@ -7,16 +7,21 @@ import { User, GraduationCap, Lock, Image, Film, Music, Wand2, ArrowRight, Crown
 interface UserData { name: string; email: string; hasPaid: boolean; }
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<UserData>({ name: "", email: "", hasPaid: false });
+  const defaultUser: UserData = { name: "Korisnik", email: "user@example.com", hasPaid: false };
+  const [user, setUser] = useState<UserData>(() => {
+    if (typeof window === "undefined") return defaultUser;
+    const stored = localStorage.getItem("ayhype_user");
+    if (!stored) return defaultUser;
+    try {
+      return JSON.parse(stored) as UserData;
+    } catch {
+      return defaultUser;
+    }
+  });
 
   useEffect(() => {
     const stored = localStorage.getItem("ayhype_user");
-    if (stored) setUser(JSON.parse(stored));
-    else {
-      const def = { name: "Korisnik", email: "user@example.com", hasPaid: false };
-      localStorage.setItem("ayhype_user", JSON.stringify(def));
-      setUser(def);
-    }
+    if (!stored) localStorage.setItem("ayhype_user", JSON.stringify(defaultUser));
   }, []);
 
   const handlePay = () => {

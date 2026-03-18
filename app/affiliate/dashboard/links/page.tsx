@@ -10,15 +10,17 @@ interface AffiliateData {
 }
 
 export default function AffiliateLinksPage() {
-  const [affiliate, setAffiliate] = useState<AffiliateData | null>(null);
-  const [copied, setCopied] = useState<string>("");
-
-  useEffect(() => {
+  const [affiliate] = useState<AffiliateData | null>(() => {
+    if (typeof window === "undefined") return null;
     const stored = localStorage.getItem("ayhype_affiliate");
-    if (stored) {
-      try { setAffiliate(JSON.parse(stored)); } catch { /* ignore */ }
+    if (!stored) return null;
+    try {
+      return JSON.parse(stored) as AffiliateData;
+    } catch {
+      return null;
     }
-  }, []);
+  });
+  const [copied, setCopied] = useState<string>("");
 
   const origin = typeof window !== "undefined" ? window.location.origin : "https://aihype-academy.com";
   const code = affiliate?.affiliateCode ?? "";

@@ -3,18 +3,21 @@
 import { useEffect, useState } from "react";
 
 export default function CountdownTimer({ targetDate, label = "PRIJAVE SE ZATVARAJU ZA" }: { targetDate: Date; label?: string }) {
-  const [t, setT] = useState({ d: 0, h: 0, m: 0, s: 0 });
+  const calc = () => {
+    const diff = Math.max(0, targetDate.getTime() - Date.now());
+    return { d: Math.floor(diff / 864e5), h: Math.floor((diff % 864e5) / 36e5), m: Math.floor((diff % 36e5) / 6e4), s: Math.floor((diff % 6e4) / 1e3) };
+  };
+
+  const [t, setT] = useState(() => calc());
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setReady(true);
-    const calc = () => {
-      const diff = Math.max(0, targetDate.getTime() - Date.now());
-      return { d: Math.floor(diff / 864e5), h: Math.floor((diff % 864e5) / 36e5), m: Math.floor((diff % 36e5) / 6e4), s: Math.floor((diff % 6e4) / 1e3) };
-    };
-    setT(calc());
+    const r = window.setTimeout(() => setReady(true), 0);
     const i = setInterval(() => setT(calc()), 1000);
-    return () => clearInterval(i);
+    return () => {
+      window.clearTimeout(r);
+      clearInterval(i);
+    };
   }, [targetDate]);
 
   const pad = (n: number) => String(n).padStart(2, "0");

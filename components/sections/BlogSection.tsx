@@ -172,12 +172,12 @@ const articles: Article[] = [
 function HeroSlideshow({ images, alt, objectPosition, objectPositions }: { images: string[]; alt?: string; objectPosition?: string; objectPositions?: string[] }) {
   const [index, setIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [prefersReducedMotion] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  });
   const currentObjectPosition = objectPositions?.[index] ?? objectPosition ?? "center";
   const imgStyle = { objectFit: "cover" as const, objectPosition: currentObjectPosition };
-  useEffect(() => {
-    setPrefersReducedMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  }, []);
 
   useEffect(() => {
     if (images.length <= 1 || prefersReducedMotion || isHovered) return;

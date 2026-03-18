@@ -16,7 +16,17 @@ export default function AffiliateDashboardLayout({ children }: { children: React
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [affiliateName, setAffiliateName] = useState("Partner");
+  const [affiliateName] = useState(() => {
+    if (typeof window === "undefined") return "Partner";
+    const stored = localStorage.getItem("ayhype_affiliate");
+    if (!stored) return "Partner";
+    try {
+      const aff = JSON.parse(stored) as { name?: string };
+      return aff.name ?? "Partner";
+    } catch {
+      return "Partner";
+    }
+  });
 
   useEffect(() => {
     const stored = localStorage.getItem("ayhype_affiliate");
@@ -25,8 +35,7 @@ export default function AffiliateDashboardLayout({ children }: { children: React
       return;
     }
     try {
-      const aff = JSON.parse(stored);
-      setAffiliateName(aff.name ?? "Partner");
+      JSON.parse(stored);
     } catch {
       router.push("/affiliate/login");
     }
