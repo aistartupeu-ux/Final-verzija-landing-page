@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { appendLeadsToSheet } from "@/lib/leads-sheet";
+import crypto from "node:crypto";
 
 // Jednostavan in-memory rate limit po IP za ovu funkciju.
 // Nije savršen (serverless instanciranje), ali pomaže da se smanji udar na API.
@@ -55,6 +56,74 @@ const supabase = supabaseUrl && supabaseKey
   ? createClient(supabaseUrl, supabaseKey)
   : null;
 
+function sha256(input: string): string {
+  return crypto.createHash("sha256").update(input).digest("hex");
+}
+
+function norm(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  const v = input.trim().toLowerCase();
+  return v.length ? v : null;
+}
+
+async function sendMetaCapiLeadEvent(opts: {
+  email: string;
+  phone?: string | null;
+  ip: string | null;
+  userAgent: string | null;
+  eventSourceUrl: string | null;
+  fbp?: string | null;
+  fbc?: string | null;
+}) {
+  const accessToken = process.env.META_CAPI_ACCESS_TOKEN;
+  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID || "2347723352398323";
+  if (!accessToken || !pixelId) return;
+
+  const em = norm(opts.email);
+  const ph = norm(opts.phone ?? null);
+
+  // If we don't have at least one identifier, skip to avoid low quality events.
+  if (!em && !ph) return;
+
+  const payload = {
+    data: [
+      {
+        event_name: "Lead",
+        event_time: Math.floor(Date.now() / 1000),
+        action_source: "website",
+        event_source_url: opts.eventSourceUrl ?? undefined,
+        user_data: {
+          em: em ? [sha256(em)] : undefined,
+          ph: ph ? [sha256(ph.replace(/[^\d+]/g, ""))] : undefined,
+          client_ip_address: opts.ip ?? undefined,
+          client_user_agent: opts.userAgent ?? undefined,
+          fbp: opts.fbp ?? undefined,
+          fbc: opts.fbc ?? undefined,
+        },
+      },
+    ],
+  };
+
+  const url = `https://graph.facebook.com/v20.0/${pixelId}/events?access_token=${encodeURIComponent(accessToken)}`;
+
+  // Fire-and-forget with timeout: never block lead submission.
+  (async () => {
+    try {
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), 4_000);
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timeoutId);
+    } catch (e) {
+      console.error("Meta CAPI error:", e);
+    }
+  })();
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -84,6 +153,8 @@ export async function POST(req: NextRequest) {
     // Get location from ipapi using the real visitor IP
     const forwarded = req.headers.get("x-forwarded-for");
     const ip = forwarded ? forwarded.split(",")[0].trim() : req.headers.get("x-real-ip") ?? "";
+    const userAgent = req.headers.get("user-agent");
+    const eventSourceUrl = req.headers.get("referer");
 
     if (isRateLimited(ip)) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
@@ -131,6 +202,17 @@ export async function POST(req: NextRequest) {
 
     const cookieStore = await cookies();
     const affiliateCode = bodyAffiliate ?? cookieStore.get("af_ref")?.value ?? null;
+
+    // Meta Conversions API (server-side Lead event)
+    await sendMetaCapiLeadEvent({
+      email,
+      phone: phone ?? null,
+      ip: ip || null,
+      userAgent,
+      eventSourceUrl,
+      fbp: req.cookies.get("_fbp")?.value ?? null,
+      fbc: req.cookies.get("_fbc")?.value ?? null,
+    });
 
     // Leads by Source Sheet: webhook za Meta / affiliate tracking
     const leadsSourceWebhook = process.env.LEADS_SOURCE_WEBHOOK_URL;
