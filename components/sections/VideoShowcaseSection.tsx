@@ -71,7 +71,18 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
   const [inView, setInView] = useState(false);
   const [shouldAttachSrc, setShouldAttachSrc] = useState(false);
   const hasLoadSlot = useRef(false);
+  const didMarkLoaded = useRef(false);
   const cancelWaitRef = useRef<(() => void) | null>(null);
+
+  const markLoaded = () => {
+    if (didMarkLoaded.current) return;
+    didMarkLoaded.current = true;
+    setLoaded(true);
+    if (hasLoadSlot.current) {
+      hasLoadSlot.current = false;
+      releaseLoadSlot();
+    }
+  };
 
   useEffect(() => {
     const card = cardRef.current;
@@ -111,6 +122,13 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
   useEffect(() => {
     if (failed) return;
     if (!inView) {
+      // If card leaves viewport before it finished loading, free the load slot
+      // so other cards can progress.
+      if (hasLoadSlot.current) {
+        hasLoadSlot.current = false;
+        releaseLoadSlot();
+      }
+      setShouldAttachSrc(false);
       return;
     }
 
@@ -202,7 +220,7 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
           src={shouldAttachSrc || loaded ? src : undefined}
           muted
           playsInline
-          preload="metadata"
+          preload="auto"
           onError={() => {
             setFailed(true);
             if (hasLoadSlot.current) {
@@ -222,13 +240,8 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
               }
             }
           }}
-          onLoadedData={() => {
-            setLoaded(true);
-            if (hasLoadSlot.current) {
-              hasLoadSlot.current = false;
-              releaseLoadSlot();
-            }
-          }}
+          onCanPlay={() => markLoaded()}
+          onLoadedData={() => markLoaded()}
           style={{
             width: "100%", height: "100%", objectFit: "cover", display: "block",
             position: "absolute", inset: 0,
