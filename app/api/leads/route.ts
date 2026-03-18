@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { appendLeadsToSheet } from "@/lib/leads-sheet";
 import crypto from "node:crypto";
+import { appendAffiliateLeadToSheet, isAffiliateSheetConfigured } from "@/lib/affiliate-sheet";
 
 // Jednostavan in-memory rate limit po IP za ovu funkciju.
 // Nije savršen (serverless instanciranje), ali pomaže da se smanji udar na API.
@@ -215,6 +216,62 @@ export async function POST(req: NextRequest) {
       fbp: req.cookies.get("_fbp")?.value ?? null,
       fbc: req.cookies.get("_fbc")?.value ?? null,
     });
+
+    // Affiliate lead: upis u Supabase + Affiliate Sheet (fallback ako client ne pozove /api/affiliate/track)
+    if (affiliateCode) {
+      const acode = String(affiliateCode).trim().toLowerCase();
+      // 1) Supabase affiliate_leads (za dashboard)
+      try {
+        const { data: affiliate } = await supabase
+          .from("affiliates")
+          .select("id")
+          .eq("affiliate_code", acode)
+          .eq("status", "active")
+          .single();
+
+        if (affiliate?.id) {
+          const { error: leadErr } = await supabase.from("affiliate_leads").insert({
+            affiliate_id: affiliate.id,
+            visitor_id: cookieStore.get("af_vid")?.value ?? null,
+            email: String(email).trim().toLowerCase(),
+            phone: phone ?? null,
+            page_url: eventSourceUrl ?? null,
+            utm_source: utm_source ?? null,
+            utm_campaign: utm_campaign ?? null,
+            created_at: new Date().toISOString(),
+          });
+          if (leadErr) {
+            console.error("Affiliate leads Supabase insert error:", JSON.stringify({
+              code: leadErr.code,
+              message: leadErr.message,
+              details: leadErr.details,
+              hint: leadErr.hint,
+            }));
+          }
+        }
+      } catch (e) {
+        console.error("Affiliate leads Supabase exception:", e);
+      }
+
+      // 2) Affiliate Google Sheet (Leads tab)
+      if (isAffiliateSheetConfigured()) {
+        try {
+          await appendAffiliateLeadToSheet({
+            created_at: new Date().toISOString(),
+            email: String(email).trim().toLowerCase(),
+            phone: phone ?? null,
+            affiliate_code: acode,
+            visitor_id: cookieStore.get("af_vid")?.value ?? null,
+            page_url: eventSourceUrl ?? null,
+            utm_source: utm_source ?? null,
+            utm_campaign: utm_campaign ?? null,
+            status: "new",
+          });
+        } catch (e) {
+          console.error("Affiliate lead Sheet error:", e);
+        }
+      }
+    }
 
     // Leads by Source Sheet: webhook za Meta / affiliate tracking
     const leadsSourceWebhook = process.env.LEADS_SOURCE_WEBHOOK_URL;
