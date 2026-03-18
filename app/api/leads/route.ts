@@ -76,6 +76,7 @@ async function sendMetaCapiLeadEvent(opts: {
   fbc?: string | null;
 }) {
   const accessToken = process.env.META_CAPI_ACCESS_TOKEN;
+  const testEventCode = process.env.META_CAPI_TEST_EVENT_CODE || null;
   const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID || "2347723352398323";
   if (!accessToken || !pixelId) return;
 
@@ -102,6 +103,7 @@ async function sendMetaCapiLeadEvent(opts: {
         },
       },
     ],
+    test_event_code: testEventCode || undefined,
   };
 
   const url = `https://graph.facebook.com/v20.0/${pixelId}/events?access_token=${encodeURIComponent(accessToken)}`;
