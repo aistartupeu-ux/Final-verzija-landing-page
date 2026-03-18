@@ -39,7 +39,7 @@ const LogoFallback = () => (
 );
 
 let activeLoadSlots = 0;
-const MAX_CONCURRENT_VIDEO_LOADS = 2;
+const MAX_CONCURRENT_VIDEO_LOADS = 1;
 const loadWaiters = new Set<() => void>();
 
 function tryAcquireLoadSlot() {
@@ -98,8 +98,9 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
     if (!card || !video || failed || !inView) return;
     const io = new IntersectionObserver(
       ([e]) => {
-        if (e.isIntersecting) video.play().catch(() => {});
-        else video.pause();
+        // We only want to SHOW the frame, not continuously decode/play.
+        // Autoplaying many MP4s causes heavy bandwidth/CPU and can crash the tab.
+        if (!e.isIntersecting) video.pause();
       },
       { threshold: 0.3, rootMargin: "80px" }
     );
@@ -200,7 +201,6 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
           ref={videoRef}
           src={shouldAttachSrc || loaded ? src : undefined}
           muted
-          loop
           playsInline
           preload="metadata"
           onError={() => {
@@ -208,6 +208,18 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
             if (hasLoadSlot.current) {
               hasLoadSlot.current = false;
               releaseLoadSlot();
+            }
+          }}
+          onLoadedMetadata={() => {
+            // Ensure we display the first frame (without actually playing).
+            // Some browsers update the frame after seeking to 0.
+            if (videoRef.current) {
+              try {
+                videoRef.current.pause();
+                videoRef.current.currentTime = 0;
+              } catch {
+                // ignore; not all browsers allow seeking before enough data
+              }
             }
           }}
           onLoadedData={() => {
