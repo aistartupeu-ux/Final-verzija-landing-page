@@ -40,6 +40,7 @@ const LogoFallback = () => (
 
 let activeVideoSlots = 0;
 const MAX_ACTIVE_VIDEO_SLOTS = 1;
+const waiters = new Set<() => void>();
 
 function tryAcquireVideoSlot() {
   if (activeVideoSlots >= MAX_ACTIVE_VIDEO_SLOTS) return false;
@@ -49,6 +50,17 @@ function tryAcquireVideoSlot() {
 
 function releaseVideoSlot() {
   activeVideoSlots = Math.max(0, activeVideoSlots - 1);
+  // Wake up one waiter (progressive loading).
+  for (const fn of waiters) {
+    waiters.delete(fn);
+    fn();
+    break;
+  }
+}
+
+function onNextVideoSlotAvailable(cb: () => void) {
+  waiters.add(cb);
+  return () => waiters.delete(cb);
 }
 
 const VideoCard = memo(function VideoCard({ src }: { src: string }) {
@@ -59,6 +71,7 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
   const [inView, setInView] = useState(false);
   const [allowed, setAllowed] = useState(false);
   const hasSlot = useRef(false);
+  const cancelWaitRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const card = cardRef.current;
@@ -97,6 +110,11 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
   useEffect(() => {
     if (failed) return;
     if (!inView) {
+      // Free slot when offscreen so other cards can load.
+      if (hasSlot.current) {
+        hasSlot.current = false;
+        releaseVideoSlot();
+      }
       setAllowed(false);
       return;
     }
@@ -106,15 +124,48 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
       return;
     }
 
-    if (tryAcquireVideoSlot()) {
-      hasSlot.current = true;
-      setAllowed(true);
-      return;
-    }
+    const requestSlot = () => {
+      if (failed || !inView || hasSlot.current) return;
+      if (tryAcquireVideoSlot()) {
+        hasSlot.current = true;
+        setAllowed(true);
+        return;
+      }
+
+      // Wait for a slot, then try again when browser is idle.
+      const run = () => {
+        if (failed || !inView || hasSlot.current) return;
+        requestSlot();
+      };
+      cancelWaitRef.current?.();
+      const cancelWaiter = onNextVideoSlotAvailable(() => {
+        const w = window as unknown as {
+          requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+          cancelIdleCallback?: (id: number) => void;
+        };
+        if (typeof w.requestIdleCallback === "function") {
+          const id = w.requestIdleCallback(run, { timeout: 1200 });
+          cancelWaitRef.current = () => {
+            cancelWaiter();
+            w.cancelIdleCallback?.(id);
+          };
+          return;
+        }
+        const t = window.setTimeout(run, 250);
+        cancelWaitRef.current = () => {
+          cancelWaiter();
+          window.clearTimeout(t);
+        };
+      });
+      cancelWaitRef.current = cancelWaiter;
+    };
+
+    requestSlot();
   }, [failed, inView]);
 
   useEffect(() => {
     return () => {
+      cancelWaitRef.current?.();
       if (hasSlot.current) {
         hasSlot.current = false;
         releaseVideoSlot();
@@ -162,6 +213,13 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
           onError={() => {
             setFailed(true);
             if (hasSlot.current) {
+              hasSlot.current = false;
+              releaseVideoSlot();
+            }
+          }}
+          onPause={() => {
+            // If user scrolls away and playback pauses, allow others to load.
+            if (!inView && hasSlot.current) {
               hasSlot.current = false;
               releaseVideoSlot();
             }
