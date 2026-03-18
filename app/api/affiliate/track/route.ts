@@ -151,40 +151,7 @@ export async function POST(req: NextRequest) {
         created_at: leadCreatedAt,
       };
 
-      // Upis u Supabase za dashboard (affiliate_leads)
-      if (supabase) {
-        try {
-          const { data: affiliate } = await supabase
-            .from("affiliates")
-            .select("id")
-            .eq("affiliate_code", acode)
-            .eq("status", "active")
-            .single();
-
-          if (affiliate?.id) {
-            const { error: leadErr } = await supabase.from("affiliate_leads").insert({
-              affiliate_id: affiliate.id,
-              visitor_id: visitor_id ?? null,
-              email: leadEmail,
-              phone: phone ?? null,
-              page_url: page_url ?? null,
-              utm_source: utm_source ?? null,
-              utm_campaign: utm_campaign ?? null,
-              created_at: leadCreatedAt,
-            });
-            if (leadErr) {
-              console.error("Affiliate lead Supabase insert error:", JSON.stringify({
-                code: leadErr.code,
-                message: leadErr.message,
-                details: leadErr.details,
-                hint: leadErr.hint,
-              }));
-            }
-          }
-        } catch (e) {
-          console.error("Affiliate lead Supabase exception:", e);
-        }
-      }
+      // Supabase upis ide kroz /api/leads (Opcija 2: sve u tabelu "leads").
 
       if (MAKE_WEBHOOK) {
         (async () => {

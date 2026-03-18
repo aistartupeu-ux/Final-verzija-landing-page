@@ -133,13 +133,13 @@ export async function POST(req: NextRequest) {
     const {
       email,
       phone,
-      name,
       utm_source,
       utm_medium,
       utm_campaign,
       affiliate_code: bodyAffiliate,
       source_tag,
     } = body;
+    const name = typeof body?.name === "string" ? body.name.trim() : null;
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -184,6 +184,11 @@ export async function POST(req: NextRequest) {
       // Location je opciono — ne blokiramo lead zbog ovoga
     }
 
+    const cookieStore = await cookies();
+    const affiliateCodeRaw = bodyAffiliate ?? cookieStore.get("af_ref")?.value ?? null;
+    const affiliateCode = affiliateCodeRaw ? String(affiliateCodeRaw).trim().toLowerCase() : null;
+    const sourceTag = source_tag ?? (affiliateCode ? "affiliate" : "direct");
+
     const { error } = await supabase.from("leads").insert({
       email,
       phone: phone ?? null,
@@ -191,6 +196,11 @@ export async function POST(req: NextRequest) {
       country,
       country_code,
       ip: ip || null,
+      affiliate_code: affiliateCode,
+      utm_source: utm_source ?? null,
+      utm_medium: utm_medium ?? null,
+      utm_campaign: utm_campaign ?? null,
+      source_tag: sourceTag,
     });
 
     if (error) {
@@ -203,9 +213,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const cookieStore = await cookies();
-    const affiliateCode = bodyAffiliate ?? cookieStore.get("af_ref")?.value ?? null;
-
     // Meta Conversions API (server-side Lead event)
     await sendMetaCapiLeadEvent({
       email,
@@ -217,59 +224,22 @@ export async function POST(req: NextRequest) {
       fbc: req.cookies.get("_fbc")?.value ?? null,
     });
 
-    // Affiliate lead: upis u Supabase + Affiliate Sheet (fallback ako client ne pozove /api/affiliate/track)
-    if (affiliateCode) {
-      const acode = String(affiliateCode).trim().toLowerCase();
-      // 1) Supabase affiliate_leads (za dashboard)
+    // Affiliate lead: Affiliate Google Sheet (Leads tab)
+    if (affiliateCode && isAffiliateSheetConfigured()) {
       try {
-        const { data: affiliate } = await supabase
-          .from("affiliates")
-          .select("id")
-          .eq("affiliate_code", acode)
-          .eq("status", "active")
-          .single();
-
-        if (affiliate?.id) {
-          const { error: leadErr } = await supabase.from("affiliate_leads").insert({
-            affiliate_id: affiliate.id,
-            visitor_id: cookieStore.get("af_vid")?.value ?? null,
-            email: String(email).trim().toLowerCase(),
-            phone: phone ?? null,
-            page_url: eventSourceUrl ?? null,
-            utm_source: utm_source ?? null,
-            utm_campaign: utm_campaign ?? null,
-            created_at: new Date().toISOString(),
-          });
-          if (leadErr) {
-            console.error("Affiliate leads Supabase insert error:", JSON.stringify({
-              code: leadErr.code,
-              message: leadErr.message,
-              details: leadErr.details,
-              hint: leadErr.hint,
-            }));
-          }
-        }
+        await appendAffiliateLeadToSheet({
+          created_at: new Date().toISOString(),
+          email: String(email).trim().toLowerCase(),
+          phone: phone ?? null,
+          affiliate_code: affiliateCode,
+          visitor_id: cookieStore.get("af_vid")?.value ?? null,
+          page_url: eventSourceUrl ?? null,
+          utm_source: utm_source ?? null,
+          utm_campaign: utm_campaign ?? null,
+          status: "new",
+        });
       } catch (e) {
-        console.error("Affiliate leads Supabase exception:", e);
-      }
-
-      // 2) Affiliate Google Sheet (Leads tab)
-      if (isAffiliateSheetConfigured()) {
-        try {
-          await appendAffiliateLeadToSheet({
-            created_at: new Date().toISOString(),
-            email: String(email).trim().toLowerCase(),
-            phone: phone ?? null,
-            affiliate_code: acode,
-            visitor_id: cookieStore.get("af_vid")?.value ?? null,
-            page_url: eventSourceUrl ?? null,
-            utm_source: utm_source ?? null,
-            utm_campaign: utm_campaign ?? null,
-            status: "new",
-          });
-        } catch (e) {
-          console.error("Affiliate lead Sheet error:", e);
-        }
+        console.error("Affiliate lead Sheet error:", e);
       }
     }
 
@@ -280,8 +250,8 @@ export async function POST(req: NextRequest) {
         date: new Date().toISOString(),
         email,
         phone: phone ?? "",
-        name: name ?? "",
-        source_tag: source_tag ?? (affiliateCode ? "affiliate" : "direct"),
+        name: "",
+        source_tag: sourceTag,
         utm_source: utm_source ?? "",
         utm_medium: utm_medium ?? "",
         utm_campaign: utm_campaign ?? "",
@@ -310,8 +280,8 @@ export async function POST(req: NextRequest) {
       date: new Date().toISOString(),
       email,
       phone: phone ?? "",
-      name: name ?? "",
-      source_tag: source_tag ?? (affiliateCode ? "affiliate" : "direct"),
+      name: "",
+      source_tag: sourceTag,
       utm_source: utm_source ?? "",
       utm_medium: utm_medium ?? "",
       utm_campaign: utm_campaign ?? "",
