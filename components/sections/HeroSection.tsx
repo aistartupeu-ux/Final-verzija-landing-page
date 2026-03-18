@@ -16,6 +16,8 @@ export default function HeroSection() {
   const sectionRef = useRef<HTMLElement>(null);
   const [playing, setPlaying] = useState(false);
   const [hovering, setHovering] = useState(false);
+  const [bgFailed, setBgFailed] = useState(false);
+  const [explainerFailed, setExplainerFailed] = useState(false);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -88,25 +90,37 @@ export default function HeroSection() {
     >
       {/* Video wallpaper with parallax */}
       <div style={{ position: "absolute", inset: 0, zIndex: 0, overflow: "hidden", contain: "layout style paint" }}>
-        <video
-          ref={bgVideoRef}
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="none"
-          poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%2305080c' width='1' height='1'/%3E%3C/svg%3E"
-          style={{
-            position: "absolute",
-            top: "50%", left: "50%",
-            minWidth: "100%", minHeight: "100%",
-            width: "auto", height: "auto",
-            transform: "translate(-50%, -50%) scale(1.12) translateZ(0)",
-            objectFit: "cover",
-          }}
-        >
-          <source src="/hero-vsl.mp4" type="video/mp4" />
-        </video>
+        {bgFailed ? (
+          <Image
+            src="/pozadina-plexus.png"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            style={{ objectFit: "cover" }}
+          />
+        ) : (
+          <video
+            ref={bgVideoRef}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="none"
+            poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%2305080c' width='1' height='1'/%3E%3C/svg%3E"
+            onError={() => setBgFailed(true)}
+            style={{
+              position: "absolute",
+              top: "50%", left: "50%",
+              minWidth: "100%", minHeight: "100%",
+              width: "auto", height: "auto",
+              transform: "translate(-50%, -50%) scale(1.12) translateZ(0)",
+              objectFit: "cover",
+            }}
+          >
+            <source src="/hero-vsl.mp4" type="video/mp4" />
+          </video>
+        )}
         <div style={{ position: "absolute", inset: 0, background: "rgba(5,5,8,0.82)" }} />
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "45%", background: "linear-gradient(to top, #050508 0%, rgba(5,5,8,0.7) 50%, transparent 100%)" }} />
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "25%", background: "linear-gradient(to bottom, rgba(5,5,8,0.4), transparent)" }} />
@@ -167,6 +181,7 @@ export default function HeroSection() {
               playsInline
               preload="none"
               poster="/video-poster.webp"
+              onError={() => setExplainerFailed(true)}
               onEnded={() => setPlaying(false)}
               style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
             />
@@ -177,6 +192,26 @@ export default function HeroSection() {
                 background: "rgba(5,5,12,0.52)",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
+                {explainerFailed ? (
+                  <div style={{
+                    position: "absolute",
+                    bottom: 14,
+                    left: 14,
+                    right: 14,
+                    zIndex: 3,
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    background: "rgba(0,0,0,0.55)",
+                    color: "rgba(255,255,255,0.85)",
+                    fontSize: 12,
+                    lineHeight: 1.4,
+                    textAlign: "left",
+                    backdropFilter: "blur(8px)",
+                  }}>
+                    Video se trenutno ne učitava (404). Prikazujemo fallback dok ne sredimo hostovanje.
+                  </div>
+                ) : null}
                 {/* Pulse ring */}
                 <div style={{
                   position: "absolute", width: 96, height: 96, borderRadius: "50%",

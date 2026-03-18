@@ -38,12 +38,27 @@ const LogoFallback = () => (
   </div>
 );
 
+let activeVideoSlots = 0;
+const MAX_ACTIVE_VIDEO_SLOTS = 1;
+
+function tryAcquireVideoSlot() {
+  if (activeVideoSlots >= MAX_ACTIVE_VIDEO_SLOTS) return false;
+  activeVideoSlots += 1;
+  return true;
+}
+
+function releaseVideoSlot() {
+  activeVideoSlots = Math.max(0, activeVideoSlots - 1);
+}
+
 const VideoCard = memo(function VideoCard({ src }: { src: string }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [inView, setInView] = useState(false);
+  const [allowed, setAllowed] = useState(false);
+  const hasSlot = useRef(false);
 
   useEffect(() => {
     const card = cardRef.current;
@@ -67,7 +82,7 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
   useEffect(() => {
     const card = cardRef.current;
     const video = videoRef.current;
-    if (!card || !video || failed || !inView) return;
+    if (!card || !video || failed || !inView || !allowed) return;
     const io = new IntersectionObserver(
       ([e]) => {
         if (e.isIntersecting) video.play().catch(() => {});
@@ -77,9 +92,37 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
     );
     io.observe(card);
     return () => io.disconnect();
+  }, [allowed, failed, inView]);
+
+  useEffect(() => {
+    if (failed) return;
+    if (!inView) {
+      setAllowed(false);
+      return;
+    }
+
+    if (hasSlot.current) {
+      setAllowed(true);
+      return;
+    }
+
+    if (tryAcquireVideoSlot()) {
+      hasSlot.current = true;
+      setAllowed(true);
+      return;
+    }
   }, [failed, inView]);
 
-  const shouldLoadVideo = inView && !failed;
+  useEffect(() => {
+    return () => {
+      if (hasSlot.current) {
+        hasSlot.current = false;
+        releaseVideoSlot();
+      }
+    };
+  }, []);
+
+  const shouldLoadVideo = inView && allowed && !failed;
 
   return (
     <div
@@ -115,8 +158,14 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
           muted
           loop
           playsInline
-          preload="metadata"
-          onError={() => setFailed(true)}
+          preload="none"
+          onError={() => {
+            setFailed(true);
+            if (hasSlot.current) {
+              hasSlot.current = false;
+              releaseVideoSlot();
+            }
+          }}
           onLoadedData={() => setLoaded(true)}
           style={{
             width: "100%", height: "100%", objectFit: "cover", display: "block",
