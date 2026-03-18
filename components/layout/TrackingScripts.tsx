@@ -2,7 +2,7 @@ import Script from "next/script";
 
 /**
  * Učitava tracking skripte za kampanju kada su env varijable postavljene.
- * Dodaj u Vercel: NEXT_PUBLIC_GA_MEASUREMENT_ID, NEXT_PUBLIC_META_PIXEL_ID
+ * Dodaj u Vercel: NEXT_PUBLIC_GA_MEASUREMENT_ID, NEXT_PUBLIC_META_PIXEL_ID, NEXT_PUBLIC_GTM_ID
  */
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "2347723352398323";
 const DEFAULT_GA_ID = "G-87RPG6JR4B";
@@ -10,8 +10,9 @@ const DEFAULT_GA_ID = "G-87RPG6JR4B";
 export default function TrackingScripts() {
   const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || DEFAULT_GA_ID;
   const metaPixelId = META_PIXEL_ID;
+  const gtmId = process.env.NEXT_PUBLIC_GTM_ID;
 
-  if (!gaId && !metaPixelId) return null;
+  if (!gaId && !metaPixelId && !gtmId) return null;
 
   return (
     <>
@@ -57,6 +58,17 @@ export default function TrackingScripts() {
             />
           </noscript>
         </>
+      )}
+      {gtmId && (
+        <Script id="gtm" strategy="afterInteractive">
+          {`
+            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+            new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+            })(window,document,'script','dataLayer','${gtmId}');
+          `}
+        </Script>
       )}
     </>
   );
