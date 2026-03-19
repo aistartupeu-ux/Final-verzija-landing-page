@@ -67,7 +67,7 @@ export async function ttqIdentify(params: {
 }
 
 /**
- * Za /join stranicu: ttq.identify + Lead sa strukturom contents/value/currency.
+ * Za /join stranicu: ttq.identify + SubmitForm (TikTok nema Lead event).
  * Pozovi nakon uspešnog API poziva kad imamo email.
  */
 export async function ttqLeadWithPii(params: { email: string; phone?: string | null }): Promise<void> {
@@ -76,7 +76,7 @@ export async function ttqLeadWithPii(params: { email: string; phone?: string | n
   if (typeof w.ttq?.track !== "function") return;
 
   await ttqIdentify({ email: params.email, phone: params.phone, externalId: params.email });
-  w.ttq.track("Lead", { ...TIKTOK_LEAD_CONTENT });
+  w.ttq.track("SubmitForm", { ...TIKTOK_LEAD_CONTENT });
 }
 
 /**
@@ -202,8 +202,8 @@ export async function pushThankYouPageTracking(opts?: { eventIdFromUrl?: string 
         phone: data.phone,
         externalId: eventId ?? data.email,
       });
-      w.ttq.track("Lead", { ...TIKTOK_LEAD_CONTENT });
-      w.ttq.track("CompleteRegistration", { ...TIKTOK_LEAD_CONTENT });
+      w.ttq.track("SubmitForm", { ...TIKTOK_LEAD_CONTENT }); // form submit
+      w.ttq.track("CompleteRegistration", { ...TIKTOK_LEAD_CONTENT }); // signup complete
     }
   }
 
