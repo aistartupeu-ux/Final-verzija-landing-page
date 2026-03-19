@@ -141,8 +141,11 @@ export async function pushThankYouPageTracking(opts?: { eventIdFromUrl?: string 
     w.gtag("event", "generate_lead", { event_category: "lead", event_label: "thank_you_page", user_data });
   }
   if (w.ttq) {
-    if (typeof w.ttq.page === "function") w.ttq.page(); // TikTok vidi thank-you stranicu
-    if (typeof w.ttq.track === "function") w.ttq.track("CompleteRegistration", { content_name: "thank_you_page" });
+    if (typeof w.ttq.page === "function") w.ttq.page(); // PageView kao Meta
+    if (typeof w.ttq.track === "function") {
+      w.ttq.track("Lead", { content_name: "thank_you_page" }); // isto kao fbq Lead
+      w.ttq.track("CompleteRegistration", { content_name: "thank_you_page" });
+    }
   }
 
   // Meta: PageView + Lead na thank-you stranici (client-side navigacija ne šalje auto PageView).

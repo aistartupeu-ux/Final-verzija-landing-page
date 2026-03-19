@@ -54,11 +54,7 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
         return;
       }
 
-      // fbq Lead šalje se na thank-you stranici (pushThankYouPageTracking) za bolju Meta atribuciju.
-
-      if (typeof window !== "undefined" && (window as unknown as { ttq?: { track: (ev: string, opts?: object) => void } }).ttq) {
-        (window as unknown as { ttq: { track: (ev: string, opts?: object) => void } }).ttq.track("SubmitForm", { content_name: "waitlist_lead" });
-      }
+      // Meta: Lead šalje se na thank-you (pushThankYouPageTracking). TikTok: isto – Lead samo na thank-you.
 
       await pushLeadToDataLayer(email, null);
       storeLeadForThankYou(email, null, eventId);

@@ -82,8 +82,10 @@ function JoinContent() {
           source_tag: sourceData.source_tag,
         }),
       });
-      if (res.ok && typeof window !== "undefined" && (window as unknown as { fbq?: (a: string, b: string) => void }).fbq) {
-        (window as unknown as { fbq: (a: string, b: string) => void }).fbq("track", "Lead");
+      if (res.ok && typeof window !== "undefined") {
+        const w = window as unknown as { fbq?: (a: string, b: string) => void; ttq?: { track: (ev: string) => void } };
+        if (w.fbq) w.fbq("track", "Lead");
+        if (w.ttq?.track) w.ttq.track("Lead");
       }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
