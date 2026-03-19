@@ -41,7 +41,7 @@ export function initAffiliateTracking(): void {
   if (utmCampaign) setCookie("af_utm_campaign", utmCampaign, 7);
 }
 
-/** Podaci o izvoru za lead (UTM + affiliate) — za Sheet "Leads by Source" */
+/** Podaci o izvoru za lead (UTM + affiliate) — za Sheet "Leads by Source" i Supabase */
 export function getLeadSourceData(): {
   utm_source: string | null;
   utm_medium: string | null;
@@ -56,12 +56,15 @@ export function getLeadSourceData(): {
 
   let sourceTag = "direct";
   if (affiliateCode) sourceTag = "affiliate";
-  else if (utmSource) {
+  else {
     const s = (utmSource + "").toLowerCase();
-    if (s.includes("instagram")) sourceTag = "instagram";
-    else if (s.includes("facebook") || s.includes("fb")) sourceTag = "facebook";
+    const m = (utmMedium + "").toLowerCase();
+    const probe = `${s} ${m}`;
+    if (probe.includes("instagram") || s === "ig" || m === "ig") sourceTag = "instagram";
+    else if (probe.includes("facebook") || s === "fb" || m === "fb") sourceTag = "facebook";
+    else if (probe.includes("tiktok") || s === "tt" || m === "tt") sourceTag = "tiktok";
     else if (s.includes("meta")) sourceTag = "meta";
-    else sourceTag = s;
+    else if (s) sourceTag = s;
   }
 
   return {
