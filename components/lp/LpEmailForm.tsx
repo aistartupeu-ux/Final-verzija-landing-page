@@ -1,14 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 import { getLeadSourceData } from "@/lib/affiliate-tracking";
+import { useRouter } from "next/navigation";
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
 export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -66,6 +68,12 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!done) return;
+    const t = window.setTimeout(() => router.push("/thank-you"), 2400);
+    return () => window.clearTimeout(t);
+  }, [done, router]);
 
   if (done) {
     return (

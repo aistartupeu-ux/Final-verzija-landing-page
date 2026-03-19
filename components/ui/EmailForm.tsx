@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 import { trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
 import PhoneInput, { type Value } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
+import { useRouter } from "next/navigation";
 
 export default function EmailForm({ microcopy }: { microcopy?: string; className?: string }) {
+  const router = useRouter();
   const [step, setStep] = useState<"email" | "phone" | "done">("email");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState<Value | undefined>();
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [didRedirect, setDidRedirect] = useState(false);
 
   const submitEmail = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +62,15 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
       return;
     }
   };
+
+  useEffect(() => {
+    if (step !== "done" || didRedirect) return;
+    const t = window.setTimeout(() => {
+      setDidRedirect(true);
+      router.push("/thank-you");
+    }, 2400);
+    return () => window.clearTimeout(t);
+  }, [didRedirect, router, step]);
 
   if (step === "done") {
     return (
