@@ -23,6 +23,8 @@ type AnalyticsData = {
   tiktokLeads: number;
   direct: number;
   affiliate: number;
+  secondsUntilMidnight?: number;
+  belgradeTime?: string;
   debug?: {
     sheetRowsTotal: number;
     sheetBySource: Record<string, number>;
@@ -54,6 +56,8 @@ export default function AdminAnalyticsPage() {
     facebook: { spend: number; leads: number; cpl: number | null };
   } | null>(null);
   const [tiktokSpend, setTiktokSpend] = useState("");
+  const [todayData, setTodayData] = useState<AnalyticsData | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -64,6 +68,24 @@ export default function AdminAnalyticsPage() {
     if (!from) setFrom(firstDay.toISOString().slice(0, 10));
     if (!to) setTo(now.toISOString().slice(0, 10));
   }, []);
+
+  const fetchTodayData = async (token: string) => {
+    try {
+      const params = new URLSearchParams();
+      params.set("secret", token);
+      params.set("today", "1");
+      const res = await fetch(`/api/admin/analytics?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setTodayData(json);
+        if (json.secondsUntilMidnight != null) setSecondsLeft(json.secondsUntilMidnight);
+      }
+    } catch {
+      // opciono
+    }
+  };
 
   const fetchData = async (token: string, silent = false, withDebug = false) => {
     if (!silent) setLoading(true);
@@ -89,6 +111,7 @@ export default function AdminAnalyticsPage() {
       }
       const json = await res.json();
       setData(json);
+      fetchTodayData(token);
 
       const mp = new URLSearchParams();
       mp.set("secret", token);
@@ -146,6 +169,7 @@ export default function AdminAnalyticsPage() {
       localStorage.setItem("admin_analytics_secret", secret.trim());
       setAuth(secret.trim());
       setData(json);
+      fetchTodayData(secret.trim());
       setAttempts(0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Greška pri prijavi.");
@@ -190,6 +214,22 @@ export default function AdminAnalyticsPage() {
     const id = setInterval(() => { const t = authRef.current; if (t) fetchData(t, true); }, 20000);
     return () => clearInterval(id);
   }, [auth, data]);
+
+  // Countdown do ponoći Beograd — reset na 24h
+  useEffect(() => {
+    if (secondsLeft == null || secondsLeft <= 0) return;
+    const id = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev == null || prev <= 1) {
+          const t = authRef.current;
+          if (t) fetchTodayData(t);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [secondsLeft]);
 
   const handleRefresh = () => auth && fetchData(auth);
 
@@ -319,6 +359,37 @@ export default function AdminAnalyticsPage() {
           </div>
         ) : data ? (
           <>
+            {todayData && (
+              <div style={{ marginBottom: 24, padding: 20, borderRadius: 18, background: "linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(0,180,224,0.05) 100%)", border: "1px solid rgba(0,212,255,0.25)" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+                  <div>
+                    <h2 style={{ fontSize: 14, fontWeight: 700, color: "#00d4ff", marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                      Danas (Beograd · CET)
+                    </h2>
+                    <div style={{ fontSize: 36, fontWeight: 800, color: "#fff" }}>{todayData.total}</div>
+                    <div style={{ fontSize: 13, color: "#888" }}>Leadova danas · reset u ponoć</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    {todayData.belgradeTime && (
+                      <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>{todayData.belgradeTime}</div>
+                    )}
+                    {secondsLeft != null && secondsLeft > 0 && (
+                      <div style={{ fontSize: 18, fontWeight: 700, color: "#00d4ff", fontVariantNumeric: "tabular-nums" }}>
+                        {Math.floor(secondsLeft / 3600)}h {Math.floor((secondsLeft % 3600) / 60)}m {secondsLeft % 60}s
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: "#555" }}>do resetovanja</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16, fontSize: 12, color: "#aaa" }}>
+                  <span>IG: {todayData.bySource?.instagram ?? 0}</span>
+                  <span>FB: {todayData.bySource?.facebook ?? 0}</span>
+                  <span>TikTok: {todayData.tiktokLeads ?? 0}</span>
+                  <span>Direktno: {todayData.direct ?? 0}</span>
+                </div>
+              </div>
+            )}
+
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16, marginBottom: 32 }}>
               <div style={{ padding: 24, borderRadius: 18, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(0,212,255,0.15)" }}>
                 <Users size={24} color="#00d4ff" style={{ marginBottom: 12 }} />
@@ -391,6 +462,7 @@ export default function AdminAnalyticsPage() {
               <h2 style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 16 }}>Raspodela po izvoru</h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {Object.entries(data.bySource)
+                  .filter(([source]) => source !== "affiliate" && source !== "null" && source !== "")
                   .sort((a, b) => b[1] - a[1])
                   .map(([source, count]) => (
                     <div key={source} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
