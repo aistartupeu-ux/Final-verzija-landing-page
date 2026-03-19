@@ -2,33 +2,64 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAllowedEmailDomain } from "@/lib/email-domains";
 import { hasValidMxRecords } from "@/lib/email-verify-server";
 
-/** Opciono: Abstract API za deliverability (kada je API key setovan). */
+/**
+ * Abstract API za deliverability. Podržava oba:
+ * - Email Validation API (emailvalidation.abstractapi.com)
+ * - Email Reputation API (emailreputation.abstractapi.com)
+ */
 async function checkAbstractApi(email: string): Promise<{
   valid: boolean;
-  deliverability?: string;
-  autocorrect?: string;
+  message?: string;
 }> {
   const key = process.env.ABSTRACT_EMAIL_API_KEY;
-  if (!key) return { valid: true }; // Preskoči ako nema ključa
+  if (!key) return { valid: true };
 
+  // 1) Pokušaj Email Reputation API (status: deliverable | undeliverable | unknown)
   try {
-    const url = `https://emailvalidation.abstractapi.com/v1/?api_key=${encodeURIComponent(key)}&email=${encodeURIComponent(email)}`;
-    const res = await fetch(url, { next: { revalidate: 0 } });
-    if (!res.ok) return { valid: true }; // Na grešku ne blokiramo
+    const repUrl = `https://emailreputation.abstractapi.com/v1/?api_key=${encodeURIComponent(key)}&email=${encodeURIComponent(email)}`;
+    const repRes = await fetch(repUrl, { next: { revalidate: 0 } });
+    if (repRes.ok) {
+      const data = await repRes.json();
+      const status = data?.email_deliverability?.status;
+      if (status === "undeliverable") {
+        const detail = data?.email_deliverability?.status_detail || "";
+        return {
+          valid: false,
+          message: detail === "invalid_mailbox"
+            ? "Email adresa ne postoji ili nije isporučiva."
+            : "Email adresa nije isporučiva.",
+        };
+      }
+      return { valid: true };
+    }
+    if (repRes.status === 401) {
+      // Ključ nije za Reputation, pokušaj Validation
+    } else {
+      return { valid: true };
+    }
+  } catch {
+    // Fallback na Validation
+  }
 
-    const data = await res.json();
+  // 2) Pokušaj Email Validation API (deliverability: DELIVERABLE | UNDELIVERABLE)
+  try {
+    const valUrl = `https://emailvalidation.abstractapi.com/v1/?api_key=${encodeURIComponent(key)}&email=${encodeURIComponent(email)}`;
+    const valRes = await fetch(valUrl, { next: { revalidate: 0 } });
+    if (!valRes.ok) return { valid: true };
+
+    const data = await valRes.json();
     const deliverability = data?.deliverability;
     const autocorrect = data?.autocorrect;
 
-    // DELIVERABLE = ok, UNDELIVERABLE = odbij, UNKNOWN = prihvati (da ne blokiramo lažno)
     if (deliverability === "UNDELIVERABLE") {
       return {
         valid: false,
-        deliverability,
-        autocorrect: autocorrect || undefined,
+        message: autocorrect
+          ? `Email nije isporučiv. Da li ste mislili: ${autocorrect}?`
+          : "Email adresa nije isporučiva ili ne postoji.",
       };
     }
-    return { valid: true, deliverability, autocorrect };
+    return { valid: true };
   } catch {
     return { valid: true };
   }
@@ -66,10 +97,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       valid: false,
       reason: "undeliverable",
-      message: abstractResult.autocorrect
-        ? `Email nije isporučiv. Da li ste mislili: ${abstractResult.autocorrect}?`
-        : "Email adresa nije isporučiva ili ne postoji.",
-      autocorrect: abstractResult.autocorrect,
+      message: abstractResult.message ?? "Email adresa nije isporučiva ili ne postoji.",
     });
   }
 
