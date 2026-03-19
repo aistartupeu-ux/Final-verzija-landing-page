@@ -135,9 +135,7 @@ export async function pushThankYouPageTracking(): Promise<void> {
   if (w.ttq?.track) {
     w.ttq.track("CompleteRegistration", { content_name: "thank_you_page" });
   }
-  if (w.fbq) {
-    w.fbq("track", "Lead");
-  }
+  // Ne šaljemo fbq Lead ovde — već je poslat na form submit. Dupli event.
 }
 
 export type PurchaseItem = {
