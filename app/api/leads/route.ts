@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { appendLeadsToSheet } from "@/lib/leads-sheet";
 import { appendAffiliateLeadToSheet, isAffiliateSheetConfigured } from "@/lib/affiliate-sheet";
+import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 
 // Jednostavan in-memory rate limit po IP za ovu funkciju.
 // Nije savršen (serverless instanciranje), ali pomaže da se smanji udar na API.
@@ -72,6 +73,9 @@ export async function POST(req: NextRequest) {
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+    if (!isAllowedEmailDomain(String(email).trim())) {
+      return NextResponse.json({ error: EMAIL_DOMAIN_ERROR }, { status: 400 });
     }
 
     if (!supabase) {

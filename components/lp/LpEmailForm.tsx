@@ -3,11 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 import { getLeadSourceData } from "@/lib/affiliate-tracking";
+import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { pushLeadToDataLayer, storeLeadForThankYou } from "@/lib/tiktok-datalayer";
 import { useRouter } from "next/navigation";
 
-function isValidEmail(email: string) {
+function hasValidEmailFormat(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+function isValidEmail(email: string) {
+  if (!hasValidEmailFormat(email)) return false;
+  return isAllowedEmailDomain(email);
 }
 
 export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
@@ -158,9 +164,9 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
         </button>
       </div>
 
-      {error && (
+      {(error || (email && hasValidEmailFormat(email) && !isAllowedEmailDomain(email))) && (
         <div style={{ marginTop: 10, color: "#ef4444", fontSize: 13, textAlign: "center" }}>
-          {error}
+          {error || EMAIL_DOMAIN_ERROR}
         </div>
       )}
 

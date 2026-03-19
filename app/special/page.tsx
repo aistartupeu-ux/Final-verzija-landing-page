@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, Loader2, Gift, Check } from "lucide-react";
 import { initAffiliateTracking, trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
+import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import NetworkBackground from "@/components/ui/NetworkBackground";
 
 function SpecialGateContent() {
@@ -26,6 +27,10 @@ function SpecialGateContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.includes("@")) return;
+    if (!isAllowedEmailDomain(email)) {
+      setError(EMAIL_DOMAIN_ERROR);
+      return;
+    }
     setError(null);
     setLoading(true);
     try {

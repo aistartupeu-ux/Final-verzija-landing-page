@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 import { trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
+import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { pushLeadToDataLayer, storeLeadForThankYou } from "@/lib/tiktok-datalayer";
 import PhoneInput, { type Value } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
@@ -22,6 +23,10 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
   const submitEmail = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.includes("@")) return;
+    if (!isAllowedEmailDomain(email)) {
+      setError(EMAIL_DOMAIN_ERROR);
+      return;
+    }
     setError(null);
     setStep("phone");
   };
@@ -180,7 +185,7 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
           transition: "border-color 0.3s ease, box-shadow 0.3s ease",
         }}>
           <input
-            type="email" value={email} onChange={e => setEmail(e.target.value)}
+            type="email" value={email} onChange={e => { setEmail(e.target.value); setError(null); }}
             onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
             placeholder="Unesi svoj email" required
             style={{
@@ -194,6 +199,11 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
           </button>
         </div>
       </form>
+      {error && (
+        <p style={{ textAlign: "center", fontSize: 13, color: "#ef4444", marginTop: 12 }}>
+          {error}
+        </p>
+      )}
       {microcopy && (
         <p style={{ textAlign: "center", fontSize: 12, color: "#555", marginTop: 12, letterSpacing: "0.02em" }}>
           {microcopy}

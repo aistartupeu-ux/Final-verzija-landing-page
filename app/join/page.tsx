@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
+import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import {
   ArrowLeft, Mail, ArrowRight, Loader2, CheckCircle,
   Sparkles, GraduationCap, Users, ShieldCheck, Zap, Award,
@@ -49,6 +50,10 @@ function JoinContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.includes("@") || !name) return;
+    if (!isAllowedEmailDomain(email)) {
+      alert(EMAIL_DOMAIN_ERROR);
+      return;
+    }
     setStatus("loading");
     try {
       const sourceData = getLeadSourceData();
