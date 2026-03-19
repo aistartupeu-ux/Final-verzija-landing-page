@@ -118,6 +118,25 @@ export async function POST(req: NextRequest) {
     const affiliateCode = affiliateCodeRaw ? String(affiliateCodeRaw).trim().toLowerCase() : null;
     const sourceTag = source_tag ?? (affiliateCode ? "affiliate" : "direct");
 
+    const emailNorm = String(email).trim().toLowerCase();
+    const { data: existing } = await supabase
+      .from("leads")
+      .select("id")
+      .ilike("email", emailNorm)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      cookieStore.set("special_access", "1", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24,
+        path: "/",
+      });
+      return NextResponse.json({ success: true });
+    }
+
     const { error } = await supabase.from("leads").insert({
       email,
       phone: phone ?? null,
