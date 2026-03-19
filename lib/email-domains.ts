@@ -25,3 +25,6 @@ export function isAllowedEmailDomain(email: string): boolean {
 
 export const EMAIL_DOMAIN_ERROR =
   "Koristite email sa dozvoljenog provajdera (npr. Gmail, Outlook, Yahoo, iCloud, AOL).";
+
+export const EMAIL_MX_ERROR =
+  "Email adresa nije validna ili domen nema podešene mail servere.";

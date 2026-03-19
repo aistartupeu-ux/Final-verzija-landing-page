@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { appendLeadsToSheet } from "@/lib/leads-sheet";
-import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
+import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR, EMAIL_MX_ERROR } from "@/lib/email-domains";
+import { hasValidMxRecords } from "@/lib/email-verify-server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -31,6 +32,9 @@ export async function POST(req: NextRequest) {
     }
     if (!isAllowedEmailDomain(String(email).trim())) {
       return NextResponse.json({ error: EMAIL_DOMAIN_ERROR }, { status: 400 });
+    }
+    if (!(await hasValidMxRecords(String(email).trim()))) {
+      return NextResponse.json({ error: EMAIL_MX_ERROR }, { status: 400 });
     }
 
     if (!supabase) {

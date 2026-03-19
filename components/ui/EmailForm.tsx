@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle, Loader2, XCircle } from "lucide-react";
 import { trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
+import { useEmailVerify } from "@/lib/use-email-verify";
 import { pushLeadToDataLayer, storeLeadForThankYou } from "@/lib/tiktok-datalayer";
 import PhoneInput, { type Value } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
@@ -19,6 +20,11 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
   const [error, setError] = useState<string | null>(null);
   const [didRedirect, setDidRedirect] = useState(false);
   const [pendingEventId, setPendingEventId] = useState<string | null>(null);
+  const { state: verifyState, error: verifyError, check: verifyCheck } = useEmailVerify();
+
+  useEffect(() => {
+    verifyCheck(email);
+  }, [email, verifyCheck]);
 
   const submitEmail = (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,9 +33,15 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
       setError(EMAIL_DOMAIN_ERROR);
       return;
     }
+    if (verifyState !== "valid") {
+      setError(verifyError ?? "Proverite da li je email adresa validna i da postoji.");
+      return;
+    }
     setError(null);
     setStep("phone");
   };
+
+  const canSubmit = verifyState === "valid";
 
   const submitPhone = async (e: React.FormEvent, skipPhone = false) => {
     e.preventDefault();
@@ -175,33 +187,49 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
       <style>{`
         .ef-email-row{display:flex;align-items:stretch;border-radius:50px;overflow:hidden}
         .ef-email-btn{padding:16px 28px;background:linear-gradient(135deg,#00d4ff 0%,#00b0e0 100%);border:none;cursor:pointer;color:#050508;font-weight:700;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;transition:all 0.3s ease;flex-shrink:0}
-        @media(max-width:480px){.ef-email-row{flex-direction:column;border-radius:16px;gap:8px;overflow:visible}.ef-email-btn{border-radius:12px !important;width:100%;padding:14px 20px}}
+        @media(max-width:480px){.ef-email-row{flex-direction:column;border-radius:16px;gap:8px;overflow:visible}        .ef-email-btn{border-radius:12px !important;width:100%;padding:14px 20px}
+        .ef-email-btn:disabled{cursor:not-allowed}
+        @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
       `}</style>
       <form onSubmit={submitEmail} style={{ maxWidth: 520, margin: "0 auto" }}>
         <div className="ef-email-row" style={{
-          border: `1px solid ${focused ? "rgba(0,212,255,0.4)" : "rgba(0,212,255,0.15)"}`,
+          border: `1px solid ${
+            verifyState === "invalid" ? "rgba(239,68,68,0.4)" :
+            focused ? "rgba(0,212,255,0.4)" : "rgba(0,212,255,0.15)"
+          }`,
           background: "rgba(255,255,255,0.03)",
           boxShadow: focused ? "0 0 30px rgba(0,212,255,0.08)" : "none",
           transition: "border-color 0.3s ease, box-shadow 0.3s ease",
         }}>
-          <input
-            type="email" value={email} onChange={e => { setEmail(e.target.value); setError(null); }}
-            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-            placeholder="Unesi svoj email" required
-            style={{
-              flex: 1, minWidth: 0, padding: "16px 20px", background: "transparent",
-              border: "none", outline: "none", color: "#fff", fontSize: 15, fontFamily: "inherit",
-              width: "100%",
-            }}
-          />
-          <button type="submit" className="ef-email-btn">
+          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", position: "relative" }}>
+            <input
+              type="email" value={email} onChange={e => { setEmail(e.target.value); setError(null); }}
+              onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+              placeholder="Unesi svoj email" required
+              style={{
+                flex: 1, minWidth: 0, padding: "16px 44px 16px 20px", background: "transparent",
+                border: "none", outline: "none", color: "#fff", fontSize: 15, fontFamily: "inherit",
+                width: "100%",
+              }}
+            />
+            {verifyState === "checking" && (
+              <Loader2 size={18} color="#00d4ff" style={{ position: "absolute", right: 16, animation: "spin 1s linear infinite" }} />
+            )}
+            {verifyState === "valid" && (
+              <CheckCircle size={18} color="#22c55e" style={{ position: "absolute", right: 16 }} />
+            )}
+            {verifyState === "invalid" && (
+              <XCircle size={18} color="#ef4444" style={{ position: "absolute", right: 16 }} />
+            )}
+          </div>
+          <button type="submit" disabled={!canSubmit} className="ef-email-btn" style={{ opacity: canSubmit ? 1 : 0.6, cursor: canSubmit ? "pointer" : "not-allowed" }}>
             Join The Hype <ArrowRight size={15} />
           </button>
         </div>
       </form>
-      {error && (
+      {(error || verifyError) && (
         <p style={{ textAlign: "center", fontSize: 13, color: "#ef4444", marginTop: 12 }}>
-          {error}
+          {error || verifyError}
         </p>
       )}
       {microcopy && (

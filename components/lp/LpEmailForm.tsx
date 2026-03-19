@@ -1,20 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowRight, CheckCircle, Loader2, XCircle } from "lucide-react";
 import { getLeadSourceData } from "@/lib/affiliate-tracking";
-import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
+import { useEmailVerify } from "@/lib/use-email-verify";
 import { pushLeadToDataLayer, storeLeadForThankYou } from "@/lib/tiktok-datalayer";
 import { useRouter } from "next/navigation";
-
-function hasValidEmailFormat(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-}
-
-function isValidEmail(email: string) {
-  if (!hasValidEmailFormat(email)) return false;
-  return isAllowedEmailDomain(email);
-}
 
 export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
   const router = useRouter();
@@ -24,12 +15,18 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);
   const [pendingEventId, setPendingEventId] = useState<string | null>(null);
+  const { state: verifyState, error: verifyError, check: verifyCheck } = useEmailVerify();
 
-  const valid = useMemo(() => isValidEmail(email), [email]);
+  useEffect(() => {
+    verifyCheck(email);
+  }, [email, verifyCheck]);
+
+  const valid = verifyState === "valid";
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!valid || loading) return;
+    setError(null);
     setLoading(true);
     setError(null);
     const eventId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -120,36 +117,51 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
         className="lp-ef-row"
         style={{
           border: `1px solid ${
-            error ? "rgba(239,68,68,0.35)" : focused ? "rgba(0,212,255,0.4)" : "rgba(0,212,255,0.15)"
+            error || verifyState === "invalid"
+              ? "rgba(239,68,68,0.35)"
+              : focused
+                ? "rgba(0,212,255,0.4)"
+                : "rgba(0,212,255,0.15)"
           }`,
           background: "rgba(255,255,255,0.03)",
           boxShadow: focused ? "0 0 30px rgba(0,212,255,0.08)" : "none",
           transition: "border-color 0.3s ease, box-shadow 0.3s ease",
         }}
       >
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          placeholder="Unesi svoj email"
-          autoComplete="email"
-          inputMode="email"
-          required
-          style={{
-            flex: 1,
-            minWidth: 0,
-            padding: "16px 20px",
-            background: "transparent",
-            border: "none",
-            outline: "none",
-            color: "#fff",
-            fontSize: 15,
-            fontFamily: "inherit",
-            width: "100%",
-          }}
-        />
+        <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", position: "relative" }}>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setError(null); }}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder="Unesi svoj email"
+            autoComplete="email"
+            inputMode="email"
+            required
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: "16px 44px 16px 20px",
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              color: "#fff",
+              fontSize: 15,
+              fontFamily: "inherit",
+              width: "100%",
+            }}
+          />
+          {verifyState === "checking" && (
+            <Loader2 size={18} color="#00d4ff" style={{ position: "absolute", right: 16, animation: "spin 1s linear infinite" }} />
+          )}
+          {verifyState === "valid" && (
+            <CheckCircle size={18} color="#22c55e" style={{ position: "absolute", right: 16 }} />
+          )}
+          {verifyState === "invalid" && (
+            <XCircle size={18} color="#ef4444" style={{ position: "absolute", right: 16 }} />
+          )}
+        </div>
         <button type="submit" disabled={!valid || loading} className="lp-ef-btn">
           {loading ? (
             <>
@@ -164,9 +176,9 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
         </button>
       </div>
 
-      {(error || (email && hasValidEmailFormat(email) && !isAllowedEmailDomain(email))) && (
+      {(error || verifyError) && (
         <div style={{ marginTop: 10, color: "#ef4444", fontSize: 13, textAlign: "center" }}>
-          {error || EMAIL_DOMAIN_ERROR}
+          {error || verifyError}
         </div>
       )}
 

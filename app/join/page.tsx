@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
+import { useEmailVerify } from "@/lib/use-email-verify";
 import {
-  ArrowLeft, Mail, ArrowRight, Loader2, CheckCircle,
+  ArrowLeft, Mail, ArrowRight, Loader2, CheckCircle, XCircle,
   Sparkles, GraduationCap, Users, ShieldCheck, Zap, Award,
 } from "lucide-react";
 import NetworkBackground from "@/components/ui/NetworkBackground";
@@ -39,6 +40,12 @@ function JoinContent() {
   const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
   const [focused, setFocused] = useState("");
 
+  const { state: verifyState, error: verifyError, check: verifyCheck } = useEmailVerify();
+
+  useEffect(() => {
+    verifyCheck(email);
+  }, [email, verifyCheck]);
+
   // Postavi af_ref cookie kad korisnik dođe preko /join?ref=CODE (affiliate direktni link)
   useEffect(() => {
     const ref = searchParams.get("ref");
@@ -52,6 +59,10 @@ function JoinContent() {
     if (!email.includes("@") || !name) return;
     if (!isAllowedEmailDomain(email)) {
       alert(EMAIL_DOMAIN_ERROR);
+      return;
+    }
+    if (verifyState !== "valid") {
+      alert(verifyError ?? "Proverite da li je email adresa validna i da postoji.");
       return;
     }
     setStatus("loading");
@@ -223,12 +234,30 @@ function JoinContent() {
               </div>
               <div>
                 <label style={{ fontSize: 12, color: "#777", fontWeight: 500, marginBottom: 6, display: "block" }}>Email</label>
-                <input
-                  type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  onFocus={() => setFocused("email")} onBlur={() => setFocused("")}
-                  placeholder="tvoj@email.com" required
-                  style={inputStyle("email")}
-                />
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="email" value={email} onChange={e => setEmail(e.target.value)}
+                    onFocus={() => setFocused("email")} onBlur={() => setFocused("")}
+                    placeholder="tvoj@email.com" required
+                    style={{
+                      ...inputStyle("email"),
+                      paddingRight: 44,
+                      borderColor: verifyState === "invalid" ? "rgba(239,68,68,0.5)" : undefined,
+                    }}
+                  />
+                  {verifyState === "checking" && (
+                    <Loader2 size={18} color="#00d4ff" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", animation: "spin 1s linear infinite" }} />
+                  )}
+                  {verifyState === "valid" && (
+                    <CheckCircle size={18} color="#22c55e" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)" }} />
+                  )}
+                  {verifyState === "invalid" && (
+                    <XCircle size={18} color="#ef4444" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)" }} />
+                  )}
+                </div>
+                {verifyError && (
+                  <p style={{ fontSize: 12, color: "#ef4444", marginTop: 6 }}>{verifyError}</p>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: 12, color: "#777", fontWeight: 500, marginBottom: 6, display: "block" }}>Lozinka</label>
@@ -240,7 +269,7 @@ function JoinContent() {
                 />
               </div>
 
-              <button type="submit" disabled={status === "loading"} className="glow-btn" style={{
+              <button type="submit" disabled={status === "loading" || verifyState !== "valid"} className="glow-btn" style={{
                 width: "100%", borderRadius: 14, marginTop: 6, fontSize: 14,
               }}>
                 {status === "loading"

@@ -3,18 +3,24 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, Loader2, Gift, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Gift, Check, CheckCircle, XCircle } from "lucide-react";
 import { initAffiliateTracking, trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
+import { useEmailVerify } from "@/lib/use-email-verify";
 import NetworkBackground from "@/components/ui/NetworkBackground";
 
 function SpecialGateContent() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
 
+  const { state: verifyState, error: verifyError, check: verifyCheck } = useEmailVerify();
+
   useEffect(() => {
     initAffiliateTracking();
   }, [searchParams]);
+  useEffect(() => {
+    verifyCheck(email);
+  }, [email, verifyCheck]);
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState("");
@@ -29,6 +35,10 @@ function SpecialGateContent() {
     if (!email.includes("@")) return;
     if (!isAllowedEmailDomain(email)) {
       setError(EMAIL_DOMAIN_ERROR);
+      return;
+    }
+    if (verifyState !== "valid") {
+      setError(verifyError ?? "Proverite da li je email adresa validna i da postoji.");
       return;
     }
     setError(null);
@@ -251,16 +261,34 @@ function SpecialGateContent() {
                 >
                   Email *
                 </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onFocus={() => setFocused("email")}
-                  onBlur={() => setFocused("")}
-                  placeholder="tvoj@email.com"
-                  required
-                  style={inputStyle("email")}
-                />
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                    onFocus={() => setFocused("email")}
+                    onBlur={() => setFocused("")}
+                    placeholder="tvoj@email.com"
+                    required
+                    style={{
+                      ...inputStyle("email"),
+                      paddingRight: 44,
+                      borderColor: verifyState === "invalid" ? "rgba(239,68,68,0.5)" : undefined,
+                    }}
+                  />
+                  {verifyState === "checking" && (
+                    <Loader2 size={18} color="#00d4ff" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", animation: "spin 1s linear infinite" }} />
+                  )}
+                  {verifyState === "valid" && (
+                    <CheckCircle size={18} color="#22c55e" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)" }} />
+                  )}
+                  {verifyState === "invalid" && (
+                    <XCircle size={18} color="#ef4444" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)" }} />
+                  )}
+                </div>
+                {verifyError && (
+                  <p style={{ fontSize: 12, color: "#ef4444", marginTop: 6 }}>{verifyError}</p>
+                )}
               </div>
               <div>
                 <label
@@ -291,7 +319,7 @@ function SpecialGateContent() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || verifyState !== "valid"}
                 className="glow-btn"
                 style={{
                   width: "100%",
