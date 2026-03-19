@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
+import { ttqLeadWithPii } from "@/lib/tiktok-datalayer";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { useEmailVerify } from "@/lib/use-email-verify";
 import {
@@ -83,9 +84,9 @@ function JoinContent() {
         }),
       });
       if (res.ok && typeof window !== "undefined") {
-        const w = window as unknown as { fbq?: (a: string, b: string) => void; ttq?: { track: (ev: string) => void } };
+        const w = window as unknown as { fbq?: (a: string, b: string) => void };
         if (w.fbq) w.fbq("track", "Lead");
-        if (w.ttq?.track) w.ttq.track("Lead");
+        void ttqLeadWithPii({ email, phone: null });
       }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

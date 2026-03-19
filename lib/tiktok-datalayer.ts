@@ -26,6 +26,59 @@ async function sha256Hex(str: string): Promise<string> {
     .join("");
 }
 
+/** TikTok standard event payload (contents, value, currency). */
+const TIKTOK_LEAD_CONTENT = {
+  contents: [{ content_id: "ai-hype-waitlist", content_type: "product_group", content_name: "AI Hype Academy - Waitlist" }],
+  value: 0,
+  currency: "EUR",
+} as const;
+
+type TtqWindow = Window & {
+  ttq?: { identify?: (p: object) => void; track: (ev: string, opts?: object) => void };
+};
+
+/**
+ * ttq.identify() sa hashed PII pre eventa (TikTok preporuka za bolju atribuciju).
+ * Pozovi na stranicama gde imamo email/phone pre Lead ili CompleteRegistration.
+ */
+export async function ttqIdentify(params: {
+  email?: string;
+  phone?: string | null;
+  externalId?: string | null;
+}): Promise<void> {
+  if (typeof window === "undefined") return;
+  const w = window as TtqWindow;
+  if (typeof w.ttq?.identify !== "function") return;
+
+  const payload: Record<string, string> = {};
+  if (params.email) {
+    const h = await sha256Hex(params.email.toLowerCase().trim());
+    if (h) payload.email = h;
+  }
+  if (params.phone) {
+    const phoneNorm = String(params.phone).replace(/\D/g, "");
+    if (phoneNorm) payload.phone_number = await sha256Hex(phoneNorm);
+  }
+  if (params.externalId) {
+    const h = await sha256Hex(String(params.externalId).trim());
+    if (h) payload.external_id = h;
+  }
+  if (Object.keys(payload).length > 0) w.ttq!.identify!(payload);
+}
+
+/**
+ * Za /join stranicu: ttq.identify + Lead sa strukturom contents/value/currency.
+ * Pozovi nakon uspešnog API poziva kad imamo email.
+ */
+export async function ttqLeadWithPii(params: { email: string; phone?: string | null }): Promise<void> {
+  if (typeof window === "undefined") return;
+  const w = window as TtqWindow;
+  if (typeof w.ttq?.track !== "function") return;
+
+  await ttqIdentify({ email: params.email, phone: params.phone, externalId: params.email });
+  w.ttq.track("Lead", { ...TIKTOK_LEAD_CONTENT });
+}
+
 /**
  * Push lead event na dataLayer za GTM/TikTok.
  * Email i phone se hashuju SHA-256 (lowercase, trimmed; phone digits only).
@@ -143,8 +196,14 @@ export async function pushThankYouPageTracking(opts?: { eventIdFromUrl?: string 
   if (w.ttq) {
     if (typeof w.ttq.page === "function") w.ttq.page(); // PageView kao Meta
     if (typeof w.ttq.track === "function") {
-      w.ttq.track("Lead", { content_name: "thank_you_page" }); // isto kao fbq Lead
-      w.ttq.track("CompleteRegistration", { content_name: "thank_you_page" });
+      // TikTok: identify sa hashed PII pre eventa (za bolju atribuciju)
+      await ttqIdentify({
+        email: data.email,
+        phone: data.phone,
+        externalId: eventId ?? data.email,
+      });
+      w.ttq.track("Lead", { ...TIKTOK_LEAD_CONTENT });
+      w.ttq.track("CompleteRegistration", { ...TIKTOK_LEAD_CONTENT });
     }
   }
 

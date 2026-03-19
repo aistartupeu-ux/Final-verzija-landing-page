@@ -7,8 +7,9 @@ import Image from "next/image";
 import CountdownTimer from "@/components/ui/CountdownTimer";
 import EmailForm from "@/components/ui/EmailForm";
 
-// 15. april 00:00 — kurs se otvara, tajmer se završava u ponoć
-const TARGET_DATE = new Date(2026, 3, 15, 0, 0, 0);
+// 15. april 00:00 Europe/Belgrade (CET/CEST) — kurs se otvara, tajmer se završava u ponoć
+// April je letnje vreme (CEST = UTC+2)
+const TARGET_DATE = new Date("2026-04-15T00:00:00+02:00");
 
 export default function HeroSection() {
   const bgVideoRef = useRef<HTMLVideoElement>(null);
