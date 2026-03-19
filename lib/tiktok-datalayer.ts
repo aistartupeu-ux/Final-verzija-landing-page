@@ -76,13 +76,17 @@ export async function pushLeadToDataLayer(
 
 const LEAD_CONFIRM_KEY = "lead_confirm";
 
-/** Sačuvaj email/phone pre redirecta na thank-you (za tracking na confirmation page). */
-export function storeLeadForThankYou(email: string, phone: string | null | undefined): void {
+/** Sačuvaj email/phone/eventId pre redirecta na thank-you (za Meta Lead na confirmation page). */
+export function storeLeadForThankYou(
+  email: string,
+  phone: string | null | undefined,
+  eventId?: string | null
+): void {
   if (typeof window === "undefined") return;
   try {
     sessionStorage.setItem(
       LEAD_CONFIRM_KEY,
-      JSON.stringify({ email, phone: phone ?? null })
+      JSON.stringify({ email, phone: phone ?? null, event_id: eventId ?? null })
     );
   } catch {
     // ignore
@@ -95,11 +99,11 @@ export function storeLeadForThankYou(email: string, phone: string | null | undef
  */
 export async function pushThankYouPageTracking(): Promise<void> {
   if (typeof window === "undefined") return;
-  let data: { email: string; phone: string | null } | null = null;
+  let data: { email: string; phone: string | null; event_id?: string | null } | null = null;
   try {
     const raw = sessionStorage.getItem(LEAD_CONFIRM_KEY);
     if (raw) {
-      data = JSON.parse(raw) as { email: string; phone: string | null };
+      data = JSON.parse(raw) as { email: string; phone: string | null; event_id?: string | null };
       sessionStorage.removeItem(LEAD_CONFIRM_KEY);
     }
   } catch {
@@ -108,7 +112,9 @@ export async function pushThankYouPageTracking(): Promise<void> {
 
   if (!data?.email) return;
 
-  const w = window as Window & { dataLayer?: unknown[]; gtag?: (...args: unknown[]) => void; ttq?: { track: (ev: string, opts?: object) => void }; fbq?: (a: string, b: string) => void };
+  const eventId = data.event_id ?? undefined;
+
+  const w = window as Window & { dataLayer?: unknown[]; gtag?: (...args: unknown[]) => void; ttq?: { page?: () => void; track: (ev: string, opts?: object) => void }; fbq?: (a: string, b: string, c?: object, d?: { eventID?: string }) => void };
   const emailNorm = data.email.toLowerCase().trim();
   const emailHash = await sha256Hex(emailNorm);
   let phoneHash = "";
@@ -132,10 +138,28 @@ export async function pushThankYouPageTracking(): Promise<void> {
     w.gtag("event", "lead_confirmation", { user_data, tt_content_type: "product" });
     w.gtag("event", "generate_lead", { event_category: "lead", event_label: "thank_you_page", user_data });
   }
-  if (w.ttq?.track) {
-    w.ttq.track("CompleteRegistration", { content_name: "thank_you_page" });
+  if (w.ttq) {
+    if (typeof w.ttq.page === "function") w.ttq.page(); // TikTok vidi thank-you stranicu
+    if (typeof w.ttq.track === "function") w.ttq.track("CompleteRegistration", { content_name: "thank_you_page" });
   }
-  // Ne šaljemo fbq Lead ovde — već je poslat na form submit. Dupli event.
+
+  // Meta: PageView + Lead na thank-you stranici (client-side navigacija ne šalje auto PageView).
+  if (w.fbq) {
+    w.fbq("track", "PageView"); // Meta mora da vidi posetu thank-you stranici
+    w.fbq("track", "Lead", {}, { eventID: eventId });
+  }
+
+  // Meta CAPI — server-side Lead (thank-you URL za event_source_url)
+  fetch("/api/leads/meta-capi", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: data.email,
+      phone: data.phone,
+      event_id: eventId,
+      event_source_url: typeof window !== "undefined" ? window.location.href : null,
+    }),
+  }).catch(() => {});
 }
 
 export type PurchaseItem = {

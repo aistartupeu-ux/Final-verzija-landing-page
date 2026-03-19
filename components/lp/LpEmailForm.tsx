@@ -50,16 +50,14 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
         return;
       }
 
-      if (typeof window !== "undefined" && (window as unknown as { fbq?: (a: string, b: string, c?: object, d?: { eventID?: string }) => void }).fbq) {
-        (window as unknown as { fbq: (a: string, b: string, c?: object, d?: { eventID?: string }) => void }).fbq("track", "Lead", {}, { eventID: eventId });
-      }
+      // fbq Lead šalje se na thank-you stranici (pushThankYouPageTracking) za bolju Meta atribuciju.
 
       if (typeof window !== "undefined" && (window as unknown as { ttq?: { track: (ev: string, opts?: object) => void } }).ttq) {
         (window as unknown as { ttq: { track: (ev: string, opts?: object) => void } }).ttq.track("SubmitForm", { content_name: "waitlist_lead" });
       }
 
       await pushLeadToDataLayer(email, null);
-      storeLeadForThankYou(email, null);
+      storeLeadForThankYou(email, null, eventId);
 
       setDone(true);
       setLoading(false);
@@ -71,7 +69,7 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
 
   useEffect(() => {
     if (!done) return;
-    const t = window.setTimeout(() => router.push("/thank-you"), 2400);
+    const t = window.setTimeout(() => router.push("/thank-you"), 2800);
     return () => window.clearTimeout(t);
   }, [done, router]);
 

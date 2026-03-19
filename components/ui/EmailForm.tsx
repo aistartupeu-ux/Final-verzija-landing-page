@@ -53,15 +53,13 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
         setLoading(false);
         return;
       }
-      if (typeof window !== "undefined" && (window as unknown as { fbq?: (a: string, b: string, c?: object, d?: { eventID?: string }) => void }).fbq) {
-        (window as unknown as { fbq: (a: string, b: string, c?: object, d?: { eventID?: string }) => void }).fbq("track", "Lead", {}, { eventID: eventId });
-      }
+      // fbq Lead šalje se na thank-you stranici (pushThankYouPageTracking) za bolju Meta atribuciju.
       if (typeof window !== "undefined" && (window as unknown as { ttq?: { track: (ev: string, opts?: object) => void } }).ttq) {
         (window as unknown as { ttq: { track: (ev: string, opts?: object) => void } }).ttq.track("SubmitForm", { content_name: "waitlist_lead" });
       }
       const phoneVal = (skipPhone || !phone) ? null : phone;
       await pushLeadToDataLayer(email, phoneVal);
-      storeLeadForThankYou(email, phoneVal);
+      storeLeadForThankYou(email, phoneVal, eventId);
       trackAffiliateLeadOnSubmit({ email, phone: phoneVal });
       setLoading(false);
       setStep("done");
@@ -77,7 +75,7 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
     const t = window.setTimeout(() => {
       setDidRedirect(true);
       router.push("/thank-you");
-    }, 2400);
+    }, 2800);
     return () => window.clearTimeout(t);
   }, [didRedirect, router, step]);
 
