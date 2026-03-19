@@ -29,6 +29,7 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
     e.preventDefault();
     setLoading(true);
     setError(null);
+    const eventId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     try {
       const sourceData = getLeadSourceData();
       const res = await fetch("/api/leads", {
@@ -42,6 +43,7 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
           utm_campaign: sourceData.utm_campaign,
           affiliate_code: sourceData.affiliate_code,
           source_tag: sourceData.source_tag,
+          event_id: eventId,
         }),
       });
       if (!res.ok) {
@@ -51,8 +53,8 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
         setLoading(false);
         return;
       }
-      if (typeof window !== "undefined" && (window as unknown as { fbq?: (a: string, b: string) => void }).fbq) {
-        (window as unknown as { fbq: (a: string, b: string) => void }).fbq("track", "Lead");
+      if (typeof window !== "undefined" && (window as unknown as { fbq?: (a: string, b: string, c?: object, d?: { eventID?: string }) => void }).fbq) {
+        (window as unknown as { fbq: (a: string, b: string, c?: object, d?: { eventID?: string }) => void }).fbq("track", "Lead", {}, { eventID: eventId });
       }
       if (typeof window !== "undefined" && (window as unknown as { ttq?: { track: (ev: string, opts?: object) => void } }).ttq) {
         (window as unknown as { ttq: { track: (ev: string, opts?: object) => void } }).ttq.track("SubmitForm", { content_name: "waitlist_lead" });

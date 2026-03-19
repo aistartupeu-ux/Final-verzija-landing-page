@@ -75,6 +75,7 @@ async function sendMetaCapiLeadEvent(opts: {
   eventSourceUrl: string | null;
   fbp?: string | null;
   fbc?: string | null;
+  event_id?: string | null;
 }) {
   const accessToken = process.env.META_CAPI_ACCESS_TOKEN;
   const testEventCode = process.env.META_CAPI_TEST_EVENT_CODE || null;
@@ -93,6 +94,7 @@ async function sendMetaCapiLeadEvent(opts: {
         event_name: "Lead",
         event_time: Math.floor(Date.now() / 1000),
         action_source: "website",
+        event_id: opts.event_id ?? undefined,
         event_source_url: opts.eventSourceUrl ?? undefined,
         user_data: {
           em: em ? [sha256(em)] : undefined,
@@ -138,6 +140,7 @@ export async function POST(req: NextRequest) {
       utm_campaign,
       affiliate_code: bodyAffiliate,
       source_tag,
+      event_id: bodyEventId,
     } = body;
     const name = typeof body?.name === "string" ? body.name.trim() : null;
 
@@ -213,6 +216,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    const metaEventId = typeof bodyEventId === "string" && bodyEventId.trim() ? bodyEventId.trim() : null;
+
     // Meta Conversions API (server-side Lead event)
     await sendMetaCapiLeadEvent({
       email,
@@ -222,6 +227,7 @@ export async function POST(req: NextRequest) {
       eventSourceUrl,
       fbp: req.cookies.get("_fbp")?.value ?? null,
       fbc: req.cookies.get("_fbc")?.value ?? null,
+      event_id: metaEventId,
     });
 
     // Affiliate lead: Affiliate Google Sheet (Leads tab)
