@@ -53,6 +53,9 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
       if (typeof window !== "undefined" && (window as unknown as { fbq?: (a: string, b: string) => void }).fbq) {
         (window as unknown as { fbq: (a: string, b: string) => void }).fbq("track", "Lead");
       }
+      if (typeof window !== "undefined" && (window as unknown as { ttq?: { track: (ev: string, opts?: object) => void } }).ttq) {
+        (window as unknown as { ttq: { track: (ev: string, opts?: object) => void } }).ttq.track("SubmitForm", { content_name: "waitlist_lead" });
+      }
       trackAffiliateLeadOnSubmit({ email, phone: (skipPhone || !phone) ? null : phone });
       setLoading(false);
       setStep("done");
