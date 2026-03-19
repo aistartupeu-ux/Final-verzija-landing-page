@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import ThankYouClient from "./ThankYouClient";
 
 export const metadata: Metadata = {
@@ -8,6 +9,10 @@ export const metadata: Metadata = {
 };
 
 export default function ThankYouPage() {
-  return <ThankYouClient />;
+  return (
+    <Suspense fallback={null}>
+      <ThankYouClient />
+    </Suspense>
+  );
 }
 
