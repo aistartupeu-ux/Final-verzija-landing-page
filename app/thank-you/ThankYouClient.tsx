@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { useMemo, type CSSProperties } from "react";
@@ -237,10 +238,12 @@ function BackgroundEffects() {
 export default function ThankYouClient() {
   const reduced = useReducedMotion();
   const ease = [0.16, 1, 0.3, 1] as const;
+  const searchParams = useSearchParams();
+  const eventIdFromUrl = searchParams.get("eid");
 
   useEffect(() => {
-    void pushThankYouPageTracking();
-  }, []);
+    void pushThankYouPageTracking({ eventIdFromUrl });
+  }, [eventIdFromUrl]);
 
   return (
     <div

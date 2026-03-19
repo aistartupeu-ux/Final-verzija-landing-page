@@ -17,6 +17,7 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
   const [focused, setFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [didRedirect, setDidRedirect] = useState(false);
+  const [pendingEventId, setPendingEventId] = useState<string | null>(null);
 
   const submitEmail = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +62,7 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
       await pushLeadToDataLayer(email, phoneVal);
       storeLeadForThankYou(email, phoneVal, eventId);
       trackAffiliateLeadOnSubmit({ email, phone: phoneVal });
+      setPendingEventId(eventId);
       setLoading(false);
       setStep("done");
     } catch {
@@ -71,13 +73,13 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
   };
 
   useEffect(() => {
-    if (step !== "done" || didRedirect) return;
+    if (step !== "done" || didRedirect || !pendingEventId) return;
     const t = window.setTimeout(() => {
       setDidRedirect(true);
-      router.push("/thank-you");
+      router.push(`/thank-you?eid=${encodeURIComponent(pendingEventId)}`);
     }, 2800);
     return () => window.clearTimeout(t);
-  }, [didRedirect, router, step]);
+  }, [didRedirect, pendingEventId, router, step]);
 
   if (step === "done") {
     return (

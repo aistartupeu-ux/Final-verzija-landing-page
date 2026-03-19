@@ -17,6 +17,7 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);
+  const [pendingEventId, setPendingEventId] = useState<string | null>(null);
 
   const valid = useMemo(() => isValidEmail(email), [email]);
 
@@ -58,7 +59,7 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
 
       await pushLeadToDataLayer(email, null);
       storeLeadForThankYou(email, null, eventId);
-
+      setPendingEventId(eventId);
       setDone(true);
       setLoading(false);
     } catch {
@@ -68,10 +69,10 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
   };
 
   useEffect(() => {
-    if (!done) return;
-    const t = window.setTimeout(() => router.push("/thank-you"), 2800);
+    if (!done || !pendingEventId) return;
+    const t = window.setTimeout(() => router.push(`/thank-you?eid=${encodeURIComponent(pendingEventId)}`), 2800);
     return () => window.clearTimeout(t);
-  }, [done, router]);
+  }, [done, pendingEventId, router]);
 
   if (done) {
     return (

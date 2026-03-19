@@ -96,8 +96,9 @@ export function storeLeadForThankYou(
 /**
  * Na thank-you page: pročita stored lead, push-uje lead_confirmation event, briše storage.
  * Event "lead_confirmation" = korisnik je stigao na confirmation page.
+ * eventIdFromUrl = iz ?eid= (Meta preporuka: eksplicitno prosleđivanje za deduplikaciju).
  */
-export async function pushThankYouPageTracking(): Promise<void> {
+export async function pushThankYouPageTracking(opts?: { eventIdFromUrl?: string | null }): Promise<void> {
   if (typeof window === "undefined") return;
   let data: { email: string; phone: string | null; event_id?: string | null } | null = null;
   try {
@@ -112,7 +113,8 @@ export async function pushThankYouPageTracking(): Promise<void> {
 
   if (!data?.email) return;
 
-  const eventId = data.event_id ?? undefined;
+  // event_id: prioritet URL param (Meta preporuka), pa sessionStorage
+  const eventId = opts?.eventIdFromUrl ?? data.event_id ?? undefined;
 
   const w = window as Window & { dataLayer?: unknown[]; gtag?: (...args: unknown[]) => void; ttq?: { page?: () => void; track: (ev: string, opts?: object) => void }; fbq?: (a: string, b: string, c?: object, d?: { eventID?: string }) => void };
   const emailNorm = data.email.toLowerCase().trim();
@@ -149,7 +151,8 @@ export async function pushThankYouPageTracking(): Promise<void> {
     w.fbq("track", "Lead", {}, { eventID: eventId });
   }
 
-  // Meta CAPI — server-side Lead (thank-you URL za event_source_url)
+  // Meta CAPI — server-side Lead; eksplicitan thank-you URL da Meta uvek vidi /thank-you
+  const thankYouUrl = typeof window !== "undefined" ? `${window.location.origin}/thank-you` : null;
   fetch("/api/leads/meta-capi", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -157,7 +160,7 @@ export async function pushThankYouPageTracking(): Promise<void> {
       email: data.email,
       phone: data.phone,
       event_id: eventId,
-      event_source_url: typeof window !== "undefined" ? window.location.href : null,
+      event_source_url: thankYouUrl,
     }),
   }).catch(() => {});
 }
