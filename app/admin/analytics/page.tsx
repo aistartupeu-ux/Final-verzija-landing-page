@@ -74,7 +74,7 @@ function CountdownDisplay({
 
   if (sec <= 0) return null;
   return (
-    <div style={{ fontSize: 18, fontWeight: 700, color: "#00d4ff", fontVariantNumeric: "tabular-nums", contain: "layout" }}>
+    <div style={{ fontSize: "clamp(14px, 4vw, 18px)", fontWeight: 700, color: "#00d4ff", fontVariantNumeric: "tabular-nums", contain: "layout" }}>
       {Math.floor(sec / 3600)}h {Math.floor((sec % 3600) / 60)}m {sec % 60}s
     </div>
   );
@@ -99,8 +99,7 @@ export default function AdminAnalyticsPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const saved = localStorage.getItem("admin_analytics_secret");
-    if (saved) setAuth(saved);
+    localStorage.removeItem("admin_analytics_secret");
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     if (!from) setFrom(firstDay.toISOString().slice(0, 10));
@@ -203,7 +202,6 @@ export default function AdminAnalyticsPage() {
         throw new Error(await res.text());
       }
       const json = await res.json();
-      localStorage.setItem("admin_analytics_secret", secret.trim());
       setAuth(secret.trim());
       setData(json);
       fetchTodayData(secret.trim());
@@ -283,11 +281,11 @@ export default function AdminAnalyticsPage() {
 
   if (!auth) {
     return (
-      <div style={{ minHeight: "100vh", background: "#050508", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <div style={{ maxWidth: 400, width: "100%" }}>
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
+      <div className="admin-analytics-page" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px", paddingTop: "max(24px, env(safe-area-inset-top))", paddingBottom: "max(24px, env(safe-area-inset-bottom))" }}>
+        <div className="admin-login-wrap">
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
             <Lock size={40} color="#00d4ff" style={{ margin: "0 auto 16px", display: "block" }} />
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: "#fff", marginBottom: 8 }}>Admin Analytics</h1>
+            <h1 style={{ fontSize: "clamp(20px, 5vw, 24px)", fontWeight: 800, color: "#fff", marginBottom: 8 }}>Admin Analytics</h1>
             <p style={{ fontSize: 14, color: "#888" }}>Unesi pristupni kod</p>
           </div>
           <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -301,22 +299,22 @@ export default function AdminAnalyticsPage() {
               placeholder="Pristupni kod"
               autoFocus
               disabled={attempts >= maxAttempts}
+              className="admin-login-input"
               style={{
-                padding: "14px 18px",
                 borderRadius: 14,
                 background: "rgba(255,255,255,0.05)",
                 border: "1px solid rgba(255,255,255,0.1)",
                 color: "#fff",
-                fontSize: 15,
                 outline: "none",
                 opacity: attempts >= maxAttempts ? 0.5 : 1,
+                fontFamily: "inherit",
               }}
             />
             <button
               type="submit"
               disabled={loading || attempts >= maxAttempts}
+              className="admin-login-btn"
               style={{
-                padding: "14px 20px",
                 borderRadius: 14,
                 background: attempts >= maxAttempts ? "#444" : "linear-gradient(135deg, #00d4ff 0%, #00b0e0 100%)",
                 border: "none",
@@ -324,6 +322,7 @@ export default function AdminAnalyticsPage() {
                 fontWeight: 700,
                 cursor: attempts >= maxAttempts ? "not-allowed" : "pointer",
                 opacity: loading ? 0.7 : 1,
+                fontFamily: "inherit",
               }}
             >
               {loading ? "Provera..." : "Uđi"}
@@ -338,55 +337,45 @@ export default function AdminAnalyticsPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#050508", padding: "24px 16px" }}>
-      <div style={{ maxWidth: 960, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 32 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <Link
-              href="/"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#666", textDecoration: "none", fontSize: 13 }}
-            >
+    <div className="admin-analytics-page">
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: "20px 16px", paddingTop: "max(20px, env(safe-area-inset-top))", paddingBottom: "max(24px, env(safe-area-inset-bottom))", paddingLeft: "max(16px, env(safe-area-inset-left))", paddingRight: "max(16px, env(safe-area-inset-right))" }}>
+        <div className="admin-toolbar">
+          <div className="admin-toolbar-left">
+            <Link href="/" className="admin-link-back">
               <ArrowLeft size={14} /> Nazad
             </Link>
-            <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#22c55e" }}>
+            <span className="admin-live-badge">
               <Radio size={12} /> Live
             </span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 12, color: "#555" }}>Period:</span>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              style={{ padding: "8px 12px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: 13 }}
-            />
-            <span style={{ color: "#555" }}>—</span>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              style={{ padding: "8px 12px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: 13 }}
-            />
-            <button
-              onClick={handleRefresh}
-              disabled={loading}
-              style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(0,212,255,0.15)", border: "1px solid rgba(0,212,255,0.3)", color: "#00d4ff", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
-            >
-              <RefreshCw size={14} style={{ opacity: loading ? 0.5 : 1 }} /> Osveži
-            </button>
-            <button
-              onClick={() => auth && fetchData(auth, false, true)}
-              disabled={loading}
-              style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.3)", color: "#a78bfa", cursor: "pointer", fontSize: 12 }}
-            >
-              Debug
-            </button>
-            <button
-              onClick={handleLogout}
-              style={{ padding: "8px 14px", borderRadius: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#ef4444", cursor: "pointer", fontSize: 13 }}
-            >
-              Izlaz
-            </button>
+          <div className="admin-toolbar-right">
+            <div className="admin-period-row">
+              <span className="admin-period-label">Period:</span>
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="admin-date-input"
+              />
+              <span style={{ color: "#555" }}>—</span>
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="admin-date-input"
+              />
+            </div>
+            <div className="admin-buttons-row">
+              <button onClick={handleRefresh} disabled={loading} className="admin-btn admin-btn-refresh">
+                <RefreshCw size={14} style={{ opacity: loading ? 0.5 : 1 }} /> Osveži
+              </button>
+              <button onClick={() => auth && fetchData(auth, false, true)} disabled={loading} className="admin-btn admin-btn-debug">
+                Debug
+              </button>
+              <button onClick={handleLogout} className="admin-btn admin-btn-logout">
+                Izlaz
+              </button>
+            </div>
           </div>
         </div>
 
@@ -403,18 +392,16 @@ export default function AdminAnalyticsPage() {
         ) : data ? (
           <>
             {todayData && (
-              <div style={{ marginBottom: 24, padding: 20, borderRadius: 18, background: "linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(0,180,224,0.05) 100%)", border: "1px solid rgba(0,212,255,0.25)" }}>
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+              <div className="admin-danas-card">
+                <div className="admin-danas-row">
                   <div>
-                    <h2 style={{ fontSize: 14, fontWeight: 700, color: "#00d4ff", marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
-                      Danas (Beograd · CET)
-                    </h2>
-                    <div style={{ fontSize: 36, fontWeight: 800, color: "#fff" }}>{todayData.total}</div>
-                    <div style={{ fontSize: 13, color: "#888" }}>Leadova danas · reset u ponoć</div>
+                    <h2 className="admin-danas-title">Danas (Beograd · CET)</h2>
+                    <div className="admin-danas-num">{todayData.total}</div>
+                    <div className="admin-danas-sub">Leadova danas · reset u ponoć</div>
                   </div>
-                  <div style={{ textAlign: "right", contain: "layout" }}>
+                  <div className="admin-danas-countdown" style={{ contain: "layout" }}>
                     {todayData.belgradeTime && (
-                      <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>{todayData.belgradeTime}</div>
+                      <div className="admin-danas-time">{todayData.belgradeTime}</div>
                     )}
                     {todayData.secondsUntilMidnight != null && todayData.secondsUntilMidnight > 0 && (
                       <CountdownDisplay
@@ -422,10 +409,10 @@ export default function AdminAnalyticsPage() {
                         onReset={handleCountdownReset}
                       />
                     )}
-                    <div style={{ fontSize: 11, color: "#555" }}>do resetovanja</div>
+                    <div className="admin-danas-reset-label">do resetovanja</div>
                   </div>
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16, fontSize: 12, color: "#aaa" }}>
+                <div className="admin-danas-sources">
                   <span>IG: {todayData.bySource?.instagram ?? 0}</span>
                   <span>FB: {todayData.bySource?.facebook ?? 0}</span>
                   <span>TikTok: {todayData.tiktokLeads ?? 0}</span>
@@ -434,31 +421,31 @@ export default function AdminAnalyticsPage() {
               </div>
             )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16, marginBottom: 32, contain: "layout" }}>
-              <div style={{ padding: 24, borderRadius: 18, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(0,212,255,0.15)" }}>
-                <Users size={24} color="#00d4ff" style={{ marginBottom: 12 }} />
-                <div style={{ fontSize: 28, fontWeight: 800, color: "#fff" }}>{data.total}</div>
-                <div style={{ fontSize: 13, color: "#888" }}>Ukupno leadova</div>
+            <div className="admin-stats-grid">
+              <div className="admin-stat-card" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(0,212,255,0.15)" }}>
+                <Users size={20} color="#00d4ff" style={{ marginBottom: 8 }} />
+                <div className="admin-stat-num" style={{ color: "#fff" }}>{data.total}</div>
+                <div className="admin-stat-label">Ukupno leadova</div>
               </div>
-              <div style={{ padding: 24, borderRadius: 18, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(228,64,95,0.25)" }}>
-                <Instagram size={24} color="#E4405F" style={{ marginBottom: 12 }} />
-                <div style={{ fontSize: 28, fontWeight: 800, color: "#fff" }}>{data.bySource.instagram ?? 0}</div>
-                <div style={{ fontSize: 12, color: "#888" }}>Instagram · {pct(data.bySource.instagram ?? 0)}%</div>
+              <div className="admin-stat-card" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(228,64,95,0.25)" }}>
+                <Instagram size={20} color="#E4405F" style={{ marginBottom: 8 }} />
+                <div className="admin-stat-num" style={{ color: "#fff" }}>{data.bySource.instagram ?? 0}</div>
+                <div className="admin-stat-label">Instagram · {pct(data.bySource.instagram ?? 0)}%</div>
               </div>
-              <div style={{ padding: 24, borderRadius: 18, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(24,119,242,0.25)" }}>
-                <Facebook size={24} color="#1877F2" style={{ marginBottom: 12 }} />
-                <div style={{ fontSize: 28, fontWeight: 800, color: "#fff" }}>{data.bySource.facebook ?? 0}</div>
-                <div style={{ fontSize: 12, color: "#888" }}>Facebook · {pct(data.bySource.facebook ?? 0)}%</div>
+              <div className="admin-stat-card" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(24,119,242,0.25)" }}>
+                <Facebook size={20} color="#1877F2" style={{ marginBottom: 8 }} />
+                <div className="admin-stat-num" style={{ color: "#fff" }}>{data.bySource.facebook ?? 0}</div>
+                <div className="admin-stat-label">Facebook · {pct(data.bySource.facebook ?? 0)}%</div>
               </div>
-              <div style={{ padding: 24, borderRadius: 18, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(0,242,234,0.25)" }}>
-                <TrendingUp size={24} color="#00f2ea" style={{ marginBottom: 12 }} />
-                <div style={{ fontSize: 28, fontWeight: 800, color: "#fff" }}>{data.tiktokLeads}</div>
-                <div style={{ fontSize: 12, color: "#888" }}>TikTok · {pct(data.tiktokLeads)}%</div>
+              <div className="admin-stat-card" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(0,242,234,0.25)" }}>
+                <TrendingUp size={20} color="#00f2ea" style={{ marginBottom: 8 }} />
+                <div className="admin-stat-num" style={{ color: "#fff" }}>{data.tiktokLeads}</div>
+                <div className="admin-stat-label">TikTok · {pct(data.tiktokLeads)}%</div>
               </div>
-              <div style={{ padding: 24, borderRadius: 18, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                <Share2 size={24} color="#888" style={{ marginBottom: 12 }} />
-                <div style={{ fontSize: 28, fontWeight: 800, color: "#fff" }}>{data.direct}</div>
-                <div style={{ fontSize: 12, color: "#888" }}>Direktno · {pct(data.direct)}%</div>
+              <div className="admin-stat-card" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <Share2 size={20} color="#888" style={{ marginBottom: 8 }} />
+                <div className="admin-stat-num" style={{ color: "#fff" }}>{data.direct}</div>
+                <div className="admin-stat-label">Direktno · {pct(data.direct)}%</div>
               </div>
             </div>
 
@@ -502,12 +489,12 @@ export default function AdminAnalyticsPage() {
               );
             })()}
 
-            <div style={{ marginBottom: 32, contain: "layout" }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 16 }}>Raspodela po izvoru</h2>
+            <div style={{ marginBottom: 28, contain: "layout" }}>
+              <h2 style={{ fontSize: "clamp(15px, 4vw, 16px)", fontWeight: 700, color: "#fff", marginBottom: 14 }}>Raspodela po izvoru</h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {sortedSources.map(([source, count]) => (
                     <div key={source} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "clamp(12px, 3vw, 13px)" }}>
                         <span style={{ color: "#ccc" }}>{SOURCE_LABELS[source] ?? source}</span>
                         <span style={{ color: "#fff", fontWeight: 600 }}>{count} ({pct(count)}%)</span>
                       </div>
@@ -527,12 +514,12 @@ export default function AdminAnalyticsPage() {
               </div>
             </div>
 
-            <div style={{ marginBottom: 32 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 16 }}>Cost per Lead (CPL)</h2>
+            <div style={{ marginBottom: 28 }}>
+              <h2 style={{ fontSize: "clamp(16px, 4vw, 18px)", fontWeight: 700, color: "#fff", marginBottom: 14 }}>Cost per Lead (CPL)</h2>
               <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
                 Meta (Instagram, Facebook) se automatski vuče iz Meta Ads. TikTok unesi ručno.
               </p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 20 }}>
+              <div className="admin-cpl-grid">
                 <div style={{ padding: 20, borderRadius: 16, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(228,64,95,0.2)" }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#E4405F", marginBottom: 12 }}>Instagram</div>
                   {metaAds ? (
@@ -574,10 +561,11 @@ export default function AdminAnalyticsPage() {
                   <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                     <input
                       type="text"
+                      inputMode="decimal"
                       value={tiktokSpend}
                       onChange={(e) => setTiktokSpend(e.target.value.replace(/[^0-9,.]/g, ""))}
                       placeholder="€ potrošeno"
-                      style={{ flex: 1, minWidth: 100, padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: 14 }}
+                      style={{ flex: 1, minWidth: 100, minHeight: 44, padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: 16 }}
                     />
                     {tiktokCpl !== null && tiktokCpl > 0 && (
                       <span style={{ fontSize: 15, fontWeight: 700, color: "#00f2ea" }}>
@@ -593,7 +581,50 @@ export default function AdminAnalyticsPage() {
           </>
         ) : null}
       </div>
-      <style>{"@keyframes spin{to{transform:rotate(360deg)}}"}</style>
+      <style>{`
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .admin-analytics-page { min-height: 100vh; background: #050508; padding: 0; -webkit-tap-highlight-color: transparent; }
+        .admin-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+        .admin-toolbar-left { display: flex; align-items: center; gap: 12px; }
+        .admin-toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+        .admin-link-back { display: inline-flex; align-items: center; gap: 6px; color: #666; text-decoration: none; font-size: 13px; min-height: 44px; padding: 0 4px; }
+        .admin-live-badge { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #22c55e; }
+        .admin-period-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .admin-period-label { font-size: 12px; color: #555; }
+        .admin-date-input { padding: 10px 12px; min-height: 44px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 14px; touch-action: manipulation; }
+        .admin-buttons-row { display: flex; flex-wrap: wrap; gap: 8px; }
+        .admin-btn { min-height: 44px; min-width: 44px; padding: 10px 14px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-family: inherit; border: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        .admin-btn-refresh { background: rgba(0,212,255,0.15); border: 1px solid rgba(0,212,255,0.3); color: #00d4ff; }
+        .admin-btn-debug { background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; font-size: 12px; }
+        .admin-btn-logout { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: #ef4444; }
+        .admin-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px; }
+        .admin-stat-card { padding: 16px; border-radius: 14px; min-height: 90px; display: flex; flex-direction: column; justify-content: center; }
+        .admin-stat-num { font-size: 22px; font-weight: 800; }
+        .admin-stat-label { font-size: 11px; color: #888; }
+        .admin-cpl-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+        .admin-danas-card { margin-bottom: 20px; padding: 16px; border-radius: 14px; background: linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(0,180,224,0.05) 100%); border: 1px solid rgba(0,212,255,0.25); }
+        .admin-danas-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+        .admin-danas-title { font-size: 13px; font-weight: 700; color: #00d4ff; margin-bottom: 6px; }
+        .admin-danas-num { font-size: 28px; font-weight: 800; color: #fff; }
+        .admin-danas-sub { font-size: 12px; color: #888; }
+        .admin-danas-countdown { text-align: right; }
+        .admin-danas-time { font-size: 11px; color: #666; margin-bottom: 4px; }
+        .admin-danas-reset-label { font-size: 11px; color: #555; }
+        .admin-danas-sources { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; font-size: 12px; color: #aaa; }
+        .admin-login-wrap { padding: 16px; max-width: 400px; width: 100%; }
+        .admin-login-input { padding: 14px 18px; min-height: 48px; font-size: 16px; }
+        .admin-login-btn { min-height: 48px; padding: 14px 20px; }
+        @media (min-width: 640px) {
+          .admin-danas-card { margin-bottom: 24px; padding: 20px; border-radius: 18px; }
+          .admin-danas-num { font-size: 36px; }
+          .admin-danas-sub { font-size: 13px; }
+          .admin-stats-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 32px; }
+          .admin-stat-card { padding: 24px; border-radius: 18px; min-height: auto; }
+          .admin-stat-num { font-size: 28px; }
+          .admin-stat-label { font-size: 13px; }
+          .admin-cpl-grid { gap: 20px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+        }
+      `}</style>
     </div>
   );
 }
