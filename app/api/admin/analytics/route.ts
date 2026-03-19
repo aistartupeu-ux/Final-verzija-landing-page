@@ -28,8 +28,23 @@ export async function GET(req: NextRequest) {
 
   const url = req.nextUrl ?? new URL(req.url);
   const debug = url.searchParams.get("debug") === "1";
-  const from = url.searchParams.get("from");
-  const to = url.searchParams.get("to");
+  const todayOnly = url.searchParams.get("today") === "1";
+  let from = url.searchParams.get("from");
+  let to = url.searchParams.get("to");
+
+  if (todayOnly) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Belgrade",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+    const todayBelgrade = `${get("year")}-${get("month")}-${get("day")}`;
+    from = todayBelgrade;
+    to = todayBelgrade;
+  }
+
   let fromDate: Date | null = null;
   let toDate: Date | null = null;
   if (from) fromDate = new Date(from);
@@ -135,6 +150,25 @@ export async function GET(req: NextRequest) {
     direct: bySource["direct"] ?? 0,
     affiliate: bySource["affiliate"] ?? 0,
   };
+
+  if (todayOnly) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Belgrade",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date());
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "0";
+    const h = parseInt(get("hour"), 10);
+    const m = parseInt(get("minute"), 10);
+    const s = parseInt(get("second"), 10);
+    payload.secondsUntilMidnight = 24 * 3600 - h * 3600 - m * 60 - s;
+    payload.belgradeTime = `${get("hour")}:${get("minute")}:${get("second")} (Beograd)`;
+  }
 
   if (debug) {
     const sheetBySource: Record<string, number> = {};

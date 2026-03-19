@@ -29,7 +29,7 @@ export default function CountdownTimer({ targetDate, label = "PRIJAVE SE ZATVARA
   ];
 
   return (
-    <div style={{ textAlign: "center" }}>
+    <div style={{ textAlign: "center", contain: "layout" }}>
       <style>{`
         .cd-label { font-size: 10px; letter-spacing: 0.15em; color: #8a8a9a; margin-bottom: 14px; text-transform: uppercase; font-weight: 500; }
         .cd-wrap { display: inline-flex; align-items: center; gap: 0; background: rgba(5,5,8,0.8); border: 1px solid rgba(0,212,255,0.2); border-radius: 18px; padding: 20px 28px; box-shadow: 0 0 40px rgba(0,212,255,0.06), inset 0 1px 0 rgba(255,255,255,0.03); max-width: 100%; }

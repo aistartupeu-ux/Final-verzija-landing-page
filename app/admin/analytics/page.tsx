@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -41,6 +41,45 @@ const SOURCE_LABELS: Record<string, string> = {
   ostalo: "Ostalo",
 };
 
+/** Samostalan countdown — re-renderuje samo sebe svake sekunde, ne celu stranicu. */
+function CountdownDisplay({
+  initialSeconds,
+  onReset,
+}: { initialSeconds: number; onReset: () => void }) {
+  const [sec, setSec] = useState(initialSeconds);
+  const onResetRef = useRef(onReset);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  onResetRef.current = onReset;
+
+  useEffect(() => {
+    if (initialSeconds > 0) setSec(initialSeconds);
+  }, [initialSeconds]);
+
+  useEffect(() => {
+    if (sec <= 0) return;
+    intervalRef.current = setInterval(() => {
+      setSec((p) => {
+        if (p <= 1) {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          onResetRef.current();
+          return 0;
+        }
+        return p - 1;
+      });
+    }, 1000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [sec <= 0 ? 0 : 1]);
+
+  if (sec <= 0) return null;
+  return (
+    <div style={{ fontSize: 18, fontWeight: 700, color: "#00d4ff", fontVariantNumeric: "tabular-nums", contain: "layout" }}>
+      {Math.floor(sec / 3600)}h {Math.floor((sec % 3600) / 60)}m {sec % 60}s
+    </div>
+  );
+}
+
 export default function AdminAnalyticsPage() {
   const [secret, setSecret] = useState("");
   const [auth, setAuth] = useState<string | null>(null);
@@ -57,7 +96,6 @@ export default function AdminAnalyticsPage() {
   } | null>(null);
   const [tiktokSpend, setTiktokSpend] = useState("");
   const [todayData, setTodayData] = useState<AnalyticsData | null>(null);
-  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -69,7 +107,7 @@ export default function AdminAnalyticsPage() {
     if (!to) setTo(now.toISOString().slice(0, 10));
   }, []);
 
-  const fetchTodayData = async (token: string) => {
+  const fetchTodayData = useCallback(async (token: string) => {
     try {
       const params = new URLSearchParams();
       params.set("secret", token);
@@ -80,12 +118,11 @@ export default function AdminAnalyticsPage() {
       if (res.ok) {
         const json = await res.json();
         setTodayData(json);
-        if (json.secondsUntilMidnight != null) setSecondsLeft(json.secondsUntilMidnight);
       }
     } catch {
       // opciono
     }
-  };
+  }, []);
 
   const fetchData = async (token: string, silent = false, withDebug = false) => {
     if (!silent) setLoading(true);
@@ -182,6 +219,7 @@ export default function AdminAnalyticsPage() {
     localStorage.removeItem("admin_analytics_secret");
     setAuth(null);
     setData(null);
+    setTodayData(null);
     setMetaAds(null);
     setSecret("");
     setAttempts(0);
@@ -194,6 +232,7 @@ export default function AdminAnalyticsPage() {
   const authRef = useRef(auth);
   authRef.current = auth;
 
+  const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!auth || !data) return;
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -203,40 +242,44 @@ export default function AdminAnalyticsPage() {
       const ch = client.channel("admin-leads").on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "leads" },
-        () => { const t = authRef.current; if (t) fetchData(t, true); }
+        () => {
+          if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+          fetchDebounceRef.current = setTimeout(() => {
+            const t = authRef.current;
+            if (t) fetchData(t, true);
+            fetchDebounceRef.current = null;
+          }, 800);
+        }
       ).subscribe();
-      return () => { client.removeChannel(ch); };
+      return () => {
+        if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+        client.removeChannel(ch);
+      };
     }
   }, [auth, data]);
 
   useEffect(() => {
     if (!auth || !data) return;
-    const id = setInterval(() => { const t = authRef.current; if (t) fetchData(t, true); }, 20000);
+    const id = setInterval(() => { const t = authRef.current; if (t) fetchData(t, true); }, 30000);
     return () => clearInterval(id);
   }, [auth, data]);
 
-  // Countdown do ponoći Beograd — reset na 24h
-  useEffect(() => {
-    if (secondsLeft == null || secondsLeft <= 0) return;
-    const id = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev == null || prev <= 1) {
-          const t = authRef.current;
-          if (t) fetchTodayData(t);
-          return null;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [secondsLeft]);
-
   const handleRefresh = () => auth && fetchData(auth);
+  const handleCountdownReset = useCallback(() => {
+    const t = authRef.current;
+    if (t) fetchTodayData(t);
+  }, [fetchTodayData]);
 
   const tiktokSpendNum = parseFloat(tiktokSpend.replace(",", ".")) || 0;
-  const tiktokCpl = data?.tiktokLeads ? tiktokSpendNum / data.tiktokLeads : null;
   const totalLeads = data?.total ?? 0;
-  const pct = (n: number) => totalLeads > 0 ? Math.round((n / totalLeads) * 100) : 0;
+  const tiktokCpl = data?.tiktokLeads ? tiktokSpendNum / data.tiktokLeads : null;
+  const pct = useCallback((n: number) => totalLeads > 0 ? Math.round((n / totalLeads) * 100) : 0, [totalLeads]);
+  const sortedSources = useMemo(() => {
+    if (!data?.bySource) return [];
+    return Object.entries(data.bySource)
+      .filter(([s]) => s !== "affiliate" && s !== "null" && s !== "")
+      .sort((a, b) => b[1] - a[1]);
+  }, [data?.bySource]);
 
   if (!auth) {
     return (
@@ -355,7 +398,7 @@ export default function AdminAnalyticsPage() {
 
         {loading ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 60 }}>
-            <Loader2 size={32} color="#00d4ff" style={{ animation: "spin 1s linear infinite" }} />
+            <Loader2 size={32} color="#00d4ff" style={{ animation: "spin 1s linear infinite", willChange: "transform" }} />
           </div>
         ) : data ? (
           <>
@@ -369,14 +412,15 @@ export default function AdminAnalyticsPage() {
                     <div style={{ fontSize: 36, fontWeight: 800, color: "#fff" }}>{todayData.total}</div>
                     <div style={{ fontSize: 13, color: "#888" }}>Leadova danas · reset u ponoć</div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
+                  <div style={{ textAlign: "right", contain: "layout" }}>
                     {todayData.belgradeTime && (
                       <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>{todayData.belgradeTime}</div>
                     )}
-                    {secondsLeft != null && secondsLeft > 0 && (
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "#00d4ff", fontVariantNumeric: "tabular-nums" }}>
-                        {Math.floor(secondsLeft / 3600)}h {Math.floor((secondsLeft % 3600) / 60)}m {secondsLeft % 60}s
-                      </div>
+                    {todayData.secondsUntilMidnight != null && todayData.secondsUntilMidnight > 0 && (
+                      <CountdownDisplay
+                        initialSeconds={todayData.secondsUntilMidnight}
+                        onReset={handleCountdownReset}
+                      />
                     )}
                     <div style={{ fontSize: 11, color: "#555" }}>do resetovanja</div>
                   </div>
@@ -390,7 +434,7 @@ export default function AdminAnalyticsPage() {
               </div>
             )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16, marginBottom: 32 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16, marginBottom: 32, contain: "layout" }}>
               <div style={{ padding: 24, borderRadius: 18, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(0,212,255,0.15)" }}>
                 <Users size={24} color="#00d4ff" style={{ marginBottom: 12 }} />
                 <div style={{ fontSize: 28, fontWeight: 800, color: "#fff" }}>{data.total}</div>
@@ -458,13 +502,10 @@ export default function AdminAnalyticsPage() {
               );
             })()}
 
-            <div style={{ marginBottom: 32 }}>
+            <div style={{ marginBottom: 32, contain: "layout" }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 16 }}>Raspodela po izvoru</h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {Object.entries(data.bySource)
-                  .filter(([source]) => source !== "affiliate" && source !== "null" && source !== "")
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([source, count]) => (
+                {sortedSources.map(([source, count]) => (
                     <div key={source} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                         <span style={{ color: "#ccc" }}>{SOURCE_LABELS[source] ?? source}</span>

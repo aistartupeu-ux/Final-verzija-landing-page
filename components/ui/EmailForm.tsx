@@ -157,7 +157,7 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
             </div>
             <button type="submit" disabled={loading} className="ef-btn">
               {loading
-                ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+                ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite", willChange: "transform" }} />
                 : <>Završi <ArrowRight size={15} /></>
               }
             </button>
@@ -213,7 +213,7 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
               }}
             />
             {verifyState === "checking" && (
-              <Loader2 size={18} color="#00d4ff" style={{ position: "absolute", right: 16, animation: "spin 1s linear infinite" }} />
+              <Loader2 size={18} color="#00d4ff" style={{ position: "absolute", right: 16, animation: "spin 1s linear infinite", willChange: "transform" }} />
             )}
             {verifyState === "valid" && (
               <CheckCircle size={18} color="#22c55e" style={{ position: "absolute", right: 16 }} />

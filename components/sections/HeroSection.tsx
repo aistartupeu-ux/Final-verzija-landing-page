@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Play, Pause, Maximize } from "lucide-react";
 import Image from "next/image";
@@ -68,7 +68,7 @@ export default function HeroSection() {
     };
   }, []);
 
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     if (!explainerRef.current) return;
     if (playing) {
       explainerRef.current.pause();
@@ -77,7 +77,7 @@ export default function HeroSection() {
       explainerRef.current.play();
       setPlaying(true);
     }
-  };
+  }, [playing]);
 
   return (
     <section

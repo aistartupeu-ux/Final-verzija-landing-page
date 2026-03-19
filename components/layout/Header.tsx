@@ -13,22 +13,35 @@ export default function Header() {
   const prevScrolled = useRef(false);
 
   useEffect(() => {
+    let raf = 0;
     const h = () => {
-      const now = window.scrollY > 40;
-      if (now !== prevScrolled.current) {
-        prevScrolled.current = now;
-        setScrolled(now);
-      }
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        const now = window.scrollY > 40;
+        if (now !== prevScrolled.current) {
+          prevScrolled.current = now;
+          setScrolled(now);
+        }
+        raf = 0;
+      });
     };
     h();
     window.addEventListener("scroll", h, { passive: true });
 
+    let activeRaf = 0;
     const observers: IntersectionObserver[] = [];
     NAV_SECTIONS.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
       const obs = new IntersectionObserver(
-        ([entry]) => { if (entry.isIntersecting) setActive(id); },
+        ([entry]) => {
+          if (!entry.isIntersecting) return;
+          if (activeRaf) cancelAnimationFrame(activeRaf);
+          activeRaf = requestAnimationFrame(() => {
+            setActive(id);
+            activeRaf = 0;
+          });
+        },
         { rootMargin: "-40% 0px -55% 0px" }
       );
       obs.observe(el);
@@ -37,6 +50,8 @@ export default function Header() {
 
     return () => {
       window.removeEventListener("scroll", h);
+      if (raf) cancelAnimationFrame(raf);
+      if (activeRaf) cancelAnimationFrame(activeRaf);
       observers.forEach(o => o.disconnect());
     };
   }, []);

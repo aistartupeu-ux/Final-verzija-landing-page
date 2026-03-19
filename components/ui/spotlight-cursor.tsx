@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, HTMLAttributes } from 'react';
+import { useRef, useEffect, useMemo, HTMLAttributes } from 'react';
 
 interface SpotlightConfig {
   radius?: number;
@@ -125,13 +125,13 @@ export function SpotlightCursor({
   className = '',
   ...rest
 }: SpotlightCursorProps) {
-  const spotlightConfig = {
+  const spotlightConfig = useMemo(() => ({
     radius: 220,
     brightness: 0.18,
     color: '#00d4ff',
     smoothing: 0.1,
     ...config,
-  };
+  }), [config?.radius, config?.brightness, config?.color, config?.smoothing]);
 
   const canvasRef = useSpotlightEffect(spotlightConfig);
 
