@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
 import { trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
+import { pushLeadToDataLayer, storeLeadForThankYou } from "@/lib/tiktok-datalayer";
 import PhoneInput, { type Value } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { useRouter } from "next/navigation";
@@ -56,7 +57,10 @@ export default function EmailForm({ microcopy }: { microcopy?: string; className
       if (typeof window !== "undefined" && (window as unknown as { ttq?: { track: (ev: string, opts?: object) => void } }).ttq) {
         (window as unknown as { ttq: { track: (ev: string, opts?: object) => void } }).ttq.track("SubmitForm", { content_name: "waitlist_lead" });
       }
-      trackAffiliateLeadOnSubmit({ email, phone: (skipPhone || !phone) ? null : phone });
+      const phoneVal = (skipPhone || !phone) ? null : phone;
+      await pushLeadToDataLayer(email, phoneVal);
+      storeLeadForThankYou(email, phoneVal);
+      trackAffiliateLeadOnSubmit({ email, phone: phoneVal });
       setLoading(false);
       setStep("done");
     } catch {

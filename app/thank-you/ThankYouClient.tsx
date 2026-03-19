@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { useMemo, type CSSProperties } from "react";
+import { pushThankYouPageTracking } from "@/lib/tiktok-datalayer";
 
 const SOCIAL_LINKS = [
   { label: "Instagram", href: "https://www.instagram.com/aihype.official/" },
@@ -235,6 +237,10 @@ function BackgroundEffects() {
 export default function ThankYouClient() {
   const reduced = useReducedMotion();
   const ease = [0.16, 1, 0.3, 1] as const;
+
+  useEffect(() => {
+    void pushThankYouPageTracking();
+  }, []);
 
   return (
     <div
