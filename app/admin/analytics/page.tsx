@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Users,
-  TrendingUp,
   Loader2,
   Lock,
   RefreshCw,
@@ -14,6 +13,17 @@ import {
   Share2,
   Radio,
 } from "lucide-react";
+
+function TikTokIcon({ size = 20, color = "#00f2ea" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginBottom: 8 }} aria-hidden>
+      <path
+        d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"
+        fill={color}
+      />
+    </svg>
+  );
+}
 import { createClient } from "@supabase/supabase-js";
 
 type AnalyticsData = {
@@ -91,8 +101,11 @@ export default function AdminAnalyticsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [metaAds, setMetaAds] = useState<{
+    configured?: boolean;
     instagram: { spend: number; leads: number; cpl: number | null };
     facebook: { spend: number; leads: number; cpl: number | null };
+    error?: string;
+    _debug?: { dataRows: number; hasPaging: boolean; firstRowKeys: string[] };
   } | null>(null);
   const [tiktokSpend, setTiktokSpend] = useState("");
   const [todayData, setTodayData] = useState<AnalyticsData | null>(null);
@@ -154,18 +167,17 @@ export default function AdminAnalyticsPage() {
       if (from) mp.set("from", from);
       if (to) mp.set("to", to);
       try {
-        const metaRes = await fetch(`/api/admin/meta-ads?${mp}`, {
+        const metaRes = await fetch(`/api/admin/meta-ads?${mp}&debug=1`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (metaRes.ok) {
-          const metaJson = await metaRes.json();
-          if (metaJson.instagram || metaJson.facebook) {
-            setMetaAds({
-              instagram: metaJson.instagram ?? { spend: 0, leads: 0, cpl: null },
-              facebook: metaJson.facebook ?? { spend: 0, leads: 0, cpl: null },
-            });
-          }
-        }
+        const metaJson = await metaRes.json();
+        setMetaAds({
+          configured: metaJson.configured !== false,
+          instagram: metaJson.instagram ?? { spend: 0, leads: 0, cpl: null },
+          facebook: metaJson.facebook ?? { spend: 0, leads: 0, cpl: null },
+          error: metaJson.error,
+          _debug: metaJson._debug,
+        });
       } catch {
         // Meta API opciono
       }
@@ -224,8 +236,13 @@ export default function AdminAnalyticsPage() {
   };
 
   useEffect(() => {
-    if (auth && !data && !loading) fetchData(auth);
-  }, [auth]);
+    if (auth && from && to && !data && !loading) fetchData(auth);
+  }, [auth, from, to]);
+
+  // Refetch kad korisnik promeni period (from/to)
+  useEffect(() => {
+    if (auth && data && from && to) fetchData(auth, true);
+  }, [from, to, auth]);
 
   const authRef = useRef(auth);
   authRef.current = auth;
@@ -271,6 +288,14 @@ export default function AdminAnalyticsPage() {
   const tiktokSpendNum = parseFloat(tiktokSpend.replace(",", ".")) || 0;
   const totalLeads = data?.total ?? 0;
   const tiktokCpl = data?.tiktokLeads ? tiktokSpendNum / data.tiktokLeads : null;
+  const igLeads = data?.bySource?.instagram ?? 0;
+  const fbLeads = data?.bySource?.facebook ?? 0;
+  const igCpl = metaAds
+    ? (metaAds.instagram.cpl ?? (metaAds.instagram.spend > 0 && igLeads > 0 ? metaAds.instagram.spend / igLeads : null))
+    : null;
+  const fbCpl = metaAds
+    ? (metaAds.facebook.cpl ?? (metaAds.facebook.spend > 0 && fbLeads > 0 ? metaAds.facebook.spend / fbLeads : null))
+    : null;
   const pct = useCallback((n: number) => totalLeads > 0 ? Math.round((n / totalLeads) * 100) : 0, [totalLeads]);
   const sortedSources = useMemo(() => {
     if (!data?.bySource) return [];
@@ -438,7 +463,7 @@ export default function AdminAnalyticsPage() {
                 <div className="admin-stat-label">Facebook · {pct(data.bySource.facebook ?? 0)}%</div>
               </div>
               <div className="admin-stat-card" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(0,242,234,0.25)" }}>
-                <TrendingUp size={20} color="#00f2ea" style={{ marginBottom: 8 }} />
+                <TikTokIcon size={20} color="#00f2ea" />
                 <div className="admin-stat-num" style={{ color: "#fff" }}>{data.tiktokLeads}</div>
                 <div className="admin-stat-label">TikTok · {pct(data.tiktokLeads)}%</div>
               </div>
@@ -517,21 +542,28 @@ export default function AdminAnalyticsPage() {
             <div style={{ marginBottom: 28 }}>
               <h2 style={{ fontSize: "clamp(16px, 4vw, 18px)", fontWeight: 700, color: "#fff", marginBottom: 14 }}>Cost per Lead (CPL)</h2>
               <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
-                Meta (Instagram, Facebook) se automatski vuče iz Meta Ads. TikTok unesi ručno.
+                Meta: potrošnja iz Ads API, CPL = potrošnja ÷ leadovi sa sajta. TikTok: unesi ručno.
               </p>
+              {metaAds?.error && (
+                <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444", fontSize: 12 }}>
+                  Meta API: {metaAds.error}
+                </div>
+              )}
+              {metaAds?._debug && metaAds.instagram.spend === 0 && metaAds.facebook.spend === 0 && (
+                <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)", color: "#a78bfa", fontSize: 12 }}>
+                  Debug: {metaAds._debug.dataRows} redova od Meta. {metaAds._debug.dataRows === 0 ? "Nema potrošnje u ovom periodu ili token nema pristup." : ""}
+                </div>
+              )}
               <div className="admin-cpl-grid">
                 <div style={{ padding: 20, borderRadius: 16, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(228,64,95,0.2)" }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#E4405F", marginBottom: 12 }}>Instagram</div>
-                  {metaAds ? (
+                  {metaAds && metaAds.configured !== false ? (
                     <>
                       <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
-                        {metaAds.instagram.cpl != null ? "€" + metaAds.instagram.cpl.toFixed(2) : "—"}
+                        {igCpl != null ? "€" + igCpl.toFixed(2) : "—"}
                       </div>
                       <div style={{ fontSize: 12, color: "#555" }}>
-                        €{metaAds.instagram.spend.toFixed(2)} potrošeno · {metaAds.instagram.leads} leadova (Meta Ads)
-                      </div>
-                      <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>
-                        Sajt: {data.bySource.instagram ?? 0} leadova
+                        €{metaAds.instagram.spend.toFixed(2)} potrošeno · {data.bySource.instagram ?? 0} leadova sa sajta
                       </div>
                     </>
                   ) : (
@@ -540,16 +572,13 @@ export default function AdminAnalyticsPage() {
                 </div>
                 <div style={{ padding: 20, borderRadius: 16, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(24,119,242,0.2)" }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#1877F2", marginBottom: 12 }}>Facebook</div>
-                  {metaAds ? (
+                  {metaAds && metaAds.configured !== false ? (
                     <>
                       <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
-                        {metaAds.facebook.cpl != null ? "€" + metaAds.facebook.cpl.toFixed(2) : "—"}
+                        {fbCpl != null ? "€" + fbCpl.toFixed(2) : "—"}
                       </div>
                       <div style={{ fontSize: 12, color: "#555" }}>
-                        €{metaAds.facebook.spend.toFixed(2)} potrošeno · {metaAds.facebook.leads} leadova (Meta Ads)
-                      </div>
-                      <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>
-                        Sajt: {data.bySource.facebook ?? 0} leadova
+                        €{metaAds.facebook.spend.toFixed(2)} potrošeno · {data.bySource.facebook ?? 0} leadova sa sajta
                       </div>
                     </>
                   ) : (
