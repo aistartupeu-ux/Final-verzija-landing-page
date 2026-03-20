@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
 
   const token = process.env.META_ADS_ACCESS_TOKEN;
   const adAccountId = process.env.META_AD_ACCOUNT_ID;
+  const campaignName = process.env.META_LEAD_CAMPAIGN_NAME?.trim(); // npr. "MAD - AIH - Website Leads - 19.09.26"
   if (!token || !adAccountId) {
     return NextResponse.json({
       configured: false,
@@ -48,9 +49,43 @@ export async function GET(req: NextRequest) {
     ? `{"since":"${from}","until":"${to}"}`
     : undefined;
 
+  let insightsUrl = `${accountId}/insights`;
+  let campaignId: string | null = null;
+  let activeCampaignIds: Set<string> = new Set();
+
+  // Uvek učitaj aktivne kampanje — CPL samo iz aktivnih
+  try {
+    const campParams = new URLSearchParams({
+      access_token: token,
+      fields: "id,name,effective_status",
+      limit: "500",
+    });
+    const campRes = await fetch(
+      `https://graph.facebook.com/v21.0/${accountId}/campaigns?${campParams}`,
+      { next: { revalidate: 0 } }
+    );
+    const campJson = await campRes.json();
+    const campaigns = (campJson.data ?? []) as { id: string; name: string; effective_status?: string }[];
+    const active = campaigns.filter((c) => c.effective_status === "ACTIVE");
+    active.forEach((c) => activeCampaignIds.add(c.id));
+
+    if (campaignName) {
+      const match = active.find(
+        (c) => c.name?.trim() === campaignName || c.name?.includes(campaignName)
+      );
+      if (match) {
+        campaignId = match.id;
+        insightsUrl = `${match.id}/insights`;
+        activeCampaignIds = new Set([match.id]);
+      }
+    }
+  } catch (e) {
+    console.warn("Meta campaigns fetch failed:", e);
+  }
+
   const params = new URLSearchParams({
     access_token: token,
-    fields: "spend,actions,cost_per_action_type",
+    fields: "spend,actions,cost_per_action_type,campaign_id",
     breakdowns: "publisher_platform",
     limit: "500",
   });
@@ -59,10 +94,13 @@ export async function GET(req: NextRequest) {
   } else {
     params.set("date_preset", datePreset);
   }
+  if (!campaignId) {
+    params.set("level", "campaign");
+  }
 
   try {
     const res = await fetch(
-      `https://graph.facebook.com/v21.0/${accountId}/insights?${params}`,
+      `https://graph.facebook.com/v21.0/${insightsUrl}?${params}`,
       { next: { revalidate: 0 } }
     );
     const json = await res.json();
@@ -102,46 +140,17 @@ export async function GET(req: NextRequest) {
     }
 
     let data = json.data ?? [];
+    if (!campaignId && activeCampaignIds.size > 0) {
+      data = data.filter((row: { campaign_id?: string }) => {
+        const cid = row.campaign_id;
+        return cid && activeCampaignIds.has(cid);
+      });
+    }
+
     const byPlatform: Record<string, MetaPlatformData> = {
       instagram: { spend: 0, leads: 0, cpl: null },
       facebook: { spend: 0, leads: 0, cpl: null },
     };
-
-    // Ako breakdown vrati prazno, probaj bez breakdowns (total na nivou naloga)
-    if (data.length === 0) {
-      const fallbackParams = new URLSearchParams({
-        access_token: token,
-        fields: "spend,actions,cost_per_action_type",
-        limit: "1",
-      });
-      if (timeRange) fallbackParams.set("time_range", timeRange);
-      else fallbackParams.set("date_preset", datePreset);
-      try {
-        const fallbackRes = await fetch(
-          `https://graph.facebook.com/v21.0/${accountId}/insights?${fallbackParams}`,
-          { next: { revalidate: 0 } }
-        );
-        const fallbackJson = await fallbackRes.json();
-        const fallbackData = fallbackJson.data ?? [];
-        if (fallbackRes.ok && fallbackData.length > 0) {
-          const row = fallbackData[0];
-          const totalSpend = parseFloat(row.spend ?? 0) || 0;
-          const totalLeads = countLeads(row.actions);
-          const metaCpl = getCplFromCostPerAction(row.cost_per_action_type);
-          if (totalSpend > 0 || totalLeads > 0) {
-            byPlatform.instagram.spend = totalSpend / 2;
-            byPlatform.facebook.spend = totalSpend / 2;
-            byPlatform.instagram.leads = totalLeads;
-            byPlatform.facebook.leads = totalLeads;
-            const cpl = metaCpl ?? (totalLeads > 0 ? totalSpend / totalLeads : null);
-            byPlatform.instagram.cpl = cpl;
-            byPlatform.facebook.cpl = cpl;
-          }
-        }
-      } catch {
-        // ignorišemo fallback grešku
-      }
-    }
 
     for (const row of data) {
       const platform = (row.publisher_platform ?? "unknown").toLowerCase();
@@ -173,8 +182,9 @@ export async function GET(req: NextRequest) {
     if (url.searchParams.get("debug") === "1") {
       payload._debug = {
         dataRows: data.length,
-        hasPaging: !!json.paging,
-        firstRowKeys: data[0] ? Object.keys(data[0]) : [],
+        activeCampaigns: activeCampaignIds.size,
+        campaignFilter: campaignName ?? null,
+        campaignId: campaignId ?? null,
       };
     }
     return NextResponse.json(payload);

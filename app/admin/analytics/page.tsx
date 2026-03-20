@@ -105,7 +105,7 @@ export default function AdminAnalyticsPage() {
     instagram: { spend: number; leads: number; cpl: number | null };
     facebook: { spend: number; leads: number; cpl: number | null };
     error?: string;
-    _debug?: { dataRows: number; hasPaging: boolean; firstRowKeys: string[] };
+    _debug?: { dataRows: number; activeCampaigns?: number; campaignFilter?: string | null; campaignId?: string | null };
   } | null>(null);
   const [tiktokSpend, setTiktokSpend] = useState("");
   const [todayData, setTodayData] = useState<AnalyticsData | null>(null);
@@ -549,9 +549,16 @@ export default function AdminAnalyticsPage() {
                   Meta API: {metaAds.error}
                 </div>
               )}
-              {metaAds?._debug && metaAds.instagram.spend === 0 && metaAds.facebook.spend === 0 && (
+              {metaAds?._debug && (metaAds.instagram.spend === 0 && metaAds.facebook.spend === 0 || metaAds._debug.campaignFilter || (metaAds._debug.activeCampaigns ?? 0) > 0) && (
                 <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)", color: "#a78bfa", fontSize: 12 }}>
-                  Debug: {metaAds._debug.dataRows} redova od Meta. {metaAds._debug.dataRows === 0 ? "Nema potrošnje u ovom periodu ili token nema pristup." : ""}
+                  {metaAds._debug.campaignFilter ? (
+                    <span>Kampanja: {metaAds._debug.campaignFilter}{metaAds._debug.campaignId ? ` ✓` : " — nije pronađena"}</span>
+                  ) : (
+                    <span>Samo aktivne kampanje ({metaAds._debug.activeCampaigns ?? 0})</span>
+                  )}
+                  {metaAds._debug.dataRows === 0 && (
+                    <span> — Nema potrošnje u ovom periodu.</span>
+                  )}
                 </div>
               )}
               <div className="admin-cpl-grid">
