@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 
-export default function AdminAnalyticsErrorPage() {
+export default function AdminDashErrorPage() {
   return (
     <div style={{
       minHeight: "100vh",

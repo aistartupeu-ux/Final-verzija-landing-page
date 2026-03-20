@@ -2,7 +2,7 @@
 
 ## Šta je
 
-Stranica `/admin/analytics` prikazuje:
+Stranica `/admin/x7k9m2q4` prikazuje:
 - **Odakle dolaze leadovi** — Instagram, Facebook, TikTok, direktno (zasebno po platformi)
 - **Ukupan broj leadova** po periodu
 - **Cost per Lead (CPL)** za Meta i TikTok — unosiš potrošnju (€) i automatski se računa CPL
@@ -18,7 +18,7 @@ Stranica je **zaštićena**. Samo sa pristupnim kodom.
    ADMIN_ANALYTICS_SECRET=tvoj_tajni_kod_ovde
    ```
 2. Redeploy.
-3. Otvori `https://tvoj-domen.com/admin/analytics`
+3. Otvori `https://tvoj-domen.com/admin/x7k9m2q4`
 4. Unesi pristupni kod (ista vrednost kao `ADMIN_ANALYTICS_SECRET`)
 5. Kod se čuva u localStorage — sledeći put ne moraš ponovo da unosiš
 
