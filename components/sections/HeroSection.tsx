@@ -135,24 +135,20 @@ export default function HeroSection() {
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         style={{ textAlign: "center", maxWidth: 720, margin: "0 auto", width: "100%", position: "relative", zIndex: 2 }}
       >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-          style={{ marginBottom: 40, display: "flex", justifyContent: "center" }}
-        >
-          <Image src="/logo.png" alt="AI Hype Academy" width={260} height={80} style={{ height: 80, width: "auto", objectFit: "contain" }} priority />
-        </motion.div>
-
         <h1
+          className="hero-headline"
           style={{
-            fontSize: "clamp(32px, 6vw, 62px)", fontWeight: 800, color: "#fff",
-            lineHeight: 1.1, marginBottom: 28,
+            fontSize: "clamp(24px, 4.5vw, 44px)", fontWeight: 800, color: "#fff",
+            lineHeight: 1.15, marginBottom: 32,
             textShadow: "0 2px 40px rgba(0,0,0,0.5), 0 0 80px rgba(0,212,255,0.1)",
           }}
         >
-          Izgradi AI karijeru pre nego što bude kasno.{" "}
-          <span className="gradient-text">Počni sada.</span>
+          <span className="hero-headline-line">
+            Počni da koristiš AI, pre nego što bude kasno.
+          </span>
+          <span className="gradient-text hero-headline-line" style={{ marginTop: "0.35em" }}>
+            Prijavi se odmah.
+          </span>
         </h1>
 
         {/* 1. VSL video — prvo */}
@@ -281,10 +277,11 @@ export default function HeroSection() {
 
         {/* 2. Email forma — ispod videa */}
         <motion.div
+          id="hero-email-form"
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          style={{ marginBottom: 32 }}
+          style={{ marginBottom: 32, scrollMarginTop: 100 }}
         >
           <EmailForm />
         </motion.div>
@@ -299,15 +296,6 @@ export default function HeroSection() {
           <CountdownTimer targetDate={TARGET_DATE} />
         </motion.div>
 
-        {/* 4. Tekst — na dnu */}
-        <p style={{
-          fontSize: "clamp(15px, 2vw, 18px)", color: "rgba(255,255,255,0.85)",
-          maxWidth: 600, margin: "0 auto", lineHeight: 1.75, fontWeight: 500,
-          textShadow: "0 2px 20px rgba(0,0,0,0.5)",
-        }}>
-          Čak i ako nemaš <strong style={{ color: "#00d4ff" }}>nikakvo prethodno znanje</strong>, naučićeš sve od nule.
-          AI influenseri, filmski video, muzika, automatizacija i monetizacija.
-        </p>
       </motion.div>
     </section>
   );

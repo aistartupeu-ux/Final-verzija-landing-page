@@ -223,6 +223,21 @@ body {
   .gradient-text { animation: none; }
 }
 
+/* Hero headline: cela reč u jednom redu (bez preloma usred reči); na širem ekranu cela linija u jednom redu */
+.hero-headline {
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
+  -webkit-hyphens: none;
+}
+.hero-headline-line {
+  display: block;
+}
+/* Druga linija (gradient) uvek u jednom redu — kratka je, ne prelama reč */
+.hero-headline .gradient-text.hero-headline-line {
+  white-space: nowrap;
+}
+
 /* Infinite marquee */
 @keyframes marquee {
   0%   { transform: translateX(0); }

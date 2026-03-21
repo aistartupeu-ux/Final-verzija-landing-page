@@ -58,6 +58,27 @@ const supabase = supabaseUrl && supabaseKey
   ? createClient(supabaseUrl, supabaseKey)
   : null;
 
+function normalizeSourceTag(
+  sourceTag: string | null | undefined,
+  utmSource: string | null | undefined,
+  utmMedium: string | null | undefined,
+  utmCampaign: string | null | undefined,
+  hasAffiliate: boolean
+): string {
+  if (hasAffiliate) return "affiliate";
+  const rawTag = String(sourceTag ?? "").trim().toLowerCase();
+  const rawSource = String(utmSource ?? "").trim().toLowerCase();
+  const rawMedium = String(utmMedium ?? "").trim().toLowerCase();
+  const rawCampaign = String(utmCampaign ?? "").trim().toLowerCase();
+  const probe = `${rawTag} ${rawSource} ${rawMedium} ${rawCampaign}`;
+
+  if (probe.includes("instagram") || probe.includes("insta") || rawTag === "ig" || rawSource === "ig") return "instagram";
+  if (probe.includes("facebook") || rawTag === "fb" || rawSource === "fb" || probe.includes("fb_")) return "facebook";
+  if (probe.includes("tiktok") || rawTag === "tt" || rawSource === "tt" || rawMedium === "tt") return "tiktok";
+  if (!rawTag || rawTag === "meta") return "direct";
+  return rawTag;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -124,7 +145,13 @@ export async function POST(req: NextRequest) {
     const cookieStore = await cookies();
     const affiliateCodeRaw = bodyAffiliate ?? cookieStore.get("af_ref")?.value ?? null;
     const affiliateCode = affiliateCodeRaw ? String(affiliateCodeRaw).trim().toLowerCase() : null;
-    const sourceTag = source_tag ?? (affiliateCode ? "affiliate" : "direct");
+    const sourceTag = normalizeSourceTag(
+      source_tag,
+      utm_source,
+      utm_medium ?? null,
+      utm_campaign ?? null,
+      Boolean(affiliateCode)
+    );
 
     const emailNorm = String(email).trim().toLowerCase();
     const { data: existing } = await supabase
