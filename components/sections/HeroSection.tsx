@@ -27,11 +27,21 @@ export default function HeroSection() {
     const section = sectionRef.current;
     if (!video || !section) return;
     let raf = 0;
+    let sectionTop = 0;
+    let sectionHeight = 0;
+    const updateMetrics = () => {
+      const rect = section.getBoundingClientRect();
+      sectionTop = rect.top + window.scrollY;
+      sectionHeight = section.offsetHeight;
+    };
+    updateMetrics();
+    const ro = new ResizeObserver(updateMetrics);
+    ro.observe(section);
     const onScroll = () => {
       if (raf) return;
       raf = requestAnimationFrame(() => {
-        const rect = section.getBoundingClientRect();
-        const progress = Math.max(0, Math.min(1, -rect.top / (rect.height * 0.6)));
+        const scrollY = window.scrollY;
+        const progress = Math.max(0, Math.min(1, (scrollY - sectionTop) / (sectionHeight * 0.6)));
         video.style.transform = `translate(-50%, -50%) scale(1.12) translateY(${progress * -50}px) translateZ(0)`;
         raf = 0;
       });
@@ -39,6 +49,7 @@ export default function HeroSection() {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
+      ro.disconnect();
       window.removeEventListener("scroll", onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
@@ -117,6 +128,8 @@ export default function HeroSection() {
               width: "auto", height: "auto",
               transform: "translate(-50%, -50%) scale(1.12) translateZ(0)",
               objectFit: "cover",
+              willChange: "transform",
+              backfaceVisibility: "hidden",
             }}
           >
             <source src="/hero-vsl.mp4" type="video/mp4" />

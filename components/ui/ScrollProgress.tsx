@@ -32,6 +32,7 @@ export default function ScrollProgress() {
     <div style={{
       position: "fixed", top: 0, left: 0, right: 0, zIndex: 99990,
       height: 2, background: "transparent", pointerEvents: "none",
+      contain: "layout paint",
     }}>
       <div ref={barRef} style={{
         height: "100%", width: "100%",

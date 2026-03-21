@@ -99,7 +99,8 @@ export default function NetworkBackground() {
     let lastActivity = Date.now();
     let lastScroll = window.scrollY;
     let lastFrame = 0;
-    const FPS_CAP = isLowEnd ? 22 : 30;
+    let scrollVelocity = 0;
+    const baseFps = isLowEnd ? 22 : 30;
 
     const markActivity = () => {
       lastActivity = Date.now();
@@ -107,6 +108,9 @@ export default function NetworkBackground() {
     };
 
     const onScroll = () => {
+      const now = window.scrollY;
+      scrollVelocity = Math.abs(now - lastScroll);
+      lastScroll = now;
       markActivity();
     };
 
@@ -116,9 +120,11 @@ export default function NetworkBackground() {
         return;
       }
 
-      // Cap work on lower-end devices / heavy pages
+      // Cap work; tijekom brzog skrola smanji FPS da prioritizuje glatkoću skrola
       const nowT = typeof t === "number" ? t : performance.now();
-      if (nowT - lastFrame < 1000 / FPS_CAP) {
+      const fpsCap = scrollVelocity > 80 ? Math.max(15, baseFps - 10) : baseFps;
+      scrollVelocity *= 0.85;
+      if (nowT - lastFrame < 1000 / fpsCap) {
         raf = requestAnimationFrame(draw);
         return;
       }

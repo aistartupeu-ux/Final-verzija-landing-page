@@ -71,7 +71,6 @@ export default function Header() {
         borderBottom: scrolled ? "1px solid rgba(0,212,255,0.08)" : "1px solid transparent",
         transition: "background 0.2s ease, border-color 0.2s ease",
         transform: "translateZ(0)",
-        willChange: "transform",
       }}
     >
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 72 }}>

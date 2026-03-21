@@ -1,6 +1,7 @@
 import dynamic from "next/dynamic";
 import ScrollProgress from "@/components/ui/ScrollProgress";
 import DesktopOnlyEffects from "@/components/ui/DesktopOnlyEffects";
+import VideoPreloader from "@/components/ui/VideoPreloader";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import HeroSection from "@/components/sections/HeroSection";
@@ -20,6 +21,7 @@ const VideoShowcaseSection = dynamic(() => import("@/components/sections/VideoSh
 export default function Home() {
   return (
     <div style={{ position: "relative", minHeight: "100vh", contain: "layout" }}>
+      <VideoPreloader />
       <ScrollProgress />
       <DesktopOnlyEffects />
       <Header />
