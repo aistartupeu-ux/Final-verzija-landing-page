@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isRateLimited } from "@/lib/rate-limit";
 
 const POYO_KEY = process.env.POYO_API_KEY!;
 const POYO_URL = "https://api.poyo.ai";
@@ -12,8 +13,22 @@ const ALLOWED_MODELS = [
   "generate-music",
 ];
 
+function getClientIp(req: NextRequest): string | null {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip");
+}
+
 export async function POST(req: NextRequest) {
   try {
+    if (isRateLimited(getClientIp(req), {
+      keyPrefix: "ai-generate",
+      windowMs: 60_000,
+      maxRequests: 10,
+    })) {
+      return NextResponse.json(
+        { code: 429, error: { message: "Previše zahteva. Pokušaj ponovo za minut." } },
+        { status: 429 }
+      );
+    }
     if (!process.env.POYO_API_KEY) {
       return NextResponse.json(
         { code: 503, error: { message: "AI Studio nije konfigurisan." } },

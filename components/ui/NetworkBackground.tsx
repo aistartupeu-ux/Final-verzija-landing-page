@@ -47,7 +47,7 @@ export default function NetworkBackground() {
             ((navigator as unknown as { connection?: { effectiveType?: string } }).connection?.effectiveType ?? "").toLowerCase()
           )));
     const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
-    const NODE_COUNT = reduced || saveData ? 10 : isLowEnd ? 14 : coarse ? 16 : 24;
+    const NODE_COUNT = reduced || saveData ? 8 : isLowEnd ? 10 : coarse ? 12 : 18;
     const CONNECT = isMobile ? 120 : 145;
     const CONNECT_SQ = CONNECT * CONNECT;
     const MOUSE_R = 180;

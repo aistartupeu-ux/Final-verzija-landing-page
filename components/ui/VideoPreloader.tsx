@@ -25,9 +25,9 @@ export default function VideoPreloader() {
     const schedule = () => {
       const cb = (window as { requestIdleCallback?: (fn: () => void, o?: { timeout?: number }) => number }).requestIdleCallback;
       if (typeof cb === "function") {
-        return cb(() => startPreload(), { timeout: 2500 });
+        return cb(() => startPreload(), { timeout: 4500 });
       }
-      return window.setTimeout(startPreload, 2200) as unknown as number;
+      return window.setTimeout(startPreload, 4000) as unknown as number;
     };
 
     const startPreload = () => {

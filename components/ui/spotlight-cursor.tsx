@@ -14,6 +14,7 @@ const useSpotlightEffect = (config: SpotlightConfig) => {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches) return;
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -33,12 +34,7 @@ const useSpotlightEffect = (config: SpotlightConfig) => {
       canvas.height = window.innerHeight;
     };
 
-    let lastMove = 0;
-    const THROTTLE_MS = 50;
     const handleMouseMove = (event: MouseEvent) => {
-      const now = Date.now();
-      if (now - lastMove < THROTTLE_MS) return;
-      lastMove = now;
       targetX = event.clientX;
       targetY = event.clientY;
     };
@@ -99,8 +95,8 @@ const useSpotlightEffect = (config: SpotlightConfig) => {
     };
 
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-    window.addEventListener('mousemove', handleMousemove);
+    window.addEventListener('resize', resizeCanvas, { passive: true });
+    window.addEventListener('mousemove', handleMousemove, { passive: true });
     window.addEventListener('mouseleave', handleMouseLeave);
     animationFrameId = 0;
     scheduleDraw();
@@ -129,7 +125,7 @@ export function SpotlightCursor({
     radius: 220,
     brightness: 0.18,
     color: '#00d4ff',
-    smoothing: 0.1,
+    smoothing: 0.14,
     ...config,
   }), [config?.radius, config?.brightness, config?.color, config?.smoothing]);
 

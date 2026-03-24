@@ -1,22 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getLeadsFromSheet } from "@/lib/leads-sheet";
+import { verifyAdminSessionToken } from "@/lib/admin-session";
 
-function getAuth(req: NextRequest): string | null {
+async function isAdminAuthorized(req: NextRequest): Promise<boolean> {
+  const expected = process.env.ADMIN_ANALYTICS_SECRET;
+  if (!expected) return false;
+
   const authHeader = req.headers.get("authorization");
-  if (authHeader?.startsWith("Bearer ")) return authHeader.slice(7);
-  try {
-    const url = req.nextUrl ?? new URL(req.url);
-    return url.searchParams.get("secret");
-  } catch {
-    return null;
-  }
+  const bearerSecret = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (bearerSecret === expected) return true;
+
+  const url = req.nextUrl ?? new URL(req.url);
+  const paramSecret = url.searchParams.get("secret");
+  if (paramSecret === expected) return true;
+
+  const cookieHeader = req.headers.get("cookie");
+  const sessionToken = cookieHeader
+    ?.split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith("admin_session="))
+    ?.split("=")[1];
+  if (sessionToken && (await verifyAdminSessionToken(sessionToken, expected))) return true;
+
+  return false;
 }
 
 export async function GET(req: NextRequest) {
-  const secret = getAuth(req);
-  const expected = process.env.ADMIN_ANALYTICS_SECRET;
-  if (!expected || secret !== expected) {
+  if (!(await isAdminAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

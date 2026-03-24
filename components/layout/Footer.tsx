@@ -2,6 +2,7 @@
 
 import { Instagram, Youtube } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 function TiktokIcon({ size = 14 }: { size?: number }) {
   return (
@@ -49,7 +50,18 @@ export default function Footer() {
           </div>
         </div>
         <div style={{ borderTop: "1px solid rgba(0,212,255,0.06)", marginTop: 40, paddingTop: 20 }}>
-          <p style={{ fontSize: 11, color: "#444", textAlign: "center" }}>&copy; {new Date().getFullYear()} AI HYPE Academy. Sva prava zadržana.</p>
+          <p style={{ fontSize: 11, color: "#444", textAlign: "center", marginBottom: 8 }}>&copy; {new Date().getFullYear()} AI HYPE Academy. Sva prava zadržana.</p>
+          <div style={{ display: "flex", justifyContent: "center", gap: 14, flexWrap: "wrap", opacity: 0.72 }}>
+            <Link href="/politika-privatnosti" style={{ fontSize: 10, color: "#4f4f57", textDecoration: "none" }}>
+              Politika privatnosti
+            </Link>
+            <Link href="/uslovi-koriscenja" style={{ fontSize: 10, color: "#4f4f57", textDecoration: "none" }}>
+              Uslovi korišćenja
+            </Link>
+            <Link href="/politika-refundacije" style={{ fontSize: 10, color: "#4f4f57", textDecoration: "none" }}>
+              Politika refundacije
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

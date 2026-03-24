@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   Users,
   Loader2,
-  Lock,
   RefreshCw,
   Instagram,
   Facebook,
@@ -90,14 +89,14 @@ function CountdownDisplay({
   );
 }
 
+function redirectToLogin() {
+  window.location.href = "/admin/login";
+}
+
 export default function AdminDashPage() {
-  const [secret, setSecret] = useState("");
-  const [auth, setAuth] = useState<string | null>(null);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [attempts, setAttempts] = useState(0);
-  const maxAttempts = 3;
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [metaAds, setMetaAds] = useState<{
@@ -112,21 +111,21 @@ export default function AdminDashPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    localStorage.removeItem("admin_analytics_secret");
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     if (!from) setFrom(firstDay.toISOString().slice(0, 10));
     if (!to) setTo(now.toISOString().slice(0, 10));
   }, []);
 
-  const fetchTodayData = useCallback(async (token: string) => {
+  const fetchTodayData = useCallback(async () => {
     try {
       const params = new URLSearchParams();
-      params.set("secret", token);
       params.set("today", "1");
-      const res = await fetch(`/api/admin/analytics?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/admin/analytics?${params}`, { credentials: "include" });
+      if (res.status === 401) {
+        redirectToLogin();
+        return;
+      }
       if (res.ok) {
         const json = await res.json();
         setTodayData(json);
@@ -136,40 +135,29 @@ export default function AdminDashPage() {
     }
   }, []);
 
-  const fetchData = async (token: string, silent = false, withDebug = false) => {
+  const fetchData = useCallback(async (silent = false, withDebug = false) => {
     if (!silent) setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
-      params.set("secret", token);
       if (from) params.set("from", from);
       if (to) params.set("to", to);
       if (withDebug) params.set("debug", "1");
-      const res = await fetch(`/api/admin/analytics?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        if (res.status === 401) {
-          localStorage.removeItem("admin_analytics_secret");
-          setAuth(null);
-          setData(null);
-          setError("Pogrešan pristupni kod. Unesi ponovo.");
-          return;
-        }
-        throw new Error(await res.text());
+      const res = await fetch(`/api/admin/analytics?${params}`, { credentials: "include" });
+      if (res.status === 401) {
+        redirectToLogin();
+        return;
       }
+      if (!res.ok) throw new Error(await res.text());
       const json = await res.json();
       setData(json);
-      fetchTodayData(token);
+      fetchTodayData();
 
       const mp = new URLSearchParams();
-      mp.set("secret", token);
       if (from) mp.set("from", from);
       if (to) mp.set("to", to);
       try {
-        const metaRes = await fetch(`/api/admin/meta-ads?${mp}&debug=1`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const metaRes = await fetch(`/api/admin/meta-ads?${mp}&debug=1`, { credentials: "include" });
         const metaJson = await metaRes.json();
         setMetaAds({
           configured: metaJson.configured !== false,
@@ -186,70 +174,28 @@ export default function AdminDashPage() {
     } finally {
       if (!silent) setLoading(false);
     }
-  };
+  }, [from, to, fetchTodayData]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!secret.trim() || attempts >= maxAttempts) return;
-    setLoading(true);
-    setError(null);
+  const handleLogout = async () => {
     try {
-      const params = new URLSearchParams();
-      params.set("secret", secret.trim());
-      const res = await fetch(`/api/admin/analytics?${params}`, {
-        headers: { Authorization: `Bearer ${secret.trim()}` },
-      });
-      if (!res.ok) {
-        if (res.status === 401) {
-          setAttempts((a) => a + 1);
-          const left = maxAttempts - attempts - 1;
-          if (left <= 0) {
-            setError(`Pogrešan kod. Dostignut maksimum (${maxAttempts}) pokušaja. Osveži stranicu da pokušaš ponovo.`);
-          } else {
-            setError(`Pogrešan kod. Preostalo pokušaja: ${left}.`);
-          }
-          setSecret("");
-          return;
-        }
-        throw new Error(await res.text());
-      }
-      const json = await res.json();
-      setAuth(secret.trim());
-      setData(json);
-      fetchTodayData(secret.trim());
-      setAttempts(0);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Greška pri prijavi.");
-    } finally {
-      setLoading(false);
+      await fetch("/api/admin/logout", { method: "POST", credentials: "include" });
+    } catch {
+      // ignore
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("admin_analytics_secret");
-    setAuth(null);
-    setData(null);
-    setTodayData(null);
-    setMetaAds(null);
-    setSecret("");
-    setAttempts(0);
+    redirectToLogin();
   };
 
   useEffect(() => {
-    if (auth && from && to && !data && !loading) fetchData(auth);
-  }, [auth, from, to]);
+    if (from && to && !data && !loading) fetchData();
+  }, [from, to]);
 
-  // Refetch kad korisnik promeni period (from/to)
   useEffect(() => {
-    if (auth && data && from && to) fetchData(auth, true);
-  }, [from, to, auth]);
-
-  const authRef = useRef(auth);
-  authRef.current = auth;
+    if (data && from && to) fetchData(true);
+  }, [from, to]);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!auth || !data) return;
+    if (!data) return;
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (url && key) {
@@ -260,8 +206,7 @@ export default function AdminDashPage() {
         () => {
           if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
           fetchDebounceRef.current = setTimeout(() => {
-            const t = authRef.current;
-            if (t) fetchData(t, true);
+            fetchData(true);
             fetchDebounceRef.current = null;
           }, 800);
         }
@@ -271,19 +216,16 @@ export default function AdminDashPage() {
         client.removeChannel(ch);
       };
     }
-  }, [auth, data]);
+  }, [data]);
 
   useEffect(() => {
-    if (!auth || !data) return;
-    const id = setInterval(() => { const t = authRef.current; if (t) fetchData(t, true); }, 30000);
+    if (!data) return;
+    const id = setInterval(() => fetchData(true), 30000);
     return () => clearInterval(id);
-  }, [auth, data]);
+  }, [data]);
 
-  const handleRefresh = () => auth && fetchData(auth);
-  const handleCountdownReset = useCallback(() => {
-    const t = authRef.current;
-    if (t) fetchTodayData(t);
-  }, [fetchTodayData]);
+  const handleRefresh = () => fetchData();
+  const handleCountdownReset = useCallback(() => fetchTodayData(), [fetchTodayData]);
 
   const tiktokSpendNum = parseFloat(tiktokSpend.replace(",", ".")) || 0;
   const totalLeads = data?.total ?? 0;
@@ -303,63 +245,6 @@ export default function AdminDashPage() {
       .filter(([s]) => s !== "affiliate" && s !== "null" && s !== "")
       .sort((a, b) => b[1] - a[1]);
   }, [data?.bySource]);
-
-  if (!auth) {
-    return (
-      <div className="admin-analytics-page" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px", paddingTop: "max(24px, env(safe-area-inset-top))", paddingBottom: "max(24px, env(safe-area-inset-bottom))" }}>
-        <div className="admin-login-wrap">
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <Lock size={40} color="#00d4ff" style={{ margin: "0 auto 16px", display: "block" }} />
-            <h1 style={{ fontSize: "clamp(20px, 5vw, 24px)", fontWeight: 800, color: "#fff", marginBottom: 8 }}>Admin Analytics</h1>
-            <p style={{ fontSize: 14, color: "#888" }}>Unesi pristupni kod</p>
-          </div>
-          <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {error && (
-              <p style={{ fontSize: 13, color: "#ef4444", textAlign: "center", margin: 0 }}>{error}</p>
-            )}
-            <input
-              type="password"
-              value={secret}
-              onChange={(e) => { setSecret(e.target.value); setError(null); }}
-              placeholder="Pristupni kod"
-              autoFocus
-              disabled={attempts >= maxAttempts}
-              className="admin-login-input"
-              style={{
-                borderRadius: 14,
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                color: "#fff",
-                outline: "none",
-                opacity: attempts >= maxAttempts ? 0.5 : 1,
-                fontFamily: "inherit",
-              }}
-            />
-            <button
-              type="submit"
-              disabled={loading || attempts >= maxAttempts}
-              className="admin-login-btn"
-              style={{
-                borderRadius: 14,
-                background: attempts >= maxAttempts ? "#444" : "linear-gradient(135deg, #00d4ff 0%, #00b0e0 100%)",
-                border: "none",
-                color: attempts >= maxAttempts ? "#888" : "#050508",
-                fontWeight: 700,
-                cursor: attempts >= maxAttempts ? "not-allowed" : "pointer",
-                opacity: loading ? 0.7 : 1,
-                fontFamily: "inherit",
-              }}
-            >
-              {loading ? "Provera..." : "Uđi"}
-            </button>
-          </form>
-          <p style={{ fontSize: 12, color: "#555", textAlign: "center", marginTop: 24 }}>
-            Pristup samo za administartore.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="admin-analytics-page">
@@ -394,7 +279,7 @@ export default function AdminDashPage() {
               <button onClick={handleRefresh} disabled={loading} className="admin-btn admin-btn-refresh">
                 <RefreshCw size={14} style={{ opacity: loading ? 0.5 : 1 }} /> Osveži
               </button>
-              <button onClick={() => auth && fetchData(auth, false, true)} disabled={loading} className="admin-btn admin-btn-debug">
+              <button onClick={() => fetchData(false, true)} disabled={loading} className="admin-btn admin-btn-debug">
                 Debug
               </button>
               <button onClick={handleLogout} className="admin-btn admin-btn-logout">

@@ -9,7 +9,7 @@ Stranica `/admin/x7k9m2q4` prikazuje:
 
 ## Pristup
 
-Stranica je **zaštićena**. Samo sa pristupnim kodom.
+Stranica je **zaštićena**. HttpOnly sesija sa HMAC potpisom — kod se nikad ne čuva u browseru.
 
 ### Setup
 
@@ -18,9 +18,10 @@ Stranica je **zaštićena**. Samo sa pristupnim kodom.
    ADMIN_ANALYTICS_SECRET=tvoj_tajni_kod_ovde
    ```
 2. Redeploy.
-3. Otvori `https://tvoj-domen.com/admin/x7k9m2q4`
+3. Otvori `https://tvoj-domen.com/admin/login`
 4. Unesi pristupni kod (ista vrednost kao `ADMIN_ANALYTICS_SECRET`)
-5. Kod se čuva u localStorage — sledeći put ne moraš ponovo da unosiš
+5. Nakon uspešne prijave, sesija traje 24h (HttpOnly cookie, teško za krađu/XSS)
+6. Direktan pristup na `/admin/x7k9m2q4` bez sesije preusmerava na `/admin/login`
 
 ### Meta Ads (Instagram, Facebook) — automatski CPL
 
