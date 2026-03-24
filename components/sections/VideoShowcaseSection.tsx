@@ -39,7 +39,7 @@ const LogoFallback = () => (
 );
 
 let activeLoadSlots = 0;
-const MAX_CONCURRENT_VIDEO_LOADS = 1;
+const MAX_CONCURRENT_VIDEO_LOADS = 3;
 const loadWaiters = new Set<() => void>();
 
 function tryAcquireLoadSlot() {
@@ -82,6 +82,7 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [inView, setInView] = useState(false);
+  const [hasEnteredView, setHasEnteredView] = useState(false);
   const [shouldAttachSrc, setShouldAttachSrc] = useState(false);
   const hasLoadSlot = useRef(false);
   const hasPlaySlot = useRef(false);
@@ -105,7 +106,10 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
     const io = new IntersectionObserver(
       ([e]) => {
         if (e.isIntersecting) {
-          enterT = setTimeout(() => setInView(true), 320);
+          enterT = setTimeout(() => {
+            setInView(true);
+            setHasEnteredView(true);
+          }, 160);
         } else {
           clearTimeout(enterT);
           setInView(false);
@@ -147,24 +151,14 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
 
   useEffect(() => {
     if (failed) return;
-    if (!inView) {
-      // If card leaves viewport before it finished loading, free the load slot
-      // so other cards can progress.
-      if (hasLoadSlot.current) {
-        hasLoadSlot.current = false;
-        releaseLoadSlot();
-      }
-      // Avoid triggering "setState in effect" lint by deferring.
-      window.setTimeout(() => setShouldAttachSrc(false), 0);
-      return;
-    }
+    if (!hasEnteredView) return;
 
     if (loaded || shouldAttachSrc) {
       return;
     }
 
     const requestSlot = () => {
-      if (failed || !inView || hasLoadSlot.current || loaded || shouldAttachSrc) return;
+      if (failed || !hasEnteredView || hasLoadSlot.current || loaded || shouldAttachSrc) return;
       if (tryAcquireLoadSlot()) {
         hasLoadSlot.current = true;
         setShouldAttachSrc(true);
@@ -173,7 +167,7 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
 
       // Wait for a slot, then try again when browser is idle.
       const run = () => {
-        if (failed || !inView || hasLoadSlot.current || loaded || shouldAttachSrc) return;
+        if (failed || !hasEnteredView || hasLoadSlot.current || loaded || shouldAttachSrc) return;
         requestSlot();
       };
       cancelWaitRef.current?.();
@@ -200,7 +194,7 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
     };
 
     requestSlot();
-  }, [failed, inView, loaded, shouldAttachSrc]);
+  }, [failed, hasEnteredView, loaded, shouldAttachSrc]);
 
   useEffect(() => {
     return () => {
@@ -230,7 +224,7 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
     };
   }, [failed, inView, loaded]);
 
-  const shouldRenderVideo = (inView || loaded || shouldAttachSrc) && !failed;
+  const shouldRenderVideo = (hasEnteredView || loaded || shouldAttachSrc) && !failed;
 
   return (
     <div
@@ -293,6 +287,8 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
             position: "absolute", inset: 0,
             opacity: loaded ? 1 : 0,
             transition: "opacity 0.25s ease",
+            transform: "translateZ(0)",
+            backfaceVisibility: "hidden",
           }}
         />
       )}
@@ -357,6 +353,7 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
         overflow: "hidden",
         contain: "layout paint",
         margin: "0 24px",
+        transform: "translateZ(0)",
         maskImage: "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
         WebkitMaskImage: "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
         touchAction: isMobile ? "pan-y" : "auto",
@@ -388,11 +385,23 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
           display: flex; width: max-content;
           backface-visibility: hidden;
           transform: translate3d(0,0,0);
+          transform-style: preserve-3d;
         }
         .video-showcase-section.video-showcase-inview .vs-track-l,
-        .video-showcase-section.video-showcase-inview .vs-track-r { will-change: transform; }
-        .vs-track-l { animation: vsrow-l 48s linear infinite; }
-        .vs-track-r { animation: vsrow-r 44s linear infinite; }
+        .video-showcase-section.video-showcase-inview .vs-track-r {
+          will-change: transform;
+          transform: translate3d(0,0,0);
+        }
+        .vs-track-l {
+          animation: vsrow-l 48s linear infinite;
+          animation-timing-function: linear;
+          -webkit-animation-timing-function: linear;
+        }
+        .vs-track-r {
+          animation: vsrow-r 44s linear infinite;
+          animation-timing-function: linear;
+          -webkit-animation-timing-function: linear;
+        }
         .vs-track-l:hover, .vs-track-l.paused, .vs-track-r:hover, .vs-track-r.paused { animation-play-state: paused; }
         @media (prefers-reduced-motion: reduce) { .vs-track-l, .vs-track-r { animation: none; } }
       `}</style>
@@ -403,7 +412,8 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
             width: "max-content",
             flexShrink: 0,
             transform: `translate3d(${isMobile ? dragOffset : 0}px, 0, 0)`,
-            transition: !isDragging ? `transform ${DRAG_SNAP_MS}ms ease-out` : "none",
+            backfaceVisibility: "hidden",
+            transition: !isDragging ? `transform ${DRAG_SNAP_MS}ms cubic-bezier(0.22, 1, 0.36, 1)` : "none",
           }}
         >
           {items.map((src, i) => (
@@ -427,8 +437,12 @@ export default function VideoShowcaseSection() {
       ref={ref}
       className={`video-showcase-section${inView ? " video-showcase-inview" : ""}`}
       style={{
-        position: "relative", zIndex: 10, padding: "100px 0", overflow: "hidden", contain: "layout style paint",
-        contentVisibility: "auto", containIntrinsicSize: "auto 1100px",
+        position: "relative",
+        zIndex: 10,
+        padding: "100px 0",
+        overflow: "hidden",
+        contain: "layout paint",
+        contentVisibility: "visible",
       }}
     >
       {/* Ambient glow */}
