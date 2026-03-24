@@ -27,6 +27,16 @@ type MetaPlatformData = {
   cpl: number | null;
 };
 
+type CampaignCplRow = {
+  campaignId: string;
+  campaignName: string;
+  instagram: MetaPlatformData;
+  facebook: MetaPlatformData;
+  totalSpend: number;
+  totalLeads: number;
+  blendedCpl: number | null;
+};
+
 export async function GET(req: NextRequest) {
   if (!(await isAdminAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,6 +51,7 @@ export async function GET(req: NextRequest) {
       error: "META_ADS_ACCESS_TOKEN ili META_AD_ACCOUNT_ID nisu postavljeni",
       instagram: { spend: 0, leads: 0, cpl: null },
       facebook: { spend: 0, leads: 0, cpl: null },
+      campaigns: [] as CampaignCplRow[],
     });
   }
 
@@ -60,6 +71,7 @@ export async function GET(req: NextRequest) {
   let insightsUrl = `${accountId}/insights`;
   let campaignId: string | null = null;
   let activeCampaignIds: Set<string> = new Set();
+  const campaignIdToName = new Map<string, string>();
 
   // Uvek učitaj aktivne kampanje — CPL samo iz aktivnih
   try {
@@ -74,6 +86,9 @@ export async function GET(req: NextRequest) {
     );
     const campJson = await campRes.json();
     const campaigns = (campJson.data ?? []) as { id: string; name: string; effective_status?: string }[];
+    for (const c of campaigns) {
+      campaignIdToName.set(c.id, c.name?.trim() || c.id);
+    }
     const active = campaigns.filter((c) => c.effective_status === "ACTIVE");
     active.forEach((c) => activeCampaignIds.add(c.id));
 
@@ -120,6 +135,7 @@ export async function GET(req: NextRequest) {
         configured: true,
         instagram: { spend: 0, leads: 0, cpl: null },
         facebook: { spend: 0, leads: 0, cpl: null },
+        campaigns: [] as CampaignCplRow[],
       });
     }
 
@@ -160,20 +176,56 @@ export async function GET(req: NextRequest) {
       facebook: { spend: 0, leads: 0, cpl: null },
     };
 
+    type CampBucket = {
+      campaignId: string;
+      campaignName: string;
+      instagram: MetaPlatformData;
+      facebook: MetaPlatformData;
+    };
+
+    const byCampaign = new Map<string, CampBucket>();
+
+    function ensureCampaignBucket(cid: string, fallbackName: string): CampBucket {
+      let b = byCampaign.get(cid);
+      if (!b) {
+        b = {
+          campaignId: cid,
+          campaignName: fallbackName,
+          instagram: { spend: 0, leads: 0, cpl: null },
+          facebook: { spend: 0, leads: 0, cpl: null },
+        };
+        byCampaign.set(cid, b);
+      }
+      return b;
+    }
+
     for (const row of data) {
+      const rowCid = String((row as { campaign_id?: string }).campaign_id ?? campaignId ?? "").trim();
+      if (!rowCid) continue;
+
+      const fallbackName = campaignIdToName.get(rowCid) || rowCid;
+      const bucket = ensureCampaignBucket(rowCid, fallbackName);
+      bucket.campaignName = campaignIdToName.get(rowCid) || bucket.campaignName;
+
       const platform = (row.publisher_platform ?? "unknown").toLowerCase();
-      const spend = parseFloat(row.spend ?? 0) || 0;
-      const leads = countLeads(row.actions);
-      const metaCpl = getCplFromCostPerAction(row.cost_per_action_type);
+      const spend = parseFloat(String((row as { spend?: string }).spend ?? 0)) || 0;
+      const leads = countLeads((row as { actions?: { action_type?: string; value?: string }[] }).actions);
+      const metaCpl = getCplFromCostPerAction(
+        (row as { cost_per_action_type?: { action_type?: string; value?: string }[] }).cost_per_action_type
+      );
+
+      const addTo = (slot: MetaPlatformData) => {
+        slot.spend += spend;
+        slot.leads += leads;
+        if (metaCpl != null && slot.cpl == null) slot.cpl = metaCpl;
+      };
 
       if (platform === "instagram" || platform === "ig") {
-        byPlatform.instagram.spend += spend;
-        byPlatform.instagram.leads += leads;
-        if (metaCpl != null && byPlatform.instagram.cpl == null) byPlatform.instagram.cpl = metaCpl;
+        addTo(bucket.instagram);
+        addTo(byPlatform.instagram);
       } else if (platform === "facebook" || platform === "fb") {
-        byPlatform.facebook.spend += spend;
-        byPlatform.facebook.leads += leads;
-        if (metaCpl != null && byPlatform.facebook.cpl == null) byPlatform.facebook.cpl = metaCpl;
+        addTo(bucket.facebook);
+        addTo(byPlatform.facebook);
       }
     }
 
@@ -182,10 +234,32 @@ export async function GET(req: NextRequest) {
       if (d.cpl == null) d.cpl = d.leads > 0 ? d.spend / d.leads : null;
     }
 
+    const campaigns: CampaignCplRow[] = Array.from(byCampaign.values())
+      .map((b) => {
+        const ig = b.instagram;
+        const fb = b.facebook;
+        if (ig.cpl == null) ig.cpl = ig.leads > 0 ? ig.spend / ig.leads : null;
+        if (fb.cpl == null) fb.cpl = fb.leads > 0 ? fb.spend / fb.leads : null;
+        const totalSpend = ig.spend + fb.spend;
+        const totalLeads = ig.leads + fb.leads;
+        return {
+          campaignId: b.campaignId,
+          campaignName: b.campaignName,
+          instagram: { ...ig },
+          facebook: { ...fb },
+          totalSpend,
+          totalLeads,
+          blendedCpl: totalLeads > 0 ? totalSpend / totalLeads : null,
+        };
+      })
+      .filter((c) => c.totalSpend > 0 || c.totalLeads > 0)
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+
     const payload: Record<string, unknown> = {
       configured: true,
       instagram: byPlatform.instagram,
       facebook: byPlatform.facebook,
+      campaigns,
     };
     if (url.searchParams.get("debug") === "1") {
       payload._debug = {
@@ -193,6 +267,7 @@ export async function GET(req: NextRequest) {
         activeCampaigns: activeCampaignIds.size,
         campaignFilter: campaignName ?? null,
         campaignId: campaignId ?? null,
+        campaignsInResponse: (payload.campaigns as CampaignCplRow[]).length,
       };
     }
     return NextResponse.json(payload);
@@ -202,6 +277,7 @@ export async function GET(req: NextRequest) {
       error: e instanceof Error ? e.message : "Greška",
       instagram: { spend: 0, leads: 0, cpl: null },
       facebook: { spend: 0, leads: 0, cpl: null },
+      campaigns: [] as CampaignCplRow[],
     });
   }
 }

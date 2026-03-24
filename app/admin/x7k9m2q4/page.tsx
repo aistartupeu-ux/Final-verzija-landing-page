@@ -93,6 +93,16 @@ function redirectToLogin() {
   window.location.href = "/admin/login";
 }
 
+type MetaCampaignCpl = {
+  campaignId: string;
+  campaignName: string;
+  instagram: { spend: number; leads: number; cpl: number | null };
+  facebook: { spend: number; leads: number; cpl: number | null };
+  totalSpend: number;
+  totalLeads: number;
+  blendedCpl: number | null;
+};
+
 export default function AdminDashPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -103,8 +113,15 @@ export default function AdminDashPage() {
     configured?: boolean;
     instagram: { spend: number; leads: number; cpl: number | null };
     facebook: { spend: number; leads: number; cpl: number | null };
+    campaigns?: MetaCampaignCpl[];
     error?: string;
-    _debug?: { dataRows: number; activeCampaigns?: number; campaignFilter?: string | null; campaignId?: string | null };
+    _debug?: {
+      dataRows: number;
+      activeCampaigns?: number;
+      campaignFilter?: string | null;
+      campaignId?: string | null;
+      campaignsInResponse?: number;
+    };
   } | null>(null);
   const [tiktokSpend, setTiktokSpend] = useState("");
   const [todayData, setTodayData] = useState<AnalyticsData | null>(null);
@@ -163,6 +180,7 @@ export default function AdminDashPage() {
           configured: metaJson.configured !== false,
           instagram: metaJson.instagram ?? { spend: 0, leads: 0, cpl: null },
           facebook: metaJson.facebook ?? { spend: 0, leads: 0, cpl: null },
+          campaigns: Array.isArray(metaJson.campaigns) ? metaJson.campaigns : [],
           error: metaJson.error,
           _debug: metaJson._debug,
         });
@@ -427,7 +445,9 @@ export default function AdminDashPage() {
             <div style={{ marginBottom: 28 }}>
               <h2 style={{ fontSize: "clamp(16px, 4vw, 18px)", fontWeight: 700, color: "#fff", marginBottom: 14 }}>Cost per Lead (CPL)</h2>
               <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
-                Meta: potrošnja iz Ads API, CPL = potrošnja ÷ leadovi sa sajta. TikTok: unesi ručno.
+                Meta (kartice ispod): potrošnja iz Ads API, CPL = potrošnja ÷ leadovi <strong style={{ color: "#aaa" }}>sa sajta</strong> (ukupno po
+                mreži). <strong style={{ color: "#aaa" }}>Po kampanjama</strong>: CPL koristi lead brojeve koje Meta prijavi u insights-u (po kampanji
+                i platformi). TikTok: unesi ručno.
               </p>
               {metaAds?.error && (
                 <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444", fontSize: 12 }}>
@@ -497,6 +517,53 @@ export default function AdminDashPage() {
                   <div style={{ fontSize: 12, color: "#555", marginTop: 8 }}>{data.tiktokLeads} leadova sa sajta</div>
                 </div>
               </div>
+
+              {metaAds && metaAds.configured !== false && (metaAds.campaigns?.length ?? 0) > 0 && (
+                <div style={{ marginTop: 24 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 10 }}>Meta — CPL po kampanji</h3>
+                  <p style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
+                    Samo aktivne kampanje u nalogu; period kao gore. Lead kolone = Meta conversion broj iz oglasa.
+                  </p>
+                  <div className="admin-campaign-table-wrap">
+                    <table className="admin-campaign-table">
+                      <thead>
+                        <tr>
+                          <th>Kampanja</th>
+                          <th>IG €</th>
+                          <th>IG lead</th>
+                          <th>IG CPL</th>
+                          <th>FB €</th>
+                          <th>FB lead</th>
+                          <th>FB CPL</th>
+                          <th>Ukup €</th>
+                          <th>Ukup lead</th>
+                          <th>CPL blend</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {metaAds.campaigns!.map((c) => (
+                          <tr key={c.campaignId}>
+                            <td title={c.campaignId} style={{ maxWidth: 200 }}>
+                              {c.campaignName}
+                            </td>
+                            <td>€{c.instagram.spend.toFixed(2)}</td>
+                            <td>{c.instagram.leads}</td>
+                            <td>{c.instagram.cpl != null ? `€${c.instagram.cpl.toFixed(2)}` : "—"}</td>
+                            <td>€{c.facebook.spend.toFixed(2)}</td>
+                            <td>{c.facebook.leads}</td>
+                            <td>{c.facebook.cpl != null ? `€${c.facebook.cpl.toFixed(2)}` : "—"}</td>
+                            <td style={{ fontWeight: 600 }}>€{c.totalSpend.toFixed(2)}</td>
+                            <td style={{ fontWeight: 600 }}>{c.totalLeads}</td>
+                            <td style={{ fontWeight: 600, color: "#00d4ff" }}>
+                              {c.blendedCpl != null ? `€${c.blendedCpl.toFixed(2)}` : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
 
           </>
@@ -535,6 +602,12 @@ export default function AdminDashPage() {
         .admin-login-wrap { padding: 16px; max-width: 400px; width: 100%; }
         .admin-login-input { padding: 14px 18px; min-height: 48px; font-size: 16px; }
         .admin-login-btn { min-height: 48px; padding: 14px 20px; }
+        .admin-campaign-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+        .admin-campaign-table { width: 100%; border-collapse: collapse; font-size: 11px; color: #ccc; min-width: 720px; }
+        .admin-campaign-table th, .admin-campaign-table td { padding: 10px 8px; text-align: right; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .admin-campaign-table th:first-child, .admin-campaign-table td:first-child { text-align: left; }
+        .admin-campaign-table th { color: #888; font-weight: 600; background: rgba(255,255,255,0.03); }
+        .admin-campaign-table tbody tr:hover { background: rgba(255,255,255,0.02); }
         @media (min-width: 640px) {
           .admin-danas-card { margin-bottom: 24px; padding: 20px; border-radius: 18px; }
           .admin-danas-num { font-size: 36px; }
@@ -544,6 +617,8 @@ export default function AdminDashPage() {
           .admin-stat-num { font-size: 28px; }
           .admin-stat-label { font-size: 13px; }
           .admin-cpl-grid { gap: 20px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+          .admin-campaign-table { font-size: 12px; }
+          .admin-campaign-table th, .admin-campaign-table td { padding: 12px 10px; }
         }
       `}</style>
     </div>

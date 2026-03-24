@@ -6,6 +6,7 @@ Stranica `/admin/x7k9m2q4` prikazuje:
 - **Odakle dolaze leadovi** — Instagram, Facebook, TikTok, direktno (zasebno po platformi)
 - **Ukupan broj leadova** po periodu
 - **Cost per Lead (CPL)** za Meta i TikTok — unosiš potrošnju (€) i automatski se računa CPL
+- **Meta CPL po kampanji** — tabela: za svaku aktivnu kampanju posebno IG/FB potrošnja, leadovi iz Meta insights-a i CPL (plus „blend“ preko obe mreže)
 
 ## Pristup
 
@@ -37,7 +38,14 @@ Za automatsko povlačenje potrošnje i CPL iz Meta Ads:
    META_LEAD_CAMPAIGN_NAME=MAD - AIH - Website Leads - 19.09.26
    ```
    - Ad Account ID iz Meta Business Suite → Settings → Ad Accounts
-   - META_LEAD_CAMPAIGN_NAME (opciono): samo ova kampanja za CPL — prazno = sve kampanje
+   - META_LEAD_CAMPAIGN_NAME (opciono): sužava **agregat** (kartice IG/FB) na jednu kampanju; **tabela po kampanjama** i dalje može prikazati više redova ako API vrati više kampanja u periodu — za striktno jednu kampanju postavi filter ili imaj jednu aktivnu lead kampanju
+
+**Razlika CPL kartice vs. tabela po kampanji**
+
+| Deo ekrana | Leadovi u nazivniku |
+|------------|---------------------|
+| Kartice Instagram / Facebook | Leadovi **sa sajta** (Sheet/Supabase) za ceo period — podela samo po `instagram` / `facebook` |
+| Tabela **Meta — CPL po kampanji** | Leadovi koje Meta prijavljuje u **insights** (`actions` tipa lead) po **kampanji** i **publisher_platform** — realan CPL po oglasnoj kampanji |
 
 ### Preporučeni kod
 
