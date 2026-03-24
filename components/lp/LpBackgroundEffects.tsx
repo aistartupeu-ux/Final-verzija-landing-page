@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import NetworkBackground from "@/components/ui/NetworkBackground";
-import { SpotlightCursor } from "@/components/ui/spotlight-cursor";
 
 function shouldEnableEffects() {
   if (typeof window === "undefined") return false;
@@ -41,11 +40,6 @@ export default function LpBackgroundEffects() {
 
   if (!enabled) return null;
 
-  return (
-    <>
-      <SpotlightCursor />
-      <NetworkBackground />
-    </>
-  );
+  return <NetworkBackground />;
 }
 

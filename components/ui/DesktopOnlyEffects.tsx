@@ -4,10 +4,6 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 
 const NetworkBackground = dynamic(() => import("@/components/ui/NetworkBackground"), { ssr: false });
-const SpotlightCursor = dynamic(
-  () => import("@/components/ui/spotlight-cursor").then((m) => ({ default: m.SpotlightCursor })),
-  { ssr: false }
-);
 
 /** Teški vizuelni efekti samo na desktopu — mobile skips za glatkoću. */
 export default function DesktopOnlyEffects() {
@@ -20,10 +16,5 @@ export default function DesktopOnlyEffects() {
     return () => mq.removeEventListener("change", fn);
   }, []);
   if (!show) return null;
-  return (
-    <>
-      <SpotlightCursor />
-      <NetworkBackground />
-    </>
-  );
+  return <NetworkBackground />;
 }

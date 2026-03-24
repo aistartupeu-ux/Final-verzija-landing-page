@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useInView, useReducedMotion } from "framer-motion";
-import { useRef, useEffect, useState, memo } from "react";
+import { useRef, useEffect, useState, memo, useCallback } from "react";
 import Image from "next/image";
 import { Sparkles } from "lucide-react";
 
@@ -15,7 +15,6 @@ const row1 = [
   "/examples/v17.mp4",
 ];
 
-// Redosled po tvom spisku
 const row2 = [
   "/examples/v9.mp4",
   "/examples/v1.mp4",
@@ -30,201 +29,74 @@ const row2 = [
 ];
 
 const LogoFallback = () => (
-  <div style={{
-    width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-    background: "linear-gradient(135deg, rgba(15,15,28,0.95) 0%, rgba(25,20,45,0.9) 100%)",
-  }}>
-    <Image src="/logo.png" alt="AI Hype Academy" width={100} height={34} loading="lazy" decoding="async" style={{ width: "auto", height: "auto", maxWidth: "80%", opacity: 0.7 }} />
+  <div
+    style={{
+      width: "100%",
+      height: "100%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 24,
+      background: "linear-gradient(135deg, rgba(15,15,28,0.95) 0%, rgba(25,20,45,0.9) 100%)",
+    }}
+  >
+    <Image
+      src="/logo.png"
+      alt="AI Hype Academy"
+      width={100}
+      height={34}
+      loading="lazy"
+      decoding="async"
+      style={{ width: "auto", height: "auto", maxWidth: "80%", opacity: 0.7 }}
+    />
   </div>
 );
 
-let activeLoadSlots = 0;
-const MAX_CONCURRENT_VIDEO_LOADS = 3;
-const loadWaiters = new Set<() => void>();
-
-function tryAcquireLoadSlot() {
-  if (activeLoadSlots >= MAX_CONCURRENT_VIDEO_LOADS) return false;
-  activeLoadSlots += 1;
-  return true;
-}
-
-function releaseLoadSlot() {
-  activeLoadSlots = Math.max(0, activeLoadSlots - 1);
-  // Wake up one waiter (progressive loading).
-  for (const fn of loadWaiters) {
-    loadWaiters.delete(fn);
-    fn();
-    break;
-  }
-}
-
-function onNextLoadSlotAvailable(cb: () => void) {
-  loadWaiters.add(cb);
-  return () => loadWaiters.delete(cb);
-}
-
-let activePlaySlots = 0;
-const MAX_CONCURRENT_VIDEO_PLAYS = 3;
-
-function tryAcquirePlaySlot() {
-  if (activePlaySlots >= MAX_CONCURRENT_VIDEO_PLAYS) return false;
-  activePlaySlots += 1;
-  return true;
-}
-
-function releasePlaySlot() {
-  activePlaySlots = Math.max(0, activePlaySlots - 1);
-}
-
+/**
+ * Jedan IntersectionObserver — bez queue slotova (marquee + uži card često neće
+ * ispuniti stroge pragove za reprodukciju ako se koristi threshold 0.3).
+ */
 const VideoCard = memo(function VideoCard({ src }: { src: string }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [inView, setInView] = useState(false);
-  const [hasEnteredView, setHasEnteredView] = useState(false);
-  const [shouldAttachSrc, setShouldAttachSrc] = useState(false);
-  const hasLoadSlot = useRef(false);
-  const hasPlaySlot = useRef(false);
+  const visibleRef = useRef(false);
   const didMarkLoaded = useRef(false);
-  const cancelWaitRef = useRef<(() => void) | null>(null);
 
-  const markLoaded = () => {
+  const markLoaded = useCallback(() => {
     if (didMarkLoaded.current) return;
     didMarkLoaded.current = true;
     setLoaded(true);
-    if (hasLoadSlot.current) {
-      hasLoadSlot.current = false;
-      releaseLoadSlot();
-    }
-  };
-
-  useEffect(() => {
-    const card = cardRef.current;
-    if (!card) return;
-    let enterT: ReturnType<typeof setTimeout>;
-    const io = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) {
-          enterT = setTimeout(() => {
-            setInView(true);
-            setHasEnteredView(true);
-          }, 160);
-        } else {
-          clearTimeout(enterT);
-          setInView(false);
-        }
-      },
-      { rootMargin: "80px", threshold: 0 }
-    );
-    io.observe(card);
-    return () => { clearTimeout(enterT); io.disconnect(); };
   }, []);
 
   useEffect(() => {
     const card = cardRef.current;
-    const video = videoRef.current;
-    if (!card || !video || failed || !inView) return;
-    const io = new IntersectionObserver(
-      ([e]) => {
-        if (!e.isIntersecting) {
-          video.pause();
-          if (hasPlaySlot.current) {
-            hasPlaySlot.current = false;
-            releasePlaySlot();
-          }
-          return;
-        }
+    if (!card || failed) return;
 
-        // Play only when we already have enough data (loaded).
-        if (!loaded) return;
-        if (!hasPlaySlot.current && tryAcquirePlaySlot()) {
-          hasPlaySlot.current = true;
-        }
-        video.play().catch(() => {});
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        visibleRef.current = entry.isIntersecting;
+        const v = videoRef.current;
+        if (!v || failed || !loaded) return;
+        if (entry.isIntersecting) v.play().catch(() => {});
+        else v.pause();
       },
-      { threshold: 0.3, rootMargin: "80px" }
+      { root: null, rootMargin: "120px 0px", threshold: 0 }
     );
+
     io.observe(card);
+    if (visibleRef.current && videoRef.current && loaded && !failed) {
+      videoRef.current.play().catch(() => {});
+    }
     return () => io.disconnect();
-  }, [failed, inView, loaded]);
+  }, [failed, loaded]);
 
   useEffect(() => {
-    if (failed) return;
-    if (!hasEnteredView) return;
-
-    if (loaded || shouldAttachSrc) {
-      return;
-    }
-
-    const requestSlot = () => {
-      if (failed || !hasEnteredView || hasLoadSlot.current || loaded || shouldAttachSrc) return;
-      if (tryAcquireLoadSlot()) {
-        hasLoadSlot.current = true;
-        setShouldAttachSrc(true);
-        return;
-      }
-
-      // Wait for a slot, then try again when browser is idle.
-      const run = () => {
-        if (failed || !hasEnteredView || hasLoadSlot.current || loaded || shouldAttachSrc) return;
-        requestSlot();
-      };
-      cancelWaitRef.current?.();
-      const cancelWaiter = onNextLoadSlotAvailable(() => {
-        const w = window as unknown as {
-          requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
-          cancelIdleCallback?: (id: number) => void;
-        };
-        if (typeof w.requestIdleCallback === "function") {
-          const id = w.requestIdleCallback(run, { timeout: 1200 });
-          cancelWaitRef.current = () => {
-            cancelWaiter();
-            w.cancelIdleCallback?.(id);
-          };
-          return;
-        }
-        const t = window.setTimeout(run, 250);
-        cancelWaitRef.current = () => {
-          cancelWaiter();
-          window.clearTimeout(t);
-        };
-      });
-      cancelWaitRef.current = cancelWaiter;
-    };
-
-    requestSlot();
-  }, [failed, hasEnteredView, loaded, shouldAttachSrc]);
-
-  useEffect(() => {
-    return () => {
-      cancelWaitRef.current?.();
-      if (hasLoadSlot.current) {
-        hasLoadSlot.current = false;
-        releaseLoadSlot();
-      }
-      if (hasPlaySlot.current) {
-        hasPlaySlot.current = false;
-        releasePlaySlot();
-      }
-    };
-  }, []);
-
-  // If the video becomes loaded while the card is already in view,
-  // start playback (so visible cards don't stay frozen).
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !inView || !loaded || failed) return;
-    if (!hasPlaySlot.current && tryAcquirePlaySlot()) {
-      hasPlaySlot.current = true;
-    }
-    video.play().catch(() => {});
-    return () => {
-      // If we lose visibility, pause happens in IntersectionObserver callback.
-    };
-  }, [failed, inView, loaded]);
-
-  const shouldRenderVideo = (hasEnteredView || loaded || shouldAttachSrc) && !failed;
+    if (!loaded || failed) return;
+    const v = videoRef.current;
+    if (v && visibleRef.current) v.play().catch(() => {});
+  }, [loaded, failed]);
 
   return (
     <div
@@ -237,54 +109,49 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
         border: "1px solid rgba(255,255,255,0.07)",
         marginRight: 12,
         position: "relative",
-        contain: "layout paint",
         isolation: "isolate",
         transition: "transform 0.25s ease, border-color 0.25s ease",
         cursor: "default",
         background: "transparent",
       }}
-      onMouseEnter={e => {
+      onMouseEnter={(e) => {
         e.currentTarget.style.transform = "scale(1.02) translateZ(0)";
         e.currentTarget.style.borderColor = "rgba(0,212,255,0.35)";
       }}
-      onMouseLeave={e => {
+      onMouseLeave={(e) => {
         e.currentTarget.style.transform = "scale(1) translateZ(0)";
         e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
       }}
     >
       {!loaded ? <LogoFallback /> : null}
-      {shouldRenderVideo && (
+      {!failed && (
         <video
           ref={videoRef}
-          src={shouldAttachSrc || loaded ? src : undefined}
+          src={src}
           muted
           loop
           playsInline
           preload="auto"
-          onError={() => {
-            setFailed(true);
-            if (hasLoadSlot.current) {
-              hasLoadSlot.current = false;
-              releaseLoadSlot();
-            }
-          }}
+          onError={() => setFailed(true)}
           onLoadedMetadata={() => {
-            // Ensure we display the first frame (without actually playing).
-            // Some browsers update the frame after seeking to 0.
-            if (videoRef.current) {
-              try {
-                videoRef.current.pause();
-                videoRef.current.currentTime = 0;
-              } catch {
-                // ignore; not all browsers allow seeking before enough data
-              }
+            const v = videoRef.current;
+            if (!v) return;
+            try {
+              v.currentTime = 0.001;
+            } catch {
+              /* ignore */
             }
+            markLoaded();
           }}
-          onCanPlay={() => markLoaded()}
           onLoadedData={() => markLoaded()}
+          onCanPlay={() => markLoaded()}
           style={{
-            width: "100%", height: "100%", objectFit: "cover", display: "block",
-            position: "absolute", inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+            position: "absolute",
+            inset: 0,
             opacity: loaded ? 1 : 0,
             transition: "opacity 0.25s ease",
             transform: "translateZ(0)",
@@ -298,7 +165,15 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
 
 const DRAG_SNAP_MS = 220;
 
-function VideoRow({ videos, reverse = false, paused = false }: { videos: string[]; reverse?: boolean; paused?: boolean }) {
+function VideoRow({
+  videos,
+  reverse = false,
+  paused = false,
+}: {
+  videos: string[];
+  reverse?: boolean;
+  paused?: boolean;
+}) {
   const items = [...videos, ...videos];
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -367,7 +242,6 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
         .video-card { width: 200px; height: 356px; }
         @media (max-width: 640px) { .video-card { width: 170px; height: 302px; } }
         @media (min-width: 641px) and (max-width: 768px) { .video-card { width: 185px; height: 329px; } }
-        /* PC/desktop: edge-to-edge, filled to screen edges */
         @media (min-width: 769px) {
           .video-showcase-section .video-showcase-row {
             width: 100vw !important;
@@ -379,29 +253,18 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
             -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 2%, black 98%, transparent 100%) !important;
           }
         }
-        @keyframes vsrow-l { from { transform: translate3d(0,0,0) } to { transform: translate3d(-50%,0,0) } }
-        @keyframes vsrow-r { from { transform: translate3d(-50%,0,0) } to { transform: translate3d(0,0,0) } }
+        @keyframes vsrow-l { from { transform: translate3d(0,0,0); } to { transform: translate3d(-50%,0,0); } }
+        @keyframes vsrow-r { from { transform: translate3d(-50%,0,0); } to { transform: translate3d(0,0,0); } }
         .vs-track-l, .vs-track-r {
-          display: flex; width: max-content;
+          display: flex;
+          width: max-content;
           backface-visibility: hidden;
           transform: translate3d(0,0,0);
-          transform-style: preserve-3d;
         }
         .video-showcase-section.video-showcase-inview .vs-track-l,
-        .video-showcase-section.video-showcase-inview .vs-track-r {
-          will-change: transform;
-          transform: translate3d(0,0,0);
-        }
-        .vs-track-l {
-          animation: vsrow-l 48s linear infinite;
-          animation-timing-function: linear;
-          -webkit-animation-timing-function: linear;
-        }
-        .vs-track-r {
-          animation: vsrow-r 44s linear infinite;
-          animation-timing-function: linear;
-          -webkit-animation-timing-function: linear;
-        }
+        .video-showcase-section.video-showcase-inview .vs-track-r { will-change: transform; }
+        .vs-track-l { animation: vsrow-l 48s linear infinite; }
+        .vs-track-r { animation: vsrow-r 44s linear infinite; }
         .vs-track-l:hover, .vs-track-l.paused, .vs-track-r:hover, .vs-track-r.paused { animation-play-state: paused; }
         @media (prefers-reduced-motion: reduce) { .vs-track-l, .vs-track-r { animation: none; } }
       `}</style>
@@ -416,8 +279,8 @@ function VideoRow({ videos, reverse = false, paused = false }: { videos: string[
             transition: !isDragging ? `transform ${DRAG_SNAP_MS}ms cubic-bezier(0.22, 1, 0.36, 1)` : "none",
           }}
         >
-          {items.map((src, i) => (
-            <VideoCard key={`${src}-${i}`} src={src} />
+          {items.map((videoSrc, i) => (
+            <VideoCard key={`${videoSrc}-${i}`} src={videoSrc} />
           ))}
         </div>
       </div>
@@ -445,39 +308,59 @@ export default function VideoShowcaseSection() {
         contentVisibility: "visible",
       }}
     >
-      {/* Ambient glow */}
-      <div style={{
-        position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-        width: 800, height: 400, borderRadius: "50%",
-        background: "radial-gradient(ellipse, rgba(139,92,246,0.05) 0%, transparent 70%)",
-        pointerEvents: "none",
-      }} />
+      <div
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%,-50%)",
+          width: 800,
+          height: 400,
+          borderRadius: "50%",
+          background: "radial-gradient(ellipse, rgba(139,92,246,0.05) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }}
+      />
 
-      {/* Heading */}
       <motion.div
         initial={{ opacity: reduced ? 1 : 0, y: reduced ? 0 : 16 }}
         animate={inView ? { opacity: 1, y: 0 } : {}}
         transition={t}
         style={{ textAlign: "center", padding: "0 24px", marginBottom: 48, position: "relative" }}
       >
-        <div style={{
-          display: "inline-flex", alignItems: "center", gap: 8,
-          background: "rgba(139,92,246,0.07)", border: "1px solid rgba(139,92,246,0.18)",
-          borderRadius: 50, padding: "6px 16px", marginBottom: 20,
-        }}>
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            background: "rgba(139,92,246,0.07)",
+            border: "1px solid rgba(139,92,246,0.18)",
+            borderRadius: 50,
+            padding: "6px 16px",
+            marginBottom: 20,
+          }}
+        >
           <Sparkles size={12} color="#a855f7" />
-          <span style={{ fontSize: 11, fontWeight: 600, color: "#a855f7", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>Primeri radova</span>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#a855f7",
+              textTransform: "uppercase" as const,
+              letterSpacing: "0.1em",
+            }}
+          >
+            Primeri radova
+          </span>
         </div>
         <h2 style={{ fontSize: "clamp(26px,5vw,44px)", fontWeight: 800, lineHeight: 1.15, marginBottom: 10 }}>
-          Ovo ces praviti{" "}
-          <span style={{ color: "#a855f7" }}>unutar kursa.</span>
+          Ovo ces praviti <span style={{ color: "#a855f7" }}>unutar kursa.</span>
         </h2>
         <p style={{ fontSize: 15, color: "#8a8a9a", maxWidth: 440, margin: "0 auto", lineHeight: 1.7 }}>
           Sve je napravljeno pomocu AI alata koje ces nauciti. Bez prethodnog iskustva.
         </p>
       </motion.div>
 
-      {/* Row 1 — scrolls left */}
       <motion.div
         initial={{ opacity: reduced ? 1 : 0 }}
         animate={inView ? { opacity: 1 } : {}}
@@ -487,7 +370,6 @@ export default function VideoShowcaseSection() {
         <VideoRow videos={row1} paused={pauseMarquee} />
       </motion.div>
 
-      {/* Row 2 — scrolls right */}
       <motion.div
         initial={{ opacity: reduced ? 1 : 0 }}
         animate={inView ? { opacity: 1 } : {}}
