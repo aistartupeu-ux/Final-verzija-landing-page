@@ -28,6 +28,9 @@ const row2 = [
   "/examples/v7.mp4",
 ];
 
+const VIDEO_CARD_BG =
+  "linear-gradient(135deg, rgba(15,15,28,0.95) 0%, rgba(25,20,45,0.9) 100%)";
+
 const LogoFallback = () => (
   <div
     style={{
@@ -37,7 +40,7 @@ const LogoFallback = () => (
       alignItems: "center",
       justifyContent: "center",
       padding: 24,
-      background: "linear-gradient(135deg, rgba(15,15,28,0.95) 0%, rgba(25,20,45,0.9) 100%)",
+      background: VIDEO_CARD_BG,
     }}
   >
     <Image
@@ -61,6 +64,7 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [attachSrc, setAttachSrc] = useState(false);
   const visibleRef = useRef(false);
   const didMarkLoaded = useRef(false);
 
@@ -77,12 +81,13 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
     const io = new IntersectionObserver(
       ([entry]) => {
         visibleRef.current = entry.isIntersecting;
+        if (entry.isIntersecting) setAttachSrc(true);
         const v = videoRef.current;
         if (!v || failed || !loaded) return;
         if (entry.isIntersecting) v.play().catch(() => {});
         else v.pause();
       },
-      { root: null, rootMargin: "120px 0px", threshold: 0 }
+      { root: null, rootMargin: "180px 0px", threshold: 0 }
     );
 
     io.observe(card);
@@ -112,7 +117,7 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
         isolation: "isolate",
         transition: "transform 0.25s ease, border-color 0.25s ease",
         cursor: "default",
-        background: "transparent",
+        background: VIDEO_CARD_BG,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = "scale(1.02) translateZ(0)";
@@ -123,15 +128,14 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
         e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
       }}
     >
-      {!loaded ? <LogoFallback /> : null}
-      {!failed && (
+      {!failed && attachSrc && (
         <video
           ref={videoRef}
           src={src}
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           onError={() => setFailed(true)}
           onLoadedMetadata={() => {
             const v = videoRef.current;
@@ -152,12 +156,26 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
             display: "block",
             position: "absolute",
             inset: 0,
+            zIndex: 1,
             opacity: loaded ? 1 : 0,
             transition: "opacity 0.25s ease",
             transform: "translateZ(0)",
             backfaceVisibility: "hidden",
+            backgroundColor: "transparent",
           }}
         />
+      )}
+      {!failed && (!attachSrc || !loaded) && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 2,
+            pointerEvents: "none",
+          }}
+        >
+          <LogoFallback />
+        </div>
       )}
     </div>
   );

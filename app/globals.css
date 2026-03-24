@@ -16,7 +16,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
-  scroll-behavior: smooth;
+  /* auto: smooth na celom dokumentu opterećuje skrol na dugim stranicama */
+  scroll-behavior: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
@@ -26,12 +27,6 @@ html {
 /* Desktop-only: uvek prikaži desktop nav, sakrij mobilni meni */
 body.desktop-only .hide-mobile { display: flex !important; }
 body.desktop-only .show-mobile { display: none !important; }
-
-/* Smanji repaint pri skrolu — sekcije van viewporta se ne crtaju detaljno */
-main section {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 600px;
-}
 
 body {
   background: #050508;

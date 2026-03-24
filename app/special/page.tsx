@@ -7,8 +7,6 @@ import { ArrowLeft, ArrowRight, Loader2, Gift, Check, CheckCircle, XCircle } fro
 import { initAffiliateTracking, trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { useEmailVerify } from "@/lib/use-email-verify";
-import NetworkBackground from "@/components/ui/NetworkBackground";
-
 function SpecialGateContent() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -91,8 +89,6 @@ function SpecialGateContent() {
 
   return (
     <div style={{ position: "relative", minHeight: "100vh" }}>
-      <NetworkBackground />
-
       <div
         style={{
           position: "relative",

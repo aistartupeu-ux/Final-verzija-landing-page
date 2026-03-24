@@ -11,8 +11,6 @@ import {
   ArrowLeft, Mail, ArrowRight, Loader2, CheckCircle, XCircle,
   Sparkles, GraduationCap, Users, ShieldCheck, Zap, Award,
 } from "lucide-react";
-import NetworkBackground from "@/components/ui/NetworkBackground";
-
 const benefits = [
   { icon: Sparkles, title: "AI Influenser Sistem", desc: "Nauči kako da kreiraš AI influensere koji zarađuju" },
   { icon: GraduationCap, title: "8 Modula Obuke", desc: "Od osnova do monetizacije, korak po korak" },
@@ -120,7 +118,6 @@ function JoinContent() {
   if (status === "success") {
     return (
       <div style={{ position: "relative", minHeight: "100vh" }}>
-        <NetworkBackground />
         <div style={{ position: "relative", zIndex: 1, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ textAlign: "center", maxWidth: 480 }}>
             <div style={{
@@ -145,8 +142,6 @@ function JoinContent() {
 
   return (
     <div style={{ position: "relative", minHeight: "100vh" }}>
-      <NetworkBackground />
-
       <div style={{ position: "relative", zIndex: 1, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "100px 24px 60px" }}>
         <style>{`.join-layout{display:grid;grid-template-columns:1fr;gap:40px;max-width:960px;width:100%;align-items:center}@media(min-width:768px){.join-layout{grid-template-columns:1fr 1fr;gap:64px}}`}</style>
         <div className="join-layout">

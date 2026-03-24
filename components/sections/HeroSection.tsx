@@ -21,41 +21,6 @@ export default function HeroSection() {
   const [explainerFailed, setExplainerFailed] = useState(false);
 
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (window.matchMedia("(pointer: coarse)").matches) return;
-    const video = bgVideoRef.current;
-    const section = sectionRef.current;
-    if (!video || !section) return;
-    let raf = 0;
-    let sectionTop = 0;
-    let sectionHeight = 0;
-    const updateMetrics = () => {
-      const rect = section.getBoundingClientRect();
-      sectionTop = rect.top + window.scrollY;
-      sectionHeight = section.offsetHeight;
-    };
-    updateMetrics();
-    const ro = new ResizeObserver(updateMetrics);
-    ro.observe(section);
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        const scrollY = window.scrollY;
-        const progress = Math.max(0, Math.min(1, (scrollY - sectionTop) / (sectionHeight * 0.6)));
-        video.style.transform = `translate(-50%, -50%) scale(1.12) translateY(${progress * -50}px) translateZ(0)`;
-        raf = 0;
-      });
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("scroll", onScroll);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, []);
-
-  useEffect(() => {
     const video = bgVideoRef.current;
     const section = sectionRef.current;
     if (!video || !section) return;
@@ -65,8 +30,12 @@ export default function HeroSection() {
       ([e]) => {
         if (e.isIntersecting) {
           video.preload = "auto";
-          video.load();
-          if (video.readyState >= 2) video.play().catch(() => {});
+          if (video.readyState === 0) {
+            video.load();
+          } else {
+            void video.play();
+          }
+          if (video.readyState >= 2) void video.play();
         } else {
           video.pause();
         }
@@ -102,6 +71,18 @@ export default function HeroSection() {
     >
       {/* Video wallpaper with parallax */}
       <div style={{ position: "absolute", inset: 0, zIndex: 0, overflow: "hidden", contain: "layout style paint" }}>
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 0,
+            backgroundColor: "#08080f",
+            backgroundImage: "url(/pozadina-plexus.png)",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
         {bgFailed ? (
           <Image
             src="/pozadina-plexus.png"
@@ -109,7 +90,7 @@ export default function HeroSection() {
             fill
             priority
             sizes="100vw"
-            style={{ objectFit: "cover" }}
+            style={{ objectFit: "cover", zIndex: 1 }}
           />
         ) : (
           <video
@@ -119,16 +100,16 @@ export default function HeroSection() {
             loop
             playsInline
             preload="none"
-            poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%2305080c' width='1' height='1'/%3E%3C/svg%3E"
+            poster="/pozadina-plexus.png"
             onError={() => setBgFailed(true)}
             style={{
               position: "absolute",
               top: "50%", left: "50%",
+              zIndex: 1,
               minWidth: "100%", minHeight: "100%",
               width: "auto", height: "auto",
               transform: "translate(-50%, -50%) scale(1.12) translateZ(0)",
               objectFit: "cover",
-              willChange: "transform",
               backfaceVisibility: "hidden",
             }}
           >
@@ -178,6 +159,7 @@ export default function HeroSection() {
             style={{
               position: "relative", borderRadius: 16, overflow: "hidden",
               aspectRatio: "16 / 9", cursor: "pointer",
+              background: "linear-gradient(145deg, #12182a 0%, #0a0d18 45%, #050508 100%)",
               border: "1px solid rgba(0,212,255,0.2)",
               boxShadow: hovering
                 ? "0 0 0 1px rgba(0,212,255,0.3), 0 20px 60px rgba(0,0,0,0.7), 0 0 50px rgba(0,212,255,0.08)"
