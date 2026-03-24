@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
   const [secret, setSecret] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,15 +17,20 @@ export default function AdminLoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ secret: secret.trim() }),
+        credentials: "same-origin",
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || "Pogrešan pristupni kod.");
+        setError(
+          data.error === "Not configured"
+            ? "Server nema ADMIN_ANALYTICS_SECRET (.env.local / Vercel)."
+            : data.error || "Pogrešan pristupni kod."
+        );
         setSecret("");
         return;
       }
-      router.push("/admin/x7k9m2q4");
-      router.refresh();
+      // Pun document load da browser sigurno pošalje HttpOnly kolačić u middleware
+      window.location.assign("/admin/x7k9m2q4");
     } catch {
       setError("Greška u konekciji.");
     } finally {

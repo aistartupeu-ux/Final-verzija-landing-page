@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getLeadsFromSheet } from "@/lib/leads-sheet";
 import { verifyAdminSessionToken } from "@/lib/admin-session";
+import { getAdminAnalyticsSecret } from "@/lib/admin-secret";
+import { getCookieFromHeader } from "@/lib/cookie-header";
 
 async function isAdminAuthorized(req: NextRequest): Promise<boolean> {
-  const expected = process.env.ADMIN_ANALYTICS_SECRET;
+  const expected = getAdminAnalyticsSecret();
   if (!expected) return false;
 
   const authHeader = req.headers.get("authorization");
@@ -15,12 +17,7 @@ async function isAdminAuthorized(req: NextRequest): Promise<boolean> {
   const paramSecret = url.searchParams.get("secret");
   if (paramSecret === expected) return true;
 
-  const cookieHeader = req.headers.get("cookie");
-  const sessionToken = cookieHeader
-    ?.split(";")
-    .map((c) => c.trim())
-    .find((c) => c.startsWith("admin_session="))
-    ?.split("=")[1];
+  const sessionToken = getCookieFromHeader(req.headers.get("cookie"), "admin_session");
   if (sessionToken && (await verifyAdminSessionToken(sessionToken, expected))) return true;
 
   return false;

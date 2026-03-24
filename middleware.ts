@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifyAdminSessionToken } from "@/lib/admin-session";
+import { getAdminAnalyticsSecret } from "@/lib/admin-secret";
+import { getCookieFromHeader } from "@/lib/cookie-header";
 
 const CLICK_ID_PARAMS = ["fbclid", "gclid", "ttclid"];
 const UTM_PARAMS = ["utm_source", "utm_medium", "utm_campaign"];
@@ -16,15 +18,10 @@ export async function middleware(req: NextRequest) {
 
   // Admin: /admin/* osim /admin/login zahtevaju validnu sesiju
   if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
-    const expected = process.env.ADMIN_ANALYTICS_SECRET;
+    const expected = getAdminAnalyticsSecret();
     if (!expected) return NextResponse.next();
 
-    const cookieHeader = req.headers.get("cookie");
-    const sessionToken = cookieHeader
-      ?.split(";")
-      .map((c) => c.trim())
-      .find((c) => c.startsWith("admin_session="))
-      ?.split("=")[1];
+    const sessionToken = getCookieFromHeader(req.headers.get("cookie"), "admin_session");
 
     if (!sessionToken || !(await verifyAdminSessionToken(sessionToken, expected))) {
       const loginUrl = new URL("/admin/login", req.url);
