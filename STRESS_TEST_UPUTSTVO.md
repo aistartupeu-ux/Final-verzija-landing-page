@@ -65,11 +65,11 @@ ab -n 1000 -c 50 https://tvoj-domen.vercel.app/
 
 ## 5. Optimizacije na sajtu (da bolje izdrži load)
 
-- **Hero video** — učitava se tek kad je hero u viewportu (`preload="none"` + poster), bez preload u `<head>`.
-- **NetworkBackground** — 24 čvora (12 ako je prefers-reduced-motion), veza 145px; animacija se pauzira kad je tab u pozadini (`document.hidden`).
-- **SpotlightCursor** — crta se samo dok je miš aktivan; petlja se zaustavlja kad je kursor miran ~150 ms ili na mouseleave; pravilno uklanjanje listenera (bez curenja memorije).
-- **VideoShowcaseSection** — manji rootMargin i delay pre učitavanja videa; `prefers-reduced-motion` isključuje auto-animaciju.
-- **ScrollProgress** — traka preko `transform: scaleX()` (bez layout thrashing).
+- **Hero video** — učitava se tek kad je hero u viewportu (`preload="none"` + poster), bez teškog globalnog preload-a više videova u pozadini.
+- **Bez canvas mreže na marketing stranicama** — uklonjen je `NetworkBackground` (homepage, `/lp`, `/join`, `/special`) da bi main thread ostao slobodniji.
+- **VideoShowcaseSection** — `src` se dodaje na video tek kad kartica uđe u viewport (`attachSrc`); `preload="metadata"`; `prefers-reduced-motion` i `useInView` kočišu marquee dok sekcija nije u kadru.
+- **Komponente uklonjene radi performansi** — `VideoPreloader`, `ScrollProgress`, `DesktopOnlyEffects` (više nisu u bundle-u početne strane).
+- **SpotlightCursor** — komponenta postoji u `components/ui/spotlight-cursor.tsx` ali trenutno nije ugrađena na glavne stranice (nema globalnog spotlight + canvas mreže kao ranije).
 - **Cache** — MP4 7 dana (`max-age=604800`), webp/avatari 1 godina; slike preko Next Image sa AVIF/WebP i dugim cache TTL.
 - **API** — rate limit na `/api/leads` (20/min) i `/api/affiliate/track` (60/min); rate mape se čiste od isteklih unosa kad pređu prag (ograničena memorija na serveru). Sheet upisi se **await**-uju da se završe pre odgovora (Vercel ne gasi funkciju pre vremena).
 

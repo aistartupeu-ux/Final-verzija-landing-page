@@ -9,12 +9,12 @@ Kratka evaluacija **AI Hype Academy** sajta prema: Core Web Vitals / Lighthouse,
 | Kriterijum | Standard | Status | Napomena |
 |------------|----------|--------|----------|
 | **LCP** (Largest Contentful Paint) | &lt; 2.5 s | ✅ Dobre prakse | Hero video se učitava tek u viewportu (`preload="none"` + poster), logo ima `priority`; bez preload-a videa u `<head>` LCP bi trebalo da bude na tekstu/posteri. |
-| **INP / FID** (Interactivity) | &lt; 100 ms | ✅ Ublaženo | Rate limit na API-ju, Sheet upisi sa await (bez prekida). Canvas (Spotlight) crta samo kad je miš aktivan; Network na 24 čvora + pauza kad je tab u pozadini. |
+| **INP / FID** (Interactivity) | &lt; 100 ms | ✅ Ublaženo | Rate limit na API-ju, Sheet upisi sa await (bez prekida). Uklonjen je stalni canvas pozadin (`NetworkBackground`) sa glavnih stranica; manje kontinuiranog repaint-a na CPU/GPU. |
 | **CLS** (Cumulative Layout Shift) | &lt; 0.1 | ⚠️ Proveriti | Slike preko `next/image` sa dimenzijama; video placeholder. Moguće trzanje ako neki element nema rezervisan prostor (npr. neki widget). |
 | **First byte / TTFB** | Zavisi od hosta | ✅ | Vercel edge + serverless; statičke strane prerenderisane. |
 | **Caching** | Duge cache za statiku | ✅ | `next.config`: mp4 7 dana, webp/avatars 1 godina. |
 
-**Zaključak:** Kod je prilagođen performansama (lazy sekcije, manje čvorova u mreži, scroll bar preko `transform`). Za zvaničnu ocenu pokrenuti **Lighthouse** (Chrome DevTools ili PageSpeed Insights) na produkciji.
+**Zaključak:** Kod je prilagođen performansama (lazy sekcije, lazy video `src` u showcase-u, bez globalnog canvas preload overhead-a). Za zvaničnu ocenu pokrenuti **Lighthouse** (Chrome DevTools ili PageSpeed Insights) na produkciji.
 
 ---
 
@@ -28,7 +28,7 @@ Kratka evaluacija **AI Hype Academy** sajta prema: Core Web Vitals / Lighthouse,
 | **Forme** | Label povezan sa poljem ili `aria-label` | ⚠️ Poboljšati | Email/phone forma koristi samo `placeholder`; nema vidljivog `<label>` ili `aria-label` na inputu. Preporuka: dodati `<label for="...">` ili `aria-label` na polja. |
 | **Fokus** | Vidljiv fokus za tastaturu | ⚠️ Proveriti | Nije uvek eksplicitno stilizovan `:focus-visible`. Preporuka: globalni outline za fokus (npr. `outline: 2px solid #00d4ff; outline-offset: 2px`). |
 | **Skok na sadržaj** | Skip link | ❌ Nedostaje | Nema “Preskoči na sadržaj” linka na početku za korisnike tastature. Preporuka: prvi fokusabilan element link ka `#main` ili `main`. |
-| **Animacije** | `prefers-reduced-motion` | ✅ | NetworkBackground, VideoShowcaseSection i CSS poštuju `prefers-reduced-motion: reduce`. |
+| **Animacije** | `prefers-reduced-motion` | ✅ | VideoShowcaseSection i ostatak UI-ja poštuju `prefers-reduced-motion: reduce` gde je implementirano. |
 | **Žive regioni** | Aria live za dinamičke poruke | ✅ | UrgencyNotification: `role="status"`, `aria-live="polite"`. |
 | **Dugmad** | Opis za screen readere | ⚠️ | Header “Join”, hamburger (Menu/X) – preporuka: `aria-label="Otvori meni"` / “Zatvori meni”, “Join The Hype”. |
 

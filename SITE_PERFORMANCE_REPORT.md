@@ -1,7 +1,9 @@
 # Detaljna analiza performansi sajta — AI Hype Academy
 
-**Datum:** 21. mart 2026  
+**Datum:** 21. mart 2026 (ažurirano: 24. mart 2026)  
 **Tehnologija:** Next.js 16.1.6 (Turbopack), React 19, Tailwind 4
+
+**Ažuriranje 2026-03-24:** Uklonjeni su globalni efekti koji su najviše opterećavali CPU/GPU i mrežu: canvas **NetworkBackground** (i sa `/`, `/lp`, `/join`, `/special`), **VideoPreloader**, **ScrollProgress**, **DesktopOnlyEffects**. U `globals.css` uklonjen je `content-visibility: auto` na `main section` (smanjenje trzanja pri skrolu). Hero pozadinski video više nema paralaksu na scroll (nema stalnog `scroll` + RAF za transform). **VideoShowcaseSection:** `src` na `<video>` se vezuje tek kad kartica uđe u viewport (`attachSrc`), uz `preload="metadata"` — nema paralelnog `preload="auto"` na svim primerima odjednom.
 
 ---
 
@@ -15,7 +17,7 @@
 | Bundle splitting | Dinamički import za below-fold sekcije |
 
 ### Code splitting (početna stranica)
-- **Above-the-fold:** HeroSection, Header, Footer, ScrollProgress, DesktopOnlyEffects, EmailForm
+- **Above-the-fold:** HeroSection, Header, Footer, EmailForm
 - **Lazy loaded:** ProblemSection, SolutionSection, SocialProofSection, ForWhoSection, HowToEnterSection, FAQSection, FinalCTASection, BlogSection, AffiliateSection, VideoShowcaseSection
 
 ---
@@ -41,8 +43,8 @@
 
 - **LCP:** Hero video se ne učitava odmah (IntersectionObserver), LCP može biti tekst ili poster
 - **FID/INP:** `passive: true` na scroll listenerima
-- **CLS:** `contain`, `content-visibility`, slike sa dimenzijama (Next Image)
-- **Smoothness:** RAF throttling, `transform` umesto layout properties
+- **CLS:** `contain` gde ima smisla, slike sa dimenzijama (Next Image)
+- **Smoothness:** Manje globalnih scroll listenera; `transform` za animacije gde je moguće
 
 ---
 
@@ -74,7 +76,7 @@
 |-------|----------|
 | `/hero-vsl.mp4` | LCP kandidat — učitava se kad je sekcija u viewportu, dobro |
 | `/explainer-vsl.mp4` | `preload="none"` — učitava se na play, dobro |
-| 16 example videja u VideoShowcaseSection | Throttling na 1 concurrent load, 3 concurrent plays — dobro |
+| 16 example videja u VideoShowcaseSection | Lazy `src` + `preload="metadata"` — učitavanje tek blizu viewporta — dobro |
 | Plexus pozadine (pozadina-plexus*.png) | Velike slike — proveriti da li su kompresovane (WebP/AVIF) |
 | Blog slike (blog-trile-*.png, blog-rok-*.webp) | Učitavaju se u BlogSection (lazy) — OK |
 
@@ -82,7 +84,6 @@
 
 ### 3.4 `will-change` i `transform`
 
-- **ScrollProgress bar:** `will-change: transform` — OK, mali element
 - **Header:** `will-change: transform` na celom headeru — može izazvati dodatni composite layer; razmotriti uklanjanje ako nema vizuelnih problema
 - **VideoShowcaseSection:** `will-change: transform` samo kad je `inView` — dobro
 
@@ -111,10 +112,10 @@
 
 | Oblast | Implementacija |
 |--------|----------------|
-| Scroll | `scroll-behavior: auto`, passive listeners, RAF |
+| Scroll | `scroll-behavior: auto`, passive listeners gde postoje |
 | Animacije | Framer Motion, `prefers-reduced-motion` poštovan |
-| Video parallax | RAF throttling, `translateZ(0)` za GPU |
-| Marquee/ticker | `will-change: transform` samo kad je inView |
+| Hero pozadina | Statičan `transform` (bez paralakse na scroll) |
+| Marquee/ticker | `will-change: transform` samo kad je sekcija u pogledu (`video-showcase-inview`) |
 | Kartice/hover | `transform: translate3d` umesto `top`/`left` |
 
 **Napomena:** `scroll-behavior: auto` je namerno — `smooth` može izazvati frame drops pri brzom skrolu na mobilnim uređajima.
