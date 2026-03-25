@@ -149,11 +149,13 @@ export async function GET(req: NextRequest) {
     console.warn(`Analytics: sum(bySource)=${sumBySource} !== total=${total}`);
   }
 
+  const ig = bySource["instagram"] ?? 0;
+  const fb = bySource["facebook"] ?? 0;
   const payload: Record<string, unknown> = {
     total,
     bySource,
     sumBySource,
-    metaLeads: 0,
+    metaLeads: ig + fb,
     tiktokLeads: bySource["tiktok"] ?? 0,
     direct: bySource["direct"] ?? 0,
     affiliate: bySource["affiliate"] ?? 0,

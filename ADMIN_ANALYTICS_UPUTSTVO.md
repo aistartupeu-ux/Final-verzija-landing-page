@@ -40,6 +40,28 @@ Za automatsko povlačenje potrošnje i CPL iz Meta Ads:
    - Ad Account ID iz Meta Business Suite → Settings → Ad Accounts
    - META_LEAD_CAMPAIGN_NAME (opciono): sužava **agregat** (kartice IG/FB) na jednu kampanju; **tabela po kampanjama** i dalje može prikazati više redova ako API vrati više kampanja u periodu — za striktno jednu kampanju postavi filter ili imaj jednu aktivnu lead kampanju
 
+### TikTok Ads — automatski CPL (Marketing API)
+
+1. U [TikTok Ads Manager](https://ads.tiktok.com/) → **Tools** → **Marketing API** (ili [TikTok for Business Developers](https://business-api.tiktok.com/portal/)) napravi aplikaciju i generiši **Access Token** sa dozvolama za čitanje izveštaja.
+2. **Advertiser ID** (broj naloga) nađeš u Ads Manageru ili u portalu pod nalogom.
+3. U Vercel dodaj:
+   ```
+   TIKTOK_ADS_ACCESS_TOKEN=xxxx
+   TIKTOK_ADVERTISER_ID=1234567890
+   ```
+4. Redeploy. Dashboard povlači **Report Integrated Get** (kampanja, AUCTION): potrošnja, leadovi pre svega **`sales_lead`** (TikTok lead metrika). Metrika **`conversion`** u TikTok izveštajima obično obuhvata *sve* optimizovane konverzije, ne samo lead forme — zato je **podrazumevano isključena** iz broja leadova. Ako želiš staro ponašanje (broj leadova = `conversion` kada nema `sales_lead`), postavi `TIKTOK_REPORT_CONVERSION_AS_LEAD=1` u env. Ako token nije podešen, TikTok CPL ostaje **ručni unos** kao ranije.
+
+### Šta znače brojevi (Meta vs TikTok vs sajt)
+
+| Izvor | Šta meri |
+|-------|----------|
+| **Leadovi sa sajta** (kartice po izvoru, npr. Instagram / Facebook / TikTok) | Broj zapisa u Sheet + Supabase klasifikovanih po UTM / `source_tag` — **nije** isto što Meta/TikTok Ads API. |
+| **Meta — CPL po kampanji** | Lead akcije iz **Meta Insights** (`actions`), uz strože tipove (`lead`, `onsite_conversion.lead*`, `offsite_conversion.fb_pixel_lead*`, `leadgen*`, itd.) i **max po redu** da se smanji duplo brojanje kada API vrati više lead-related tipova. |
+| **TikTok Ads (API)** | Prvenstveno **`sales_lead`**; bez env zastavice ne koristimo `conversion` kao zamenu za lead. |
+| **Agregat `metaLeads` u analytics API** | Zbir leadova sa sajta za **instagram + facebook** (za poređenje sa ukupnim trendom), ne broj iz Meta Ads API-ja. |
+
+Ove tri linije **nemoj** tretirati kao jedan isti broj — različiti su definicija i izvor.
+
 **Razlika CPL kartice vs. tabela po kampanji**
 
 | Deo ekrana | Leadovi u nazivniku |

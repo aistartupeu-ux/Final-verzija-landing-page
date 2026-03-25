@@ -93,6 +93,14 @@ function redirectToLogin() {
   window.location.href = "/admin/login";
 }
 
+type TikTokCampaignCpl = {
+  campaignId: string;
+  campaignName: string;
+  spend: number;
+  leadsFromAds: number;
+  cpl: number | null;
+};
+
 type MetaCampaignCpl = {
   campaignId: string;
   campaignName: string;
@@ -122,6 +130,16 @@ export default function AdminDashPage() {
       campaignId?: string | null;
       campaignsInResponse?: number;
     };
+  } | null>(null);
+  const [tiktokAds, setTiktokAds] = useState<{
+    configured?: boolean;
+    spend: number;
+    leadsFromAds: number;
+    cpl: number | null;
+    campaigns: TikTokCampaignCpl[];
+    error?: string;
+    startDate?: string;
+    endDate?: string;
   } | null>(null);
   const [tiktokSpend, setTiktokSpend] = useState("");
   const [todayData, setTodayData] = useState<AnalyticsData | null>(null);
@@ -187,6 +205,26 @@ export default function AdminDashPage() {
       } catch {
         // Meta API opciono
       }
+      try {
+        const ttRes = await fetch(`/api/admin/tiktok-ads?${mp}&debug=1`, { credentials: "include" });
+        if (ttRes.status === 401) {
+          redirectToLogin();
+          return;
+        }
+        const ttJson = await ttRes.json();
+        setTiktokAds({
+          configured: ttJson.configured === true,
+          spend: Number(ttJson.spend) || 0,
+          leadsFromAds: Number(ttJson.leadsFromAds) || 0,
+          cpl: typeof ttJson.cpl === "number" ? ttJson.cpl : null,
+          campaigns: Array.isArray(ttJson.campaigns) ? ttJson.campaigns : [],
+          error: typeof ttJson.error === "string" ? ttJson.error : undefined,
+          startDate: typeof ttJson.startDate === "string" ? ttJson.startDate : undefined,
+          endDate: typeof ttJson.endDate === "string" ? ttJson.endDate : undefined,
+        });
+      } catch {
+        setTiktokAds(null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Greška pri učitavanju.");
     } finally {
@@ -247,7 +285,15 @@ export default function AdminDashPage() {
 
   const tiktokSpendNum = parseFloat(tiktokSpend.replace(",", ".")) || 0;
   const totalLeads = data?.total ?? 0;
-  const tiktokCpl = data?.tiktokLeads ? tiktokSpendNum / data.tiktokLeads : null;
+  const tiktokApiOk = Boolean(
+    tiktokAds && tiktokAds.configured === true && !tiktokAds.error
+  );
+  const tiktokSpendEffective = tiktokApiOk ? tiktokAds!.spend : tiktokSpendNum;
+  const tiktokCplFromSite =
+    data?.tiktokLeads && tiktokSpendEffective > 0
+      ? tiktokSpendEffective / data.tiktokLeads
+      : null;
+  const tiktokCplFromReport = tiktokApiOk ? tiktokAds!.cpl : null;
   const igLeads = data?.bySource?.instagram ?? 0;
   const fbLeads = data?.bySource?.facebook ?? 0;
   const igCpl = metaAds
@@ -447,7 +493,7 @@ export default function AdminDashPage() {
               <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
                 Meta (kartice ispod): potrošnja iz Ads API, CPL = potrošnja ÷ leadovi <strong style={{ color: "#aaa" }}>sa sajta</strong> (ukupno po
                 mreži). <strong style={{ color: "#aaa" }}>Po kampanjama</strong>: CPL koristi lead brojeve koje Meta prijavi u insights-u (po kampanji
-                i platformi). TikTok: unesi ručno.
+                i platformi). TikTok: automatski preko Marketing API ako su podešeni token i advertiser ID; inače ručni unos.
               </p>
               {metaAds?.error && (
                 <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444", fontSize: 12 }}>
@@ -499,22 +545,49 @@ export default function AdminDashPage() {
                 </div>
                 <div style={{ padding: 20, borderRadius: 16, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(0,242,234,0.2)" }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#00f2ea", marginBottom: 12 }}>TikTok</div>
-                  <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={tiktokSpend}
-                      onChange={(e) => setTiktokSpend(e.target.value.replace(/[^0-9,.]/g, ""))}
-                      placeholder="€ potrošeno"
-                      style={{ flex: 1, minWidth: 100, minHeight: 44, padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: 16 }}
-                    />
-                    {tiktokCpl !== null && tiktokCpl > 0 && (
-                      <span style={{ fontSize: 15, fontWeight: 700, color: "#00f2ea" }}>
-                        CPL: €{tiktokCpl.toFixed(2)}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#555", marginTop: 8 }}>{data.tiktokLeads} leadova sa sajta</div>
+                  {tiktokAds?.error && (
+                    <div style={{ marginBottom: 12, fontSize: 12, color: "#f87171" }}>API: {tiktokAds.error}</div>
+                  )}
+                  {tiktokApiOk ? (
+                    <>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
+                        {tiktokCplFromReport != null ? `€${tiktokCplFromReport.toFixed(2)}` : "—"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>
+                        CPL iz izveštaja · €{tiktokAds!.spend.toFixed(2)} potrošeno · {tiktokAds!.leadsFromAds} leadova (TikTok)
+                      </div>
+                      {tiktokCplFromSite != null && (
+                        <div style={{ fontSize: 12, color: "#777" }}>
+                          Blend sa sajtom: {data.tiktokLeads} leadova → €{tiktokCplFromSite.toFixed(2)}
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11, color: "#555", marginTop: 8 }}>
+                        Valuta je ona iz TikTok Ads naloga (često EUR).
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
+                        Bez API-ja: unesi potrošnju. Sa API-jem: postavi TIKTOK_ADS_ACCESS_TOKEN i TIKTOK_ADVERTISER_ID u Vercel.
+                      </div>
+                      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={tiktokSpend}
+                          onChange={(e) => setTiktokSpend(e.target.value.replace(/[^0-9,.]/g, ""))}
+                          placeholder="€ potrošeno"
+                          style={{ flex: 1, minWidth: 100, minHeight: 44, padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: 16 }}
+                        />
+                        {tiktokCplFromSite !== null && tiktokCplFromSite > 0 && (
+                          <span style={{ fontSize: 15, fontWeight: 700, color: "#00f2ea" }}>
+                            CPL: €{tiktokCplFromSite.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#555", marginTop: 8 }}>{data.tiktokLeads} leadova sa sajta</div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -556,6 +629,41 @@ export default function AdminDashPage() {
                             <td style={{ fontWeight: 600 }}>{c.totalLeads}</td>
                             <td style={{ fontWeight: 600, color: "#00d4ff" }}>
                               {c.blendedCpl != null ? `€${c.blendedCpl.toFixed(2)}` : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {tiktokApiOk && (tiktokAds!.campaigns?.length ?? 0) > 0 && (
+                <div style={{ marginTop: 24 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 10 }}>TikTok — CPL po kampanji</h3>
+                  <p style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>
+                    Aktivne kampanje u periodu; lead kolone iz TikTok integrisanog izveštaja (sales_lead / conversion).
+                  </p>
+                  <div className="admin-campaign-table-wrap">
+                    <table className="admin-campaign-table">
+                      <thead>
+                        <tr>
+                          <th>Kampanja</th>
+                          <th>Potrošnja</th>
+                          <th>Lead (TT)</th>
+                          <th>CPL</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tiktokAds!.campaigns.map((c) => (
+                          <tr key={c.campaignId}>
+                            <td title={c.campaignId} style={{ maxWidth: 220 }}>
+                              {c.campaignName}
+                            </td>
+                            <td>€{c.spend.toFixed(2)}</td>
+                            <td>{c.leadsFromAds}</td>
+                            <td style={{ fontWeight: 600, color: "#00f2ea" }}>
+                              {c.cpl != null ? `€${c.cpl.toFixed(2)}` : "—"}
                             </td>
                           </tr>
                         ))}

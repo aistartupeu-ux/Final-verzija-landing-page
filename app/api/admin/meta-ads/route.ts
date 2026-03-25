@@ -1,25 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminSessionToken } from "@/lib/admin-session";
-import { getAdminAnalyticsSecret } from "@/lib/admin-secret";
-import { getCookieFromHeader } from "@/lib/cookie-header";
-
-async function isAdminAuthorized(req: NextRequest): Promise<boolean> {
-  const expected = getAdminAnalyticsSecret();
-  if (!expected) return false;
-
-  const authHeader = req.headers.get("authorization");
-  const bearerSecret = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  if (bearerSecret === expected) return true;
-
-  const url = req.nextUrl ?? new URL(req.url);
-  const paramSecret = url.searchParams.get("secret");
-  if (paramSecret === expected) return true;
-
-  const sessionToken = getCookieFromHeader(req.headers.get("cookie"), "admin_session");
-  if (sessionToken && (await verifyAdminSessionToken(sessionToken, expected))) return true;
-
-  return false;
-}
+import { isAdminApiAuthorized } from "@/lib/admin-api-auth";
 
 type MetaPlatformData = {
   spend: number;
@@ -38,7 +18,7 @@ type CampaignCplRow = {
 };
 
 export async function GET(req: NextRequest) {
-  if (!(await isAdminAuthorized(req))) {
+  if (!(await isAdminApiAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -139,26 +119,39 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    /**
+     * Lead brojevi iz Insights `actions` — strogi tipovi (bez širokog includes("lead"))
+     * da ne uhvatimo npr. nepovezane action_type stringove. Po jednom redu obično Meta
+     * šalje više lead-related tipova koji mogu predstavljati iste događaje — uzimamo MAX,
+     * ne SUM, da smanjimo duplo brojanje.
+     */
+    function isMetaLeadActionType(actionType: string): boolean {
+      const t = actionType.toLowerCase();
+      if (t === "lead") return true;
+      if (t.startsWith("onsite_conversion.lead")) return true;
+      if (t.startsWith("offsite_conversion.fb_pixel_lead")) return true;
+      if (t.startsWith("leadgen")) return true;
+      if (t === "onsite_conversion.messaging_user_lead") return true;
+      return false;
+    }
+
     function countLeads(actions: { action_type?: string; value?: string }[] | undefined): number {
       if (!Array.isArray(actions)) return 0;
-      let n = 0;
+      let maxLead = 0;
       for (const a of actions) {
-        const t = (a.action_type ?? "").toLowerCase();
-        if (t.includes("lead") || t === "onsite_conversion.lead" || t.includes("lead_gen")) {
-          n += parseInt(String(a.value ?? "0"), 10) || 0;
-        }
+        if (!isMetaLeadActionType(a.action_type ?? "")) continue;
+        const v = parseInt(String(a.value ?? "0"), 10) || 0;
+        if (v > maxLead) maxLead = v;
       }
-      return n;
+      return maxLead;
     }
 
     function getCplFromCostPerAction(costPerActions: { action_type?: string; value?: string }[] | undefined): number | null {
       if (!Array.isArray(costPerActions)) return null;
       for (const c of costPerActions) {
-        const t = (c.action_type ?? "").toLowerCase();
-        if (t.includes("lead") || t.includes("lead_gen")) {
-          const v = parseFloat(String(c.value ?? "0"));
-          return v > 0 ? v : null;
-        }
+        if (!isMetaLeadActionType(c.action_type ?? "")) continue;
+        const v = parseFloat(String(c.value ?? "0"));
+        if (v > 0) return v;
       }
       return null;
     }
