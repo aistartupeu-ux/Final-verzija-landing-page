@@ -57,8 +57,9 @@ const LogoFallback = () => (
 );
 
 const DETACH_DELAY_MS = 900;
-const ATTACH_MIN_RATIO = 0.22;
-const PLAY_MIN_RATIO = 0.12;
+/** Marquee pomerа karticu brzo; previsok prag → <video src> se nikad ne zakači. */
+const ATTACH_MIN_RATIO = 0.06;
+const PLAY_MIN_RATIO = 0.04;
 const IO_THRESHOLDS = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.35, 0.5, 0.75, 1];
 
 /**
@@ -157,7 +158,7 @@ const VideoCard = memo(function VideoCard({
         if (wantPlay) v.play().catch(() => {});
         else v.pause();
       },
-      { root: null, rootMargin: "24px 0px", threshold: IO_THRESHOLDS }
+      { root: null, rootMargin: "120px 0px", threshold: IO_THRESHOLDS }
     );
 
     io.observe(card);
