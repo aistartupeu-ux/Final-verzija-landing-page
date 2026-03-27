@@ -206,17 +206,9 @@ const VideoCard = memo(function VideoCard({
         marginRight: 12,
         position: "relative",
         isolation: "isolate",
-        transition: "transform 0.25s ease, border-color 0.25s ease",
+        transition: "border-color 0.2s ease, box-shadow 0.2s ease",
         cursor: "default",
         background: VIDEO_CARD_BG,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "scale(1.02) translateZ(0)";
-        e.currentTarget.style.borderColor = "rgba(0,212,255,0.35)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "scale(1) translateZ(0)";
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
       }}
     >
       {!failed && attachSrc && (
@@ -348,6 +340,12 @@ function VideoRow({
     >
       <style>{`
         .video-card { width: 200px; height: 356px; }
+        @media (hover: hover) and (pointer: fine) {
+          .video-card:hover {
+            border-color: rgba(0,212,255,0.35) !important;
+            box-shadow: 0 10px 26px rgba(0, 0, 0, 0.26);
+          }
+        }
         @media (max-width: 640px) { .video-card { width: 170px; height: 302px; } }
         @media (min-width: 641px) and (max-width: 768px) { .video-card { width: 185px; height: 329px; } }
         /* Pun širinski red u odnosu na viewport (parent sekcija već ima overflow: hidden). */
@@ -377,12 +375,11 @@ function VideoRow({
           width: max-content;
           backface-visibility: hidden;
           transform: translate3d(0,0,0);
+          will-change: transform;
         }
-        .video-showcase-section.video-showcase-inview .vs-track-l,
-        .video-showcase-section.video-showcase-inview .vs-track-r { will-change: transform; }
-        .vs-track-l { animation: vsrow-l 48s linear infinite; }
-        .vs-track-r { animation: vsrow-r 44s linear infinite; }
-        .vs-track-l:hover, .vs-track-l.paused, .vs-track-r:hover, .vs-track-r.paused { animation-play-state: paused; }
+        .vs-track-l { animation: vsrow-l 64s linear infinite; }
+        .vs-track-r { animation: vsrow-r 60s linear infinite; }
+        .vs-track-l.paused, .vs-track-r.paused { animation-play-state: paused; }
         @media (prefers-reduced-motion: reduce) { .vs-track-l, .vs-track-r { animation: none; } }
       `}</style>
       <div className={`${reverse ? "vs-track-r" : "vs-track-l"}${paused ? " paused" : ""}`}>
