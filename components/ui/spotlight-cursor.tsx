@@ -127,7 +127,7 @@ export function SpotlightCursor({
     color: '#00d4ff',
     smoothing: 0.14,
     ...config,
-  }), [config?.radius, config?.brightness, config?.color, config?.smoothing]);
+  }), [config]);
 
   const canvasRef = useSpotlightEffect(spotlightConfig);
 

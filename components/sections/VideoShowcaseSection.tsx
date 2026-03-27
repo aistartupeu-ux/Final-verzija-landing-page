@@ -117,7 +117,10 @@ const VideoCard = memo(function VideoCard({
 
   useEffect(() => {
     if (!allowMedia) {
-      detachVideo();
+      const id = requestAnimationFrame(() => {
+        detachVideo();
+      });
+      return () => cancelAnimationFrame(id);
     }
   }, [allowMedia, detachVideo]);
 

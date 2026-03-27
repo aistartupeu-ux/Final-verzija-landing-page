@@ -58,10 +58,17 @@ function CountdownDisplay({
   const [sec, setSec] = useState(initialSeconds);
   const onResetRef = useRef(onReset);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  onResetRef.current = onReset;
 
   useEffect(() => {
-    if (initialSeconds > 0) setSec(initialSeconds);
+    onResetRef.current = onReset;
+  }, [onReset]);
+
+  useEffect(() => {
+    if (initialSeconds <= 0) return;
+    const id = requestAnimationFrame(() => {
+      setSec(initialSeconds);
+    });
+    return () => cancelAnimationFrame(id);
   }, [initialSeconds]);
 
   useEffect(() => {
