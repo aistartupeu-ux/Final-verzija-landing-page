@@ -53,7 +53,11 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/:path*.mp4",
-        headers: [{ key: "Cache-Control", value: "public, max-age=604800, immutable" }],
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+      {
+        source: "/:path*.zip",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
     ];
   },

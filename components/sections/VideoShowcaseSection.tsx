@@ -5,27 +5,28 @@ import { useRef, useEffect, useState, memo, useCallback } from "react";
 import Image from "next/image";
 import { Sparkles } from "lucide-react";
 
+const BUNNY_VIDEO_BASE_URL = process.env.NEXT_PUBLIC_BUNNY_VIDEO_BASE_URL?.trim() ?? "";
+
+function getVideoSrc(path: string) {
+  if (!BUNNY_VIDEO_BASE_URL) return path;
+  const base = BUNNY_VIDEO_BASE_URL.replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${normalizedPath}`;
+}
+
 /* Row 1: V11 + v12–v17 (bez v15) | Row 2: v1–v10 (optimizovani) */
 const row1 = [
-  "/examples/v11.mp4",
-  "/examples/v12.mp4",
-  "/examples/v13.mp4",
-  "/examples/v14.mp4",
-  "/examples/v16.mp4",
-  "/examples/v17.mp4",
+  getVideoSrc("/examples/v11.mp4"),
+  getVideoSrc("/examples/v12.mp4"),
+  getVideoSrc("/examples/v13.mp4"),
+  getVideoSrc("/examples/v14.mp4"),
 ];
 
 const row2 = [
-  "/examples/v9.mp4",
-  "/examples/v1.mp4",
-  "/examples/v2.mp4",
-  "/examples/v3.mp4",
-  "/examples/v4.mp4",
-  "/examples/v6.mp4",
-  "/examples/v5.mp4",
-  "/examples/v10.mp4",
-  "/examples/v8.mp4",
-  "/examples/v7.mp4",
+  getVideoSrc("/examples/v1.mp4"),
+  getVideoSrc("/examples/v2.mp4"),
+  getVideoSrc("/examples/v3.mp4"),
+  getVideoSrc("/examples/v4.mp4"),
 ];
 
 const VIDEO_CARD_BG =
@@ -55,18 +56,36 @@ const LogoFallback = () => (
   </div>
 );
 
+const DETACH_DELAY_MS = 900;
+const ATTACH_MIN_RATIO = 0.22;
+const PLAY_MIN_RATIO = 0.12;
+const IO_THRESHOLDS = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.35, 0.5, 0.75, 1];
+
 /**
- * Jedan IntersectionObserver — bez queue slotova (marquee + uži card često neće
- * ispuniti stroge pragove za reprodukciju ako se koristi threshold 0.3).
+ * Marquee drži mnogo kartica u DOM-u (duplirani niz). Bez kontrole, skoro sve
+ * istovremeno dobiju <video src> (širok rootMargin + threshold 0) → dekodovanje
+ * i mreža gutaju CPU/GPU. Učitavamo MP4 samo kad je kartica stvarno u kadru,
+ * skidamo src posle kratke pauze kad izađe, i ne učitavamo pri reduced motion.
  */
-const VideoCard = memo(function VideoCard({ src }: { src: string }) {
+const VideoCard = memo(function VideoCard({
+  src,
+  allowMedia,
+  marqueePaused,
+}: {
+  src: string;
+  allowMedia: boolean;
+  marqueePaused: boolean;
+}) {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [attachSrc, setAttachSrc] = useState(false);
   const visibleRef = useRef(false);
+  const ratioRef = useRef(0);
   const didMarkLoaded = useRef(false);
+  const detachTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attachSrcRef = useRef(false);
 
   const markLoaded = useCallback(() => {
     if (didMarkLoaded.current) return;
@@ -74,34 +93,86 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
     setLoaded(true);
   }, []);
 
+  const clearDetachTimer = useCallback(() => {
+    if (detachTimerRef.current != null) {
+      clearTimeout(detachTimerRef.current);
+      detachTimerRef.current = null;
+    }
+  }, []);
+
+  const detachVideo = useCallback(() => {
+    clearDetachTimer();
+    attachSrcRef.current = false;
+    setAttachSrc(false);
+    const v = videoRef.current;
+    if (v) {
+      v.pause();
+      v.removeAttribute("src");
+      v.load();
+    }
+    didMarkLoaded.current = false;
+    setLoaded(false);
+  }, [clearDetachTimer]);
+
+  useEffect(() => {
+    if (!allowMedia) {
+      detachVideo();
+    }
+  }, [allowMedia, detachVideo]);
+
   useEffect(() => {
     const card = cardRef.current;
     if (!card || failed) return;
 
     const io = new IntersectionObserver(
       ([entry]) => {
-        visibleRef.current = entry.isIntersecting;
-        if (entry.isIntersecting) setAttachSrc(true);
+        const ratio = entry.intersectionRatio;
+        ratioRef.current = ratio;
+        visibleRef.current = entry.isIntersecting && ratio >= PLAY_MIN_RATIO;
+
+        const wantAttach =
+          allowMedia && entry.isIntersecting && ratio >= ATTACH_MIN_RATIO;
+        if (wantAttach) {
+          clearDetachTimer();
+          attachSrcRef.current = true;
+          setAttachSrc(true);
+        } else if (allowMedia && attachSrcRef.current) {
+          if (detachTimerRef.current == null) {
+            detachTimerRef.current = setTimeout(() => {
+              detachTimerRef.current = null;
+              detachVideo();
+            }, DETACH_DELAY_MS);
+          }
+        } else if (!allowMedia) {
+          detachVideo();
+        }
+
         const v = videoRef.current;
         if (!v || failed || !loaded) return;
-        if (entry.isIntersecting) v.play().catch(() => {});
+        const wantPlay =
+          allowMedia &&
+          !marqueePaused &&
+          entry.isIntersecting &&
+          ratio >= PLAY_MIN_RATIO;
+        if (wantPlay) v.play().catch(() => {});
         else v.pause();
       },
-      { root: null, rootMargin: "180px 0px", threshold: 0 }
+      { root: null, rootMargin: "24px 0px", threshold: IO_THRESHOLDS }
     );
 
     io.observe(card);
-    if (visibleRef.current && videoRef.current && loaded && !failed) {
-      videoRef.current.play().catch(() => {});
-    }
-    return () => io.disconnect();
-  }, [failed, loaded]);
+    return () => {
+      clearDetachTimer();
+      io.disconnect();
+    };
+  }, [allowMedia, failed, loaded, marqueePaused, clearDetachTimer, detachVideo]);
 
   useEffect(() => {
-    if (!loaded || failed) return;
+    if (!loaded || failed || !allowMedia) return;
     const v = videoRef.current;
-    if (v && visibleRef.current) v.play().catch(() => {});
-  }, [loaded, failed]);
+    if (v && visibleRef.current && !marqueePaused) v.play().catch(() => {});
+    if (v && marqueePaused) v.pause();
+  }, [loaded, failed, allowMedia, marqueePaused]);
 
   return (
     <div
@@ -135,7 +206,7 @@ const VideoCard = memo(function VideoCard({ src }: { src: string }) {
           muted
           loop
           playsInline
-          preload="metadata"
+          preload="none"
           onError={() => setFailed(true)}
           onLoadedMetadata={() => {
             const v = videoRef.current;
@@ -187,10 +258,12 @@ function VideoRow({
   videos,
   reverse = false,
   paused = false,
+  allowMedia,
 }: {
   videos: string[];
   reverse?: boolean;
   paused?: boolean;
+  allowMedia: boolean;
 }) {
   const items = [...videos, ...videos];
   const [dragOffset, setDragOffset] = useState(0);
@@ -298,7 +371,12 @@ function VideoRow({
           }}
         >
           {items.map((videoSrc, i) => (
-            <VideoCard key={`${videoSrc}-${i}`} src={videoSrc} />
+            <VideoCard
+              key={`${videoSrc}-${i}`}
+              src={videoSrc}
+              allowMedia={allowMedia}
+              marqueePaused={paused}
+            />
           ))}
         </div>
       </div>
@@ -310,7 +388,18 @@ export default function VideoShowcaseSection() {
   const ref = useRef(null);
   const inView = useInView(ref, { once: false, amount: 0.1 });
   const reduced = useReducedMotion();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const onChange = () => setIsMobile(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   const pauseMarquee = reduced || !inView;
+  const allowMedia = inView && !reduced;
   const t = { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const };
 
   return (
@@ -385,16 +474,18 @@ export default function VideoShowcaseSection() {
         transition={{ ...t, delay: 0.15 }}
         style={{ marginBottom: 12 }}
       >
-        <VideoRow videos={row1} paused={pauseMarquee} />
+        <VideoRow videos={row1} paused={pauseMarquee} allowMedia={allowMedia} />
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: reduced ? 1 : 0 }}
-        animate={inView ? { opacity: 1 } : {}}
-        transition={{ ...t, delay: 0.3 }}
-      >
-        <VideoRow videos={row2} reverse paused={pauseMarquee} />
-      </motion.div>
+      {!isMobile && (
+        <motion.div
+          initial={{ opacity: reduced ? 1 : 0 }}
+          animate={inView ? { opacity: 1 } : {}}
+          transition={{ ...t, delay: 0.3 }}
+        >
+          <VideoRow videos={row2} reverse paused={pauseMarquee} allowMedia={allowMedia} />
+        </motion.div>
+      )}
     </section>
   );
 }
