@@ -334,10 +334,7 @@ function VideoRow({
       style={{
         overflow: "hidden",
         contain: "layout paint",
-        margin: "0 24px",
         transform: "translateZ(0)",
-        maskImage: "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
-        WebkitMaskImage: "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
         touchAction: isMobile ? "pan-y" : "auto",
       }}
       onTouchStart={onTouchStart}
@@ -349,15 +346,24 @@ function VideoRow({
         .video-card { width: 200px; height: 356px; }
         @media (max-width: 640px) { .video-card { width: 170px; height: 302px; } }
         @media (min-width: 641px) and (max-width: 768px) { .video-card { width: 185px; height: 329px; } }
+        /* Pun širinski red u odnosu na viewport (parent sekcija već ima overflow: hidden). */
+        .video-showcase-section .video-showcase-row {
+          width: 100vw !important;
+          max-width: 100vw !important;
+          margin-left: calc(50% - 50vw) !important;
+          margin-right: calc(50% - 50vw) !important;
+          box-sizing: border-box !important;
+        }
+        @media (max-width: 768px) {
+          .video-showcase-section .video-showcase-row {
+            mask-image: linear-gradient(90deg, transparent 0%, black 5%, black 95%, transparent 100%) !important;
+            -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 5%, black 95%, transparent 100%) !important;
+          }
+        }
         @media (min-width: 769px) {
           .video-showcase-section .video-showcase-row {
-            width: 100vw !important;
-            max-width: 100vw !important;
-            margin-left: calc(50% - 50vw) !important;
-            margin-right: calc(50% - 50vw) !important;
-            box-sizing: border-box !important;
-            mask-image: linear-gradient(90deg, transparent 0%, black 2%, black 98%, transparent 100%) !important;
-            -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 2%, black 98%, transparent 100%) !important;
+            mask-image: linear-gradient(90deg, transparent 0%, black 1%, black 99%, transparent 100%) !important;
+            -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 1%, black 99%, transparent 100%) !important;
           }
         }
         @keyframes vsrow-l { from { transform: translate3d(0,0,0); } to { transform: translate3d(-50%,0,0); } }
@@ -404,15 +410,6 @@ export default function VideoShowcaseSection() {
   const ref = useRef(null);
   const inView = useInView(ref, { once: false, amount: 0.1 });
   const reduced = useReducedMotion();
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 768px)");
-    const onChange = () => setIsMobile(mq.matches);
-    onChange();
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
 
   const pauseMarquee = reduced || !inView;
   const allowMedia = inView && !reduced;
@@ -493,15 +490,14 @@ export default function VideoShowcaseSection() {
         <VideoRow videos={row1} paused={pauseMarquee} allowMedia={allowMedia} />
       </motion.div>
 
-      {!isMobile && (
-        <motion.div
-          initial={{ opacity: reduced ? 1 : 0 }}
-          animate={inView ? { opacity: 1 } : {}}
-          transition={{ ...t, delay: 0.3 }}
-        >
-          <VideoRow videos={row2} reverse paused={pauseMarquee} allowMedia={allowMedia} />
-        </motion.div>
-      )}
+      <motion.div
+        initial={{ opacity: reduced ? 1 : 0 }}
+        animate={inView ? { opacity: 1 } : {}}
+        transition={{ ...t, delay: 0.3 }}
+        style={{ marginBottom: 0 }}
+      >
+        <VideoRow videos={row2} reverse paused={pauseMarquee} allowMedia={allowMedia} />
+      </motion.div>
     </section>
   );
 }
