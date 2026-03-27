@@ -124,6 +124,18 @@ const VideoCard = memo(function VideoCard({
     }
   }, [allowMedia, detachVideo]);
 
+  /** Sa preload="none" marquee često skine src pre nego što stigne metadata → loaded ostane false i opacity 0. */
+  useEffect(() => {
+    if (!attachSrc || failed) return;
+    const v = videoRef.current;
+    if (!v) return;
+    try {
+      v.load();
+    } catch {
+      /* ignore */
+    }
+  }, [attachSrc, failed, src]);
+
   useEffect(() => {
     const card = cardRef.current;
     if (!card || failed) return;
@@ -210,7 +222,7 @@ const VideoCard = memo(function VideoCard({
           muted
           loop
           playsInline
-          preload="none"
+          preload="metadata"
           onError={() => setFailed(true)}
           onLoadedMetadata={() => {
             const v = videoRef.current;
