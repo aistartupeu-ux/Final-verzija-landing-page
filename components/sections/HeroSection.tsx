@@ -6,10 +6,15 @@ import { Play, Pause, Maximize } from "lucide-react";
 import Image from "next/image";
 import CountdownTimer from "@/components/ui/CountdownTimer";
 import EmailForm from "@/components/ui/EmailForm";
+import { getCdnMediaUrl } from "@/lib/cdn-media";
 
-// 15. april 00:00 Europe/Belgrade (CET/CEST) — kurs se otvara, tajmer se završava u ponoć
-// April je letnje vreme (CEST = UTC+2)
+// Perioda giveawaya 2.–14. apr. 2026, Europe/Belgrade (CEST = UTC+2 u aprilu).
+// Tajmer do kraja 14. apr. = 15. apr. 00:00 lokalno. Isto za hero / giveaway LP.
 const TARGET_DATE = new Date("2026-04-15T00:00:00+02:00");
+
+const HERO_BG_MP4 = getCdnMediaUrl("/hero-vsl.mp4");
+const EXPLAINER_MP4 = getCdnMediaUrl("/explainer-vsl.mp4");
+const EXPLAINER_POSTER = getCdnMediaUrl("/video-poster.webp");
 
 export default function HeroSection() {
   const bgVideoRef = useRef<HTMLVideoElement>(null);
@@ -132,7 +137,7 @@ export default function HeroSection() {
               backfaceVisibility: "hidden",
             }}
           >
-            <source src="/hero-vsl.mp4" type="video/mp4" />
+            <source src={HERO_BG_MP4} type="video/mp4" />
           </video>
         )}
         <div style={{ position: "absolute", inset: 0, background: "rgba(5,5,8,0.82)" }} />
@@ -188,10 +193,10 @@ export default function HeroSection() {
           >
             <video
               ref={explainerRef}
-              src="/explainer-vsl.mp4"
+              src={EXPLAINER_MP4}
               playsInline
               preload="none"
-              poster="/video-poster.webp"
+              poster={EXPLAINER_POSTER}
               onError={() => setExplainerFailed(true)}
               onEnded={() => setPlaying(false)}
               style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}

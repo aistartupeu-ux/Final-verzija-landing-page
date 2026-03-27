@@ -4,33 +4,25 @@ import { motion, useInView, useReducedMotion } from "framer-motion";
 import { useRef, useEffect, useState, memo, useCallback } from "react";
 import Image from "next/image";
 import { Sparkles } from "lucide-react";
-
-const BUNNY_VIDEO_BASE_URL = process.env.NEXT_PUBLIC_BUNNY_VIDEO_BASE_URL?.trim() ?? "";
-
-function getVideoSrc(path: string) {
-  if (!BUNNY_VIDEO_BASE_URL) return path;
-  const base = BUNNY_VIDEO_BASE_URL.replace(/\/+$/, "");
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${normalizedPath}`;
-}
+import { getCdnMediaUrl } from "@/lib/cdn-media";
 
 /* Row 1: V11 + v12–v17 (bez v15) | Row 2: v1–v10 (optimizovani) */
 const row1 = [
-  getVideoSrc("/examples/v11.mp4"),
-  getVideoSrc("/examples/v12.mp4"),
-  getVideoSrc("/examples/v13.mp4"),
-  getVideoSrc("/examples/v14.mp4"),
-  getVideoSrc("/examples/v16.mp4"),
-  getVideoSrc("/examples/v17.mp4"),
+  getCdnMediaUrl("/examples/v11.mp4"),
+  getCdnMediaUrl("/examples/v12.mp4"),
+  getCdnMediaUrl("/examples/v13.mp4"),
+  getCdnMediaUrl("/examples/v14.mp4"),
+  getCdnMediaUrl("/examples/v16.mp4"),
+  getCdnMediaUrl("/examples/v17.mp4"),
 ];
 
 const row2 = [
-  getVideoSrc("/examples/v1.mp4"),
-  getVideoSrc("/examples/v2.mp4"),
-  getVideoSrc("/examples/v3.mp4"),
-  getVideoSrc("/examples/v4.mp4"),
-  getVideoSrc("/examples/v5.mp4"),
-  getVideoSrc("/examples/v6.mp4"),
+  getCdnMediaUrl("/examples/v1.mp4"),
+  getCdnMediaUrl("/examples/v2.mp4"),
+  getCdnMediaUrl("/examples/v3.mp4"),
+  getCdnMediaUrl("/examples/v4.mp4"),
+  getCdnMediaUrl("/examples/v5.mp4"),
+  getCdnMediaUrl("/examples/v6.mp4"),
 ];
 
 const VIDEO_CARD_BG =
