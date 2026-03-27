@@ -20,6 +20,8 @@ const row1 = [
   getVideoSrc("/examples/v12.mp4"),
   getVideoSrc("/examples/v13.mp4"),
   getVideoSrc("/examples/v14.mp4"),
+  getVideoSrc("/examples/v16.mp4"),
+  getVideoSrc("/examples/v17.mp4"),
 ];
 
 const row2 = [
@@ -27,6 +29,8 @@ const row2 = [
   getVideoSrc("/examples/v2.mp4"),
   getVideoSrc("/examples/v3.mp4"),
   getVideoSrc("/examples/v4.mp4"),
+  getVideoSrc("/examples/v5.mp4"),
+  getVideoSrc("/examples/v6.mp4"),
 ];
 
 const VIDEO_CARD_BG =
