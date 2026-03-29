@@ -1,22 +1,23 @@
 "use client";
 
-import { motion, AnimatePresence, useInView } from "framer-motion";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, type ReactNode } from "react";
 import { ChevronDown, ChevronUp, Music2 } from "lucide-react";
 import Image from "next/image";
+import { useInView } from "@/lib/use-in-view";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 interface Article {
   id: string;
-  badge: { icon: React.ReactNode; label: string; color: string; bg: string; border: string };
+  badge: { icon: ReactNode; label: string; color: string; bg: string; border: string };
   heroImage: string;
   heroImages?: string[];
-  heroImagePosition?: string; // npr. "center 30%" da se vidi lik
-  heroImagePositions?: string[]; // opciono: per-slide objectPosition (mora matchovati heroImages)
+  heroImagePosition?: string;
+  heroImagePositions?: string[];
   overlayLogo?: { src: string; alt: string; subtitle: string; title: string };
-  title: React.ReactNode;
-  intro: React.ReactNode;
+  title: ReactNode;
+  intro: ReactNode;
   quote?: { text: string; author: string };
-  full: React.ReactNode;
+  full: ReactNode;
   date: string;
 }
 
@@ -34,13 +35,13 @@ const articles: Article[] = [
     heroImages: ["/blog-trile-2.png", "/blog-trile-3.png", "/blog-trile-4b.jpg", "/blog-trile-5.png", "/blog-trile-6.png", "/blog-trile-7.png", "/blog-trile-8.png"],
     heroImagePosition: "center 25%",
     heroImagePositions: [
-      "center 25%", // blog-trile-2.png
-      "center 25%", // blog-trile-3.png
-      "center 60%", // blog-trile-4b.jpg (spustiti još ~15%)
-      "center 25%", // blog-trile-5.png
-      "center 25%", // blog-trile-6.png
-      "center 25%", // blog-trile-7.png
-      "center 25%", // blog-trile-8.png
+      "center 25%",
+      "center 25%",
+      "center 60%",
+      "center 25%",
+      "center 25%",
+      "center 25%",
+      "center 25%",
     ],
     title: (
       <>
@@ -101,24 +102,25 @@ function HeroSlideshow({ images, alt, objectPosition, objectPositions }: { image
       onMouseLeave={() => setIsHovered(false)}
       style={{ position: "absolute", inset: 0 }}
     >
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={index}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.5 }}
-          style={{ position: "absolute", inset: 0 }}
+      {images.map((src, i) => (
+        <div
+          key={src}
+          className="blog-slide-layer"
+          style={{
+            opacity: i === index ? 1 : 0,
+            zIndex: i === index ? 1 : 0,
+            pointerEvents: i === index ? "auto" : "none",
+          }}
         >
           <Image
-            src={images[index]}
+            src={src}
             alt={alt ?? ""}
             fill
             style={imgStyle}
             sizes="(max-width: 768px) 100vw, 50vw"
           />
-        </motion.div>
-      </AnimatePresence>
+        </div>
+      ))}
       <div style={{
         position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)",
         display: "flex", gap: 6, zIndex: 2,
@@ -141,27 +143,25 @@ function HeroSlideshow({ images, alt, objectPosition, objectPositions }: { image
   );
 }
 
-function ArticleCard({ article, delay }: { article: Article; delay: number }) {
+function ArticleCard({ article }: { article: Article }) {
   const [expanded, setExpanded] = useState(false);
   const images = article.heroImages?.length ? article.heroImages : [article.heroImage];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 28 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.65, delay }}
-      className="card"
+    <div
+      className="card blog-article-card"
       style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}
     >
-      {/* Hero image / slideshow */}
       <div style={{ position: "relative", height: 240, overflow: "hidden", flexShrink: 0 }}>
         <HeroSlideshow images={images} objectPosition={article.heroImagePosition} objectPositions={article.heroImagePositions} />
         <div style={{
           position: "absolute", inset: 0,
           background: "linear-gradient(to top, rgba(5,5,12,0.95) 0%, rgba(5,5,12,0.3) 50%, transparent 100%)",
+          zIndex: 2,
+          pointerEvents: "none",
         }} />
         {article.overlayLogo && (
-          <div style={{ position: "absolute", bottom: 16, left: 20, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ position: "absolute", bottom: 16, left: 20, display: "flex", alignItems: "center", gap: 10, zIndex: 3 }}>
             <Image src={article.overlayLogo.src} alt={article.overlayLogo.alt} width={44} height={44}
               style={{ borderRadius: 8, objectFit: "cover", border: `2px solid ${article.badge.color}66` }} />
             <div>
@@ -170,7 +170,7 @@ function ArticleCard({ article, delay }: { article: Article; delay: number }) {
             </div>
           </div>
         )}
-        <div style={{ position: "absolute", top: 14, left: 16 }}>
+        <div style={{ position: "absolute", top: 14, left: 16, zIndex: 3 }}>
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 6,
             background: article.badge.bg, border: `1px solid ${article.badge.border}`,
@@ -182,7 +182,6 @@ function ArticleCard({ article, delay }: { article: Article; delay: number }) {
         </div>
       </div>
 
-      {/* Content */}
       <div style={{ padding: "24px 24px 20px", flex: 1, display: "flex", flexDirection: "column" }}>
         <div style={{ fontSize: 11, color: "#555", marginBottom: 10 }}>{article.date}</div>
         <h3 style={{ fontSize: "clamp(16px, 2.5vw, 22px)", fontWeight: 800, lineHeight: 1.3, marginBottom: 16, color: "#fff" }}>
@@ -205,12 +204,13 @@ function ArticleCard({ article, delay }: { article: Article; delay: number }) {
         )}
 
         {expanded && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
+          <div className="blog-expand-body">
             {article.full}
-          </motion.div>
+          </div>
         )}
 
         <button
+          type="button"
           onClick={() => setExpanded(!expanded)}
           style={{
             display: "inline-flex", alignItems: "center", gap: 6, marginTop: 16,
@@ -225,24 +225,21 @@ function ArticleCard({ article, delay }: { article: Article; delay: number }) {
           {expanded ? <><ChevronUp size={13} /> Prikaži manje</> : <><ChevronDown size={13} /> Pročitaj ceo članak</>}
         </button>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
 export default function BlogSection() {
-  const ref = useRef(null);
+  const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.1 });
+  const reduced = useReducedMotion();
+  const iv = inView || reduced;
 
   return (
-    <section id="blog" ref={ref} style={{ position: "relative", zIndex: 10, padding: "80px 24px 100px", contentVisibility: "auto", containIntrinsicSize: "auto 700px" }}>
+    <section id="blog" ref={ref} className={reduced ? "sr-nomotion" : undefined} style={{ position: "relative", zIndex: 10, padding: "80px 24px 100px", contentVisibility: "auto", containIntrinsicSize: "auto 700px" }}>
       <div className="section-container">
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.65 }}
-          style={{ textAlign: "center", marginBottom: 48 }}
-        >
+        <div className={`sr-from-y sr-from-y-lg sr-ease ${iv ? "sr-inview" : ""}`} style={{ textAlign: "center", marginBottom: 48 }}>
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 8,
             background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
@@ -254,13 +251,13 @@ export default function BlogSection() {
           <h2 style={{ fontSize: "clamp(26px, 4vw, 42px)", fontWeight: 800, lineHeight: 1.15 }}>
             Muzika, video i <span style={{ color: "#00d4ff" }}>AI eksperti</span>
           </h2>
-        </motion.div>
+        </div>
 
         <style>{`.blog-grid{display:grid;grid-template-columns:1fr;gap:24px;max-width:400px;margin:0 auto;width:100%}`}</style>
-        {inView && (
-          <div className="blog-grid">
-            {articles.map((article, i) => (
-              <ArticleCard key={article.id} article={article} delay={i * 0.12} />
+        {(inView || reduced) && (
+          <div className={`blog-grid sr-blog-cards ${iv ? "sr-inview" : ""}`}>
+            {articles.map((article) => (
+              <ArticleCard key={article.id} article={article} />
             ))}
           </div>
         )}

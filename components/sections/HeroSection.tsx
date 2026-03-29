@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { motion } from "framer-motion";
 import { Play, Pause, Maximize } from "lucide-react";
 import Image from "next/image";
 import CountdownTimer from "@/components/ui/CountdownTimer";
 import EmailForm from "@/components/ui/EmailForm";
 import { getCdnMediaUrl } from "@/lib/cdn-media";
+import { arePromoLandingPagesEnabled } from "@/lib/promo-landing-pages";
 import { CDN_PATH_HERO_BG, CDN_PATH_EXPLAINER_MP4 } from "@/lib/video-cdn-paths";
 
 /** Poster pre prvog play-a — isti logo kao u headeru (`public/logo.png`). */
@@ -43,68 +43,20 @@ export default function HeroSection({
   const [explainerHasPlayed, setExplainerHasPlayed] = useState(false);
   const primeExplainerFrameRef = useRef(true);
 
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (window.matchMedia("(pointer: coarse)").matches) return;
-    const video = bgVideoRef.current;
-    const section = sectionRef.current;
-    if (!video || !section) return;
-    let raf = 0;
-    let sectionTop = 0;
-    let sectionHeight = 0;
-    let heroNearViewport = true;
-    const updateMetrics = () => {
-      const rect = section.getBoundingClientRect();
-      sectionTop = rect.top + window.scrollY;
-      sectionHeight = section.offsetHeight;
-    };
-    updateMetrics();
-    const ro = new ResizeObserver(updateMetrics);
-    ro.observe(section);
-    const visIo = new IntersectionObserver(
-      ([e]) => {
-        heroNearViewport = e.isIntersecting;
-      },
-      { threshold: 0, rootMargin: "120px 0px" }
-    );
-    visIo.observe(section);
-    const onScroll = () => {
-      if (!heroNearViewport) return;
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        const scrollY = window.scrollY;
-        const progress = Math.max(0, Math.min(1, (scrollY - sectionTop) / (sectionHeight * 0.6)));
-        video.style.transform = `translate(-50%, -50%) scale(1.12) translateY(${progress * -50}px) translateZ(0)`;
-        raf = 0;
-      });
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      ro.disconnect();
-      visIo.disconnect();
-      window.removeEventListener("scroll", onScroll);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [HERO_BG_MP4]);
-
+  /** Pozadinski video je iznad preklopa — bez lazy IO/load() (to je pravilo seckanje + „prazan“ hero na startu). Samo pauza kad nije u kadru. */
   useEffect(() => {
     const video = bgVideoRef.current;
     const section = sectionRef.current;
     if (!video || !section) return;
     const onCanPlay = () => video.play().catch(() => {});
     video.addEventListener("canplay", onCanPlay, { once: true });
+    if (video.readyState >= 3) void video.play().catch(() => {});
     const io = new IntersectionObserver(
       ([e]) => {
-        if (e.isIntersecting) {
-          video.preload = "auto";
-          video.load();
-          if (video.readyState >= 2) video.play().catch(() => {});
-        } else {
-          video.pause();
-        }
+        if (e.isIntersecting) void video.play().catch(() => {});
+        else video.pause();
       },
-      { threshold: 0.05, rootMargin: "80px" }
+      { threshold: 0, rootMargin: "0px" }
     );
     io.observe(section);
     return () => {
@@ -161,7 +113,7 @@ export default function HeroSection({
       }}
     >
       {/* Video wallpaper with parallax */}
-      <div style={{ position: "absolute", inset: 0, zIndex: 0, overflow: "hidden", contain: "layout style paint" }}>
+      <div style={{ position: "absolute", inset: 0, zIndex: 0, overflow: "hidden" }}>
         {bgFailed ? (
           <Image
             src="/pozadina-plexus.png"
@@ -180,7 +132,7 @@ export default function HeroSection({
             muted
             loop
             playsInline
-            preload="none"
+            preload="auto"
             poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%2305080c' width='1' height='1'/%3E%3C/svg%3E"
             onError={() => setBgFailed(true)}
             style={{
@@ -201,10 +153,7 @@ export default function HeroSection({
       </div>
 
       {/* Content */}
-      <motion.div
-        initial={{ opacity: 0, y: 35 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+      <div
         style={{ textAlign: "center", maxWidth: 720, margin: "0 auto", width: "100%", position: "relative", zIndex: 2 }}
       >
         <h1
@@ -224,10 +173,7 @@ export default function HeroSection({
         </h1>
 
         {/* 1. VSL video — prvo */}
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.55, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+        <div
           style={{ marginBottom: 32, position: "relative" }}
           onMouseEnter={() => setHovering(true)}
           onMouseLeave={() => setHovering(false)}
@@ -243,7 +189,6 @@ export default function HeroSection({
               cursor: "pointer",
               background: "linear-gradient(145deg, #12182a 0%, #0a0d18 45%, #050508 100%)",
               border: "1px solid rgba(0,212,255,0.2)",
-              contain: "layout paint",
             }}
           >
             <video
@@ -251,7 +196,7 @@ export default function HeroSection({
               ref={explainerRef}
               src={EXPLAINER_MP4}
               playsInline
-              preload="metadata"
+              preload="none"
               disableRemotePlayback
               onLoadedMetadata={(e) => {
                 if (!primeExplainerFrameRef.current) return;
@@ -424,30 +369,21 @@ export default function HeroSection({
               </button>
             )}
           </div>
-        </motion.div>
+        </div>
 
         {/* 2. Email forma — ispod videa */}
-        <motion.div
-          id="hero-email-form"
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          style={{ marginBottom: 32, scrollMarginTop: 100 }}
-        >
+        <div id="hero-email-form" style={{ marginBottom: 32, scrollMarginTop: 100 }}>
           <EmailForm />
-        </motion.div>
+        </div>
 
-        {/* 3. Tajmer — ispod forme */}
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          style={{ marginBottom: 36 }}
-        >
-          <CountdownTimer targetDate={TARGET_DATE} />
-        </motion.div>
+        {/* 3. Tajmer — samo kad su giveaway / promo stranice aktivne (vidi NEXT_PUBLIC_PROMO_LANDING_PAGES) */}
+        {arePromoLandingPagesEnabled() ? (
+          <div style={{ marginBottom: 36 }}>
+            <CountdownTimer targetDate={TARGET_DATE} />
+          </div>
+        ) : null}
 
-      </motion.div>
+      </div>
     </section>
   );
 }

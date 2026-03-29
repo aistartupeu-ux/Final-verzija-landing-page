@@ -1,8 +1,9 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
 import { Video, Users, Music2, Zap, ShoppingBag, Code2, TrendingUp, Sparkles } from "lucide-react";
+import { useInView } from "@/lib/use-in-view";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 const outcomes = [
   { icon: Users, color: "#00d4ff", title: "Kreirati AI influensera od nule", desc: "Potpuno virtuelni karakter koji gradi publiku i prihod" },
@@ -16,13 +17,15 @@ const outcomes = [
 ];
 
 export default function ForWhoSection() {
-  const ref = useRef(null);
+  const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.1 });
+  const reduced = useReducedMotion();
+  const iv = inView || reduced;
 
   return (
-    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "100px 24px", textAlign: "center", contentVisibility: "auto", containIntrinsicSize: "auto 700px" }}>
+    <section ref={ref} className={reduced ? "sr-nomotion" : undefined} style={{ position: "relative", zIndex: 10, padding: "100px 24px", textAlign: "center", contentVisibility: "auto", containIntrinsicSize: "auto 700px" }}>
       <div className="section-container" style={{ maxWidth: 1000 }}>
-        <motion.div initial={{ opacity: 0, y: 25 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.7 }}>
+        <div className={`sr-from-y sr-from-y-xl sr-ease ${iv ? "sr-inview" : ""}`}>
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 8,
             background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.15)",
@@ -39,17 +42,14 @@ export default function ForWhoSection() {
           <p style={{ fontSize: 15, color: "#8a8a9a", maxWidth: 500, margin: "0 auto 52px", lineHeight: 1.7 }}>
             Konkretne veštine. Realni projekti. Bez teorije koja ti ne treba.
           </p>
-        </motion.div>
+        </div>
 
         <style>{`.outcomes-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(min-width:640px){.outcomes-grid{grid-template-columns:repeat(3,1fr)}}@media(min-width:900px){.outcomes-grid{grid-template-columns:repeat(4,1fr)}}`}</style>
-        <div className="outcomes-grid">
+        <div className={`outcomes-grid sr-outcomes ${iv ? "sr-inview" : ""}`}>
           {outcomes.map((o, i) => (
-            <motion.div
+            <div
               key={i}
-              initial={{ opacity: 0, y: 20 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.4, delay: 0.05 + i * 0.05 }}
-              className="card"
+              className="card outcome-card-sr"
               style={{ padding: "24px 20px", textAlign: "left", position: "relative", overflow: "hidden" }}
             >
               <div style={{
@@ -65,7 +65,7 @@ export default function ForWhoSection() {
               </div>
               <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 6, lineHeight: 1.4 }}>{o.title}</h3>
               <p style={{ fontSize: 12, color: "#777", lineHeight: 1.65 }}>{o.desc}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>

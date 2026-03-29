@@ -3,8 +3,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import TrackingScripts from "@/components/layout/TrackingScripts";
 import AffiliateTracker from "@/components/AffiliateTracker";
-import PreloadSections from "@/components/layout/PreloadSections";
-
 const inter = Inter({ subsets: ["latin", "latin-ext"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
@@ -61,10 +59,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className={inter.variable} style={{ fontFamily: "var(--font-inter), Inter, system-ui, sans-serif", overflowX: "hidden", maxWidth: "100vw" }}>
         <TrackingScripts />
         <AffiliateTracker />
-        <div style={{ overflowX: "hidden", maxWidth: "100vw" }}>
-          {children}
-          <PreloadSections />
-        </div>
+        <div style={{ overflowX: "hidden", maxWidth: "100vw" }}>{children}</div>
       </body>
     </html>
   );

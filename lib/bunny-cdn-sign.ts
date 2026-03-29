@@ -21,15 +21,25 @@ function base64UrlToken(buf: Buffer): string {
     .replace(/=+$/, "");
 }
 
-export function getServerCdnUrl(path: string, ttlSeconds?: number): string {
+/**
+ * @param cacheBust Opcioni sufiks `&v=...` — drugačiji URL = novi keš kod CDN/pregledača kad zameniš istoimeni fajl na Bunny-ju.
+ */
+export function getServerCdnUrl(path: string, ttlSeconds?: number, cacheBust?: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   const signingOff =
     process.env.BUNNY_CDN_SIGNING === "0" || process.env.BUNNY_CDN_SIGNING === "false";
   const tokenKey = process.env.BUNNY_CDN_TOKEN_KEY?.trim() ?? "";
   const baseUrl = process.env.NEXT_PUBLIC_BUNNY_VIDEO_BASE_URL?.trim() ?? "";
+  const bust = cacheBust?.trim() || process.env.EXPLAINER_VSL_CACHE_BUST?.trim() || "";
+  const bustQs = bust ? `&v=${encodeURIComponent(bust)}` : "";
 
   if (signingOff || !tokenKey || !baseUrl) {
-    return getCdnMediaUrl(path);
+    let url = getCdnMediaUrl(path);
+    if (bust) {
+      const sep = url.includes("?") ? "&" : "?";
+      url = `${url}${sep}v=${encodeURIComponent(bust)}`;
+    }
+    return url;
   }
 
   const rawTtl = process.env.BUNNY_CDN_URL_TTL_SECONDS?.trim();
@@ -58,5 +68,5 @@ export function getServerCdnUrl(path: string, ttlSeconds?: number): string {
   const token = base64UrlToken(digest);
   const base = baseUrl.replace(/\/+$/, "");
   // Ostaje kao u Bunny primerima (token je base64url, ne zahteva encode u praksi)
-  return `${base}${normalized}?token=${token}&expires=${expires}`;
+  return `${base}${normalized}?token=${token}&expires=${expires}${bustQs}`;
 }

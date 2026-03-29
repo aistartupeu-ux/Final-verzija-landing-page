@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { arePromoLandingPagesEnabled } from "@/lib/promo-landing-pages";
 
 export async function POST(req: NextRequest) {
+  if (!arePromoLandingPagesEnabled()) {
+    return NextResponse.json({ error: "Lead magnet trenutno nije aktivan." }, { status: 403 });
+  }
+
   const baseUrl = new URL(req.url);
   const target = new URL("/api/leads", baseUrl);
 

@@ -317,6 +317,356 @@ body {
   .hero-vsl-pulse-ring { animation: none !important; opacity: 0.35; }
 }
 
+/* ─── Landing: scroll-reveal (CSS, bez framer-motion) ─── */
+.sr-ease {
+  --sr-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sr-from-y {
+  opacity: 0;
+  transform: translateY(var(--sr-dy, 24px));
+  transition:
+    opacity var(--sr-d, 0.65s) var(--sr-ease, cubic-bezier(0.22, 1, 0.36, 1)),
+    transform var(--sr-d, 0.65s) var(--sr-ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.sr-from-y.sr-inview {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.sr-from-y-sm { --sr-dy: 15px; --sr-d: 0.5s; }
+.sr-from-y-tight { --sr-dy: 10px; }
+.sr-from-y-lg { --sr-dy: 30px; --sr-d: 0.7s; }
+.sr-from-y-xl { --sr-dy: 25px; --sr-d: 0.7s; }
+
+.sr-from-x-n {
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: opacity 0.55s var(--sr-ease, cubic-bezier(0.22, 1, 0.36, 1)), transform 0.55s var(--sr-ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.sr-from-x-n.sr-inview {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sr-from-x-p {
+  opacity: 0;
+  transform: translateX(20px);
+  transition: opacity 0.55s var(--sr-ease, cubic-bezier(0.22, 1, 0.36, 1)), transform 0.55s var(--sr-ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+.sr-from-x-p.sr-inview {
+  opacity: 1;
+  transform: translateX(0);
+}
+.sr-from-x-p-delay {
+  transition-delay: 0.08s;
+}
+
+.sr-from-x-item {
+  opacity: 0;
+  transform: translateX(-14px);
+  transition:
+    opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1) var(--sr-delay, 0s),
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1) var(--sr-delay, 0s);
+}
+.sr-from-x-item.sr-inview {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sr-from-x-step {
+  opacity: 0;
+  transform: translateX(-20px);
+  transition:
+    opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1) var(--sr-delay, 0s),
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1) var(--sr-delay, 0s);
+}
+.sr-from-x-step.sr-inview {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sr-scale-pop {
+  opacity: 0;
+  transform: scale(0.88);
+  transition:
+    opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1) var(--sr-delay, 0s),
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1) var(--sr-delay, 0s);
+}
+.sr-scale-pop.sr-inview {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.sr-fade {
+  opacity: 0;
+  transition: opacity var(--sr-d, 0.6s) var(--sr-ease, cubic-bezier(0.22, 1, 0.36, 1)) var(--sr-delay, 0s);
+}
+.sr-fade.sr-inview {
+  opacity: 1;
+}
+
+.sr-scale-up {
+  opacity: 0;
+  transform: translateY(30px) scale(0.92);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--sr-delay, 0s),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--sr-delay, 0s);
+}
+.sr-scale-up.sr-inview {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.blog-article-card {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1), transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sr-blog-cards.sr-inview .blog-article-card:nth-child(1) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0s;
+}
+.sr-blog-cards.sr-inview .blog-article-card:nth-child(2) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.12s;
+}
+.sr-blog-cards.sr-inview .blog-article-card:nth-child(3) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.24s;
+}
+.sr-blog-cards.sr-inview .blog-article-card:nth-child(4) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.36s;
+}
+
+.blog-slide-layer {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.5s ease;
+}
+
+@keyframes blogExpandIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.blog-expand-body {
+  animation: blogExpandIn 0.35s ease forwards;
+}
+
+@keyframes faqItemIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.faq-item-enter {
+  opacity: 0;
+  animation: faqItemIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.faq-item-enter:nth-child(1) {
+  animation-delay: 0s;
+}
+.faq-item-enter:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.faq-item-enter:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.faq-item-enter:nth-child(4) {
+  animation-delay: 0.18s;
+}
+.faq-item-enter:nth-child(5) {
+  animation-delay: 0.24s;
+}
+.faq-item-enter:nth-child(6) {
+  animation-delay: 0.3s;
+}
+.faq-item-enter:nth-child(7) {
+  animation-delay: 0.36s;
+}
+.faq-item-enter:nth-child(8) {
+  animation-delay: 0.42s;
+}
+
+.outcome-card-sr {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1), transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sr-outcomes.sr-inview .outcome-card-sr:nth-child(1) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.05s;
+}
+.sr-outcomes.sr-inview .outcome-card-sr:nth-child(2) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.1s;
+}
+.sr-outcomes.sr-inview .outcome-card-sr:nth-child(3) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.15s;
+}
+.sr-outcomes.sr-inview .outcome-card-sr:nth-child(4) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.2s;
+}
+.sr-outcomes.sr-inview .outcome-card-sr:nth-child(5) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.25s;
+}
+.sr-outcomes.sr-inview .outcome-card-sr:nth-child(6) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.3s;
+}
+.sr-outcomes.sr-inview .outcome-card-sr:nth-child(7) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.35s;
+}
+.sr-outcomes.sr-inview .outcome-card-sr:nth-child(8) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.4s;
+}
+
+@keyframes spGlowPulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 0.65;
+  }
+}
+.sp-glow-blob {
+  animation: spGlowPulse 4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-glow-blob {
+    animation: none;
+    opacity: 0.5;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes spStatusPing {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+.sp-status-ping {
+  animation: spStatusPing 1.6s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-status-ping {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+@keyframes spBarShimmer {
+  0%,
+  100% {
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.sp-bar-shimmer {
+  animation: spBarShimmer 2.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-bar-shimmer {
+    animation: none;
+    opacity: 0.2;
+  }
+}
+
+.sr-nomotion .sr-from-y,
+.sr-nomotion .sr-from-x-n,
+.sr-nomotion .sr-from-x-p,
+.sr-nomotion .sr-from-x-item,
+.sr-nomotion .sr-from-x-step,
+.sr-nomotion .sr-scale-pop,
+.sr-nomotion .sr-fade,
+.sr-nomotion .sr-scale-up,
+.sr-nomotion .blog-article-card {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+}
+.sr-nomotion .sr-blog-cards.sr-inview .blog-article-card {
+  opacity: 1 !important;
+  transform: none !important;
+}
+.sr-nomotion .sr-outcomes.sr-inview .outcome-card-sr {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+.sr-nomotion .faq-item-enter {
+  opacity: 1 !important;
+  animation: none !important;
+  transform: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sr-from-y:not(.sr-inview),
+  .sr-from-x-n:not(.sr-inview),
+  .sr-from-x-p:not(.sr-inview),
+  .sr-from-x-item:not(.sr-inview),
+  .sr-from-x-step:not(.sr-inview),
+  .sr-scale-pop:not(.sr-inview),
+  .sr-fade:not(.sr-inview),
+  .sr-scale-up:not(.sr-inview) {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .sr-blog-cards .blog-article-card {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .sr-outcomes .outcome-card-sr {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .faq-item-enter {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
 /* Hero VSL: box-shadow samo preko CSS :hover — manje React re-rendera na mousemove */
 .hero-vsl-frame {
   box-shadow: 0 16px 50px rgba(0, 0, 0, 0.6);

@@ -1,8 +1,9 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
 import { useRef, useState } from "react";
 import { Plus, Minus } from "lucide-react";
+import { useInView } from "@/lib/use-in-view";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 const faqs = [
   {
@@ -31,20 +32,19 @@ const faqs = [
   },
 ];
 
-function FAQItem({ q, a, index }: { q: string; a: string; index: number }) {
+function FAQItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.06 }}
+    <div
+      className="faq-item-enter"
       style={{
         borderBottom: "1px solid rgba(255,255,255,0.05)",
         overflow: "hidden",
       }}
     >
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         style={{
           width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -76,23 +76,20 @@ function FAQItem({ q, a, index }: { q: string; a: string; index: number }) {
           {a}
         </p>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
 export default function FAQSection() {
-  const ref = useRef(null);
+  const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.1 });
+  const reduced = useReducedMotion();
+  const iv = inView || reduced;
 
   return (
-    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "100px 24px", contentVisibility: "auto", containIntrinsicSize: "auto 550px" }}>
+    <section ref={ref} className={reduced ? "sr-nomotion" : undefined} style={{ position: "relative", zIndex: 10, padding: "100px 24px", contentVisibility: "auto", containIntrinsicSize: "auto 550px" }}>
       <div className="section-container" style={{ maxWidth: 720 }}>
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.65 }}
-          style={{ textAlign: "center", marginBottom: 48 }}
-        >
+        <div className={`sr-from-y sr-from-y-xl sr-ease ${iv ? "sr-inview" : ""}`} style={{ textAlign: "center", marginBottom: 48 }}>
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 8,
             background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
@@ -104,12 +101,12 @@ export default function FAQSection() {
           <h2 style={{ fontSize: "clamp(26px, 4.5vw, 44px)", fontWeight: 800, lineHeight: 1.15 }}>
             Imaš pitanja? <span style={{ color: "#00d4ff" }}>Mi imamo odgovore.</span>
           </h2>
-        </motion.div>
+        </div>
 
-        {inView && (
+        {(inView || reduced) && (
           <div>
             {faqs.map((item, i) => (
-              <FAQItem key={i} q={item.q} a={item.a} index={i} />
+              <FAQItem key={i} q={item.q} a={item.a} />
             ))}
           </div>
         )}

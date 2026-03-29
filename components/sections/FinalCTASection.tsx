@@ -1,16 +1,18 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
-import { useRef } from "react";
+import { useRef, type CSSProperties } from "react";
 import EmailForm from "@/components/ui/EmailForm";
+import { useInView } from "@/lib/use-in-view";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 export default function FinalCTASection() {
-  const ref = useRef(null);
+  const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.2 });
+  const reduced = useReducedMotion();
+  const iv = inView || reduced;
 
   return (
-    <section ref={ref} id="final-cta" style={{ position: "relative", zIndex: 10, padding: "140px 24px", textAlign: "center", overflow: "hidden", contentVisibility: "auto", containIntrinsicSize: "auto 500px" }}>
-      {/* Dramatic background glow */}
+    <section ref={ref} id="final-cta" className={reduced ? "sr-nomotion" : undefined} style={{ position: "relative", zIndex: 10, padding: "140px 24px", textAlign: "center", overflow: "hidden", contentVisibility: "auto", containIntrinsicSize: "auto 500px" }}>
       <div style={{
         position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
         width: 700, height: 700, borderRadius: "50%",
@@ -24,7 +26,7 @@ export default function FinalCTASection() {
       }} />
 
       <div className="section-container" style={{ maxWidth: 660, position: "relative" }}>
-        <motion.div initial={{ opacity: 0, y: 25 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.7 }}>
+        <div className={`sr-from-y sr-from-y-xl sr-ease ${iv ? "sr-inview" : ""}`}>
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 8,
             background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.12)",
@@ -44,10 +46,13 @@ export default function FinalCTASection() {
             Svaki dan čekanja je dan prednosti za nekog drugog. Ako želiš sistem
             koji te vodi od nule do pravih AI projekata. Kreni sada.
           </p>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.5, delay: 0.15 }}>
+        </div>
+        <div
+          className={`sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
+          style={{ transitionDelay: reduced ? "0s" : "0.15s" } as CSSProperties}
+        >
           <EmailForm microcopy="10 sekundi. Bez spama." />
-        </motion.div>
+        </div>
       </div>
     </section>
   );

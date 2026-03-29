@@ -7,6 +7,7 @@ import { getServerCdnUrl } from "@/lib/bunny-cdn-sign";
 import {
   CDN_PATH_HERO_BG,
   CDN_PATH_EXPLAINER_MP4,
+  CDN_EXPLAINER_CACHE_TAG,
   CDN_PATH_SHOWCASE_ROW1,
   CDN_PATH_SHOWCASE_ROW2,
 } from "@/lib/video-cdn-paths";
@@ -34,9 +35,6 @@ const FinalCTASection = dynamic(() => import("@/components/sections/FinalCTASect
   loading: sectionLoad,
 });
 const BlogSection = dynamic(() => import("@/components/sections/BlogSection"), { loading: sectionLoad });
-const AffiliateSection = dynamic(() => import("@/components/sections/AffiliateSection"), {
-  loading: sectionLoad,
-});
 const VideoShowcaseSection = dynamic(() => import("@/components/sections/VideoShowcaseSection"), {
   loading: sectionLoad,
 });
@@ -63,13 +61,13 @@ export default function Home() {
       }
     : {
         bgMp4: getServerCdnUrl(CDN_PATH_HERO_BG),
-        explainerMp4: getServerCdnUrl(CDN_PATH_EXPLAINER_MP4),
+        explainerMp4: getServerCdnUrl(CDN_PATH_EXPLAINER_MP4, undefined, CDN_EXPLAINER_CACHE_TAG),
       };
   const showcaseRow1Urls = CDN_PATH_SHOWCASE_ROW1.map((p) => getServerCdnUrl(p));
   const showcaseRow2Urls = CDN_PATH_SHOWCASE_ROW2.map((p) => getServerCdnUrl(p));
 
   return (
-    <div style={{ position: "relative", minHeight: "100vh", contain: "layout" }}>
+    <div style={{ position: "relative", minHeight: "100vh" }}>
       <Header />
       <main style={{ position: "relative", zIndex: 1 }}>
         <HeroSection mediaUrls={heroMedia} />
@@ -98,7 +96,6 @@ export default function Home() {
         <div className="section-divider" />
         <FinalCTASection />
         <div className="section-divider" />
-        <AffiliateSection />
       </main>
       <Footer />
       {/* Desktop-only: mobile CTA bar skriven */}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useInView, useReducedMotion } from "framer-motion";
 import { useRef, useEffect, useState, memo, useCallback } from "react";
+import { useInView } from "@/lib/use-in-view";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 import Image from "next/image";
 import { Sparkles } from "lucide-react";
 import { getCdnMediaUrl } from "@/lib/cdn-media";
@@ -37,47 +38,45 @@ const LogoFallback = () => (
   </div>
 );
 
-/**
- * Gornji red: pun video (play + heavy preload kad je u kadru).
- * Donji red ista marquee animacija; kartice su „still“ — isti MP4 fajl, samo prvi kadar (metadata), bez puštanja.
- */
-const CARD_PLAY_IO_MARGIN = "180px 0px 180px 0px";
-const CARD_PLAY_THRESHOLDS = [0, 0.02, 0.08, 0.2, 0.45, 0.75, 1];
-const PAUSE_DEBOUNCE_MS = 260;
-const WARMUP_STAGGER_MS = 140;
 /** Posle ovog mirnog prozora ponovo puštamo CSS marquee (manje GPU pri skrolu). */
 const SCROLL_IDLE_RESUME_MS = 420;
-const WARMUP_MAX_DELAY_MS = 9000;
 const LOAD_REVEAL_FALLBACK_MS = 12_000;
+const LAZY_SRC_ROOT_MARGIN = "80px 160px 80px 160px";
 
 const VideoCard = memo(function VideoCard({
+  instanceKey,
   src,
   reduced,
   sectionInView,
-  marqueePaused,
-  warmupIndex,
-  stillPreview = false,
+  hoverLoop = false,
+  autoPlayContest = false,
+  autoPlayActive = false,
+  allowAutoPlay = true,
+  onVisibilityRatio,
 }: {
+  instanceKey: string;
   src: string;
   reduced: boolean;
   sectionInView: boolean;
-  marqueePaused: boolean;
-  /** Redosled provere učitavanja kad je sekcija u kadru (širi raspored u vremenu). */
-  warmupIndex: number;
-  /** Samo statičan kadar (bez play / auto buffer) — ista MP4 putanja. */
-  stillPreview?: boolean;
+  /** Donji red: puštanje na hover (desktop). */
+  hoverLoop?: boolean;
+  /** Gornji red: kartica učešćuje u izboru koji 2 klipa rade automatski. */
+  autoPlayContest?: boolean;
+  autoPlayActive?: boolean;
+  /** Za auto red: false kad je marquee zbog skrola ili sekcija van kadra. */
+  allowAutoPlay?: boolean;
+  onVisibilityRatio?: (key: string, ratio: number) => void;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [videoSrc, setVideoSrc] = useState(src);
-  const [heavyPreload, setHeavyPreload] = useState(false);
+  /** Ne vezuj src dok kartica nije blizu viewporta — ne povlači sve mp4 odjednom. */
+  const [srcAttached, setSrcAttached] = useState(false);
+  const [hoverPlaying, setHoverPlaying] = useState(false);
   const didMarkLoaded = useRef(false);
   const errorRetries = useRef(0);
-  const wantPlayRef = useRef(false);
-  const pauseDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const heavyPreloadBoostedRef = useRef(false);
 
   useEffect(() => {
     setVideoSrc(src);
@@ -85,8 +84,8 @@ const VideoCard = memo(function VideoCard({
     didMarkLoaded.current = false;
     setLoaded(false);
     setFailed(false);
-    setHeavyPreload(false);
-    heavyPreloadBoostedRef.current = false;
+    setSrcAttached(false);
+    setHoverPlaying(false);
   }, [src]);
 
   const markLoaded = useCallback(() => {
@@ -95,108 +94,69 @@ const VideoCard = memo(function VideoCard({
     setLoaded(true);
   }, []);
 
-  const hardPause = useCallback(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.pause();
-  }, []);
-
-  const clearPauseDebounce = useCallback(() => {
-    if (pauseDebounceRef.current != null) {
-      clearTimeout(pauseDebounceRef.current);
-      pauseDebounceRef.current = null;
-    }
-  }, []);
-
   useEffect(() => {
-    if (reduced || failed || stillPreview) return;
-    const card = cardRef.current;
-    const v = videoRef.current;
-    if (!card || !v) return;
-
-    const kickPlay = () => {
-      if (v.readyState === HTMLMediaElement.HAVE_NOTHING) {
-        try {
-          v.load();
-        } catch {
-          /* ignore */
-        }
-      }
-      void v.play().catch(() => {});
-    };
-
+    if (reduced || failed) return;
+    const el = cardRef.current;
+    if (!el) return;
     const io = new IntersectionObserver(
-      ([entry]) => {
-        const wantPlay =
-          sectionInView && !marqueePaused && entry.isIntersecting;
-        wantPlayRef.current = wantPlay;
-
-        if (wantPlay) {
-          clearPauseDebounce();
-          if (!heavyPreloadBoostedRef.current) {
-            heavyPreloadBoostedRef.current = true;
-            setHeavyPreload(true);
-          }
-          kickPlay();
-        } else {
-          clearPauseDebounce();
-          pauseDebounceRef.current = setTimeout(() => {
-            pauseDebounceRef.current = null;
-            if (!wantPlayRef.current) v.pause();
-          }, PAUSE_DEBOUNCE_MS);
-        }
+      ([e]) => {
+        if (e.isIntersecting) setSrcAttached(true);
       },
-      { root: null, rootMargin: CARD_PLAY_IO_MARGIN, threshold: CARD_PLAY_THRESHOLDS }
+      { root: null, rootMargin: LAZY_SRC_ROOT_MARGIN, threshold: 0 }
     );
-
-    io.observe(card);
-    return () => {
-      clearPauseDebounce();
-      io.disconnect();
-    };
-  }, [reduced, failed, stillPreview, sectionInView, marqueePaused, clearPauseDebounce]);
+    io.observe(el);
+    return () => io.disconnect();
+  }, [reduced, failed]);
 
   useEffect(() => {
-    if (reduced || failed || stillPreview) return;
-    if (!sectionInView || marqueePaused) {
-      clearPauseDebounce();
-      wantPlayRef.current = false;
-      hardPause();
-    }
-  }, [sectionInView, marqueePaused, reduced, failed, stillPreview, hardPause, clearPauseDebounce]);
+    if (reduced || failed || !autoPlayContest || !onVisibilityRatio) return;
+    const el = cardRef.current;
+    if (!el) return;
+    const thresholds = [0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95, 1];
+    const io = new IntersectionObserver(
+      (entries) => {
+        const e = entries[0];
+        if (!e) return;
+        onVisibilityRatio(instanceKey, e.intersectionRatio);
+      },
+      { root: null, rootMargin: "0px", threshold: thresholds }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [reduced, failed, autoPlayContest, onVisibilityRatio, instanceKey]);
 
-  /** Forsiraj skidanje metapodataka za off-screen kartice u marquee-u (still: samo lagano). */
   useEffect(() => {
-    if (reduced || failed || !sectionInView) return;
+    if (!hoverLoop) return;
+    if (!sectionInView) setHoverPlaying(false);
+  }, [sectionInView, hoverLoop]);
+
+  const shouldPlay =
+    (hoverLoop && hoverPlaying) || (autoPlayContest && autoPlayActive && allowAutoPlay);
+
+  useEffect(() => {
     const v = videoRef.current;
-    if (!v) return;
-    const delay = Math.min(warmupIndex * WARMUP_STAGGER_MS, WARMUP_MAX_DELAY_MS);
-    const idleTimeout = stillPreview ? 14_000 : 10_000;
-    const t = window.setTimeout(() => {
-      const run = () => {
-        try {
-          v.load();
-        } catch {
-          /* ignore */
-        }
-      };
-      if (typeof window.requestIdleCallback === "function") {
-        window.requestIdleCallback(run, { timeout: idleTimeout });
-      } else {
-        run();
+    if (!v || failed || !srcAttached) return;
+    if (shouldPlay) {
+      v.preload = "auto";
+      void v.play().catch(() => {});
+    } else {
+      v.pause();
+      try {
+        v.currentTime = 0.001;
+      } catch {
+        /* ignore */
       }
-    }, delay);
-    return () => clearTimeout(t);
-  }, [sectionInView, reduced, failed, stillPreview, warmupIndex, src]);
+      v.preload = "metadata";
+    }
+  }, [shouldPlay, failed, srcAttached, videoSrc]);
 
-  /** Ako CDN sporije odgovara, ipak skloni logo da ne stoji zauvek. */
   useEffect(() => {
-    if (reduced || failed || !sectionInView || loaded) return;
+    if (reduced || failed || !sectionInView || loaded || !srcAttached) return;
     const t = window.setTimeout(() => {
       if (!didMarkLoaded.current) markLoaded();
     }, LOAD_REVEAL_FALLBACK_MS);
     return () => clearTimeout(t);
-  }, [sectionInView, reduced, failed, loaded, markLoaded]);
+  }, [sectionInView, reduced, failed, loaded, markLoaded, srcAttached]);
 
   if (reduced) {
     return (
@@ -231,19 +191,29 @@ const VideoCard = memo(function VideoCard({
         position: "relative",
         isolation: "isolate",
         transition: "border-color 0.2s ease, box-shadow 0.2s ease",
-        cursor: "default",
+        cursor: hoverLoop ? "pointer" : "default",
         background: VIDEO_CARD_BG,
       }}
+      onPointerEnter={() => {
+        if (!hoverLoop) return;
+        if (typeof window === "undefined") return;
+        if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+        setHoverPlaying(true);
+      }}
+      onPointerLeave={() => {
+        if (!hoverLoop) return;
+        setHoverPlaying(false);
+      }}
     >
-      {!failed && (
+      {!failed && srcAttached && (
         <video
           ref={videoRef}
           src={videoSrc}
           muted
-          loop={!stillPreview}
+          loop={shouldPlay}
           playsInline
           disableRemotePlayback
-          preload={stillPreview ? "metadata" : heavyPreload ? "auto" : "metadata"}
+          preload={shouldPlay ? "auto" : "metadata"}
           onError={() => {
             if (errorRetries.current >= 1) {
               setFailed(true);
@@ -264,7 +234,7 @@ const VideoCard = memo(function VideoCard({
           }}
           onStalled={() => {
             const v = videoRef.current;
-            if (!v || failed || stillPreview) return;
+            if (!v || failed || !shouldPlay) return;
             try {
               v.load();
             } catch {
@@ -273,7 +243,7 @@ const VideoCard = memo(function VideoCard({
           }}
           onWaiting={() => {
             const v = videoRef.current;
-            if (!v || failed || stillPreview || !wantPlayRef.current) return;
+            if (!v || failed || !shouldPlay) return;
             void v.play().catch(() => {});
           }}
           onProgress={() => {
@@ -290,18 +260,18 @@ const VideoCard = memo(function VideoCard({
             if (!v) return;
             try {
               v.currentTime = 0.001;
-              if (stillPreview) v.pause();
+              if (!shouldPlay) v.pause();
             } catch {
               /* ignore */
             }
             markLoaded();
           }}
           onLoadedData={() => {
-            if (stillPreview) videoRef.current?.pause();
+            if (!shouldPlay) videoRef.current?.pause();
             markLoaded();
           }}
           onCanPlay={() => {
-            if (stillPreview) videoRef.current?.pause();
+            if (!shouldPlay) videoRef.current?.pause();
             markLoaded();
           }}
           style={{
@@ -320,7 +290,7 @@ const VideoCard = memo(function VideoCard({
           }}
         />
       )}
-      {!failed && !loaded && (
+      {!failed && (!srcAttached || !loaded) && (
         <div
           style={{
             position: "absolute",
@@ -338,32 +308,101 @@ const VideoCard = memo(function VideoCard({
 
 const DRAG_SNAP_MS = 220;
 
+function pickTopVisibleNonAdjacent(entries: [string, number][], maxSlots: number): string[] {
+  const picked: string[] = [];
+  for (const [k] of entries) {
+    if (picked.length >= maxSlots) break;
+    const idx = Number(k);
+    if (!Number.isInteger(idx)) continue;
+    if (picked.some((pk) => Math.abs(Number(pk) - idx) <= 1)) continue;
+    picked.push(k);
+  }
+  return picked;
+}
+
 function VideoRow({
   videos,
   reverse = false,
   paused = false,
   reduced,
   sectionInView,
-  warmupSlotOffset = 0,
-  stillPreview = false,
+  hoverLoop = false,
+  autoPlayWinnerCount = 0,
+  autoPlayWinnerCountDesktop,
 }: {
   videos: string[];
   reverse?: boolean;
   paused?: boolean;
   reduced: boolean;
   sectionInView: boolean;
-  /** Indeksi za stagger load-a u drugom redu (row1.length * 2). */
-  warmupSlotOffset?: number;
-  /** Donji red: isti marquee, ali kartice kao statičan kadar bez puštanja videa. */
-  stillPreview?: boolean;
+  hoverLoop?: boolean;
+  /** Mobilni / podrazumevano: najviše ovoliko autoplay (najvidljivije). */
+  autoPlayWinnerCount?: number;
+  /** Desktop: više autoplay; ako je veće od autoPlayWinnerCount, biraju se bez susednih kartica. */
+  autoPlayWinnerCountDesktop?: number;
 }) {
   const items = [...videos, ...videos];
-  const [dragOffset, setDragOffset] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(max-width: 768px)").matches;
   });
+
+  const mobileSlots = reduced ? 0 : (autoPlayWinnerCount ?? 0);
+  const desktopSlots = reduced ? 0 : (autoPlayWinnerCountDesktop ?? autoPlayWinnerCount ?? 0);
+  const contestSlots = isMobile ? mobileSlots : desktopSlots;
+  const useSpacedDesktopPick =
+    !isMobile &&
+    !reduced &&
+    (autoPlayWinnerCountDesktop ?? 0) > (autoPlayWinnerCount ?? 0);
+
+  const visibilityRef = useRef<Map<string, number>>(new Map());
+  const rafPickRef = useRef(0);
+  const [winnerKeys, setWinnerKeys] = useState<Set<string>>(() => new Set());
+
+  const flushWinnerPick = useCallback(() => {
+    if (contestSlots <= 0) {
+      setWinnerKeys(new Set());
+      return;
+    }
+    const entries = [...visibilityRef.current.entries()]
+      .filter(([, r]) => r > 0.02)
+      .sort((a, b) => b[1] - a[1]);
+    const picked = useSpacedDesktopPick
+      ? pickTopVisibleNonAdjacent(entries, contestSlots)
+      : entries.slice(0, contestSlots).map(([k]) => k);
+    const next = new Set(picked);
+    setWinnerKeys((prev) => {
+      if (prev.size !== next.size) return next;
+      for (const k of next) {
+        if (!prev.has(k)) return next;
+      }
+      return prev;
+    });
+  }, [contestSlots, useSpacedDesktopPick]);
+
+  const reportVisibility = useCallback(
+    (key: string, ratio: number) => {
+      if (contestSlots <= 0) return;
+      if (ratio < 0.02) visibilityRef.current.delete(key);
+      else visibilityRef.current.set(key, ratio);
+
+      if (rafPickRef.current) return;
+      rafPickRef.current = requestAnimationFrame(() => {
+        rafPickRef.current = 0;
+        flushWinnerPick();
+      });
+    },
+    [contestSlots, flushWinnerPick]
+  );
+
+  useEffect(() => {
+    flushWinnerPick();
+  }, [isMobile, flushWinnerPick]);
+
+  const allowAutoPlay = sectionInView && !paused;
+
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const lastX = useRef(0);
   const pendingOffset = useRef(0);
   const rafRef = useRef<number | 0>(0);
@@ -374,6 +413,9 @@ function VideoRow({
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);
   }, []);
+
+  /** Telefon: bez hover-play u redu (cela prva traka ostaje kao ranije — marquee + autoplay po vidljivosti). Desktop: hover kao i do sada. */
+  const hoverLoopEffective = hoverLoop && !isMobile;
 
   const onTouchStart = (e: React.TouchEvent) => {
     if (!isMobile) return;
@@ -465,17 +507,23 @@ function VideoRow({
             transition: !isDragging ? `transform ${DRAG_SNAP_MS}ms cubic-bezier(0.22, 1, 0.36, 1)` : "none",
           }}
         >
-          {items.map((videoSrc, i) => (
-            <VideoCard
-              key={`${videoSrc}-${i}`}
-              src={videoSrc}
-              reduced={reduced}
-              sectionInView={sectionInView}
-              marqueePaused={paused}
-              warmupIndex={warmupSlotOffset + i}
-              stillPreview={stillPreview}
-            />
-          ))}
+          {items.map((videoSrc, i) => {
+            const instanceKey = String(i);
+            return (
+              <VideoCard
+                key={`${videoSrc}-${i}`}
+                instanceKey={instanceKey}
+                src={videoSrc}
+                reduced={reduced}
+                sectionInView={sectionInView}
+                hoverLoop={hoverLoopEffective}
+                autoPlayContest={contestSlots > 0}
+                autoPlayActive={winnerKeys.has(instanceKey)}
+                allowAutoPlay={allowAutoPlay}
+                onVisibilityRatio={contestSlots > 0 ? reportVisibility : undefined}
+              />
+            );
+          })}
         </div>
       </div>
       {/* Isto kao meki ivičnjak kao mask, ali bez skupe mask-kompozicije pri skrolu */}
@@ -525,8 +573,7 @@ export default function VideoShowcaseSection({
   const ref = useRef(null);
   /** Širi „prozor“ da se play/pause ne okida na border skrola (manje treperenja). */
   const inView = useInView(ref, { once: false, amount: 0.08, margin: "140px 0px 200px 0px" });
-  const reducedMotion = useReducedMotion();
-  const reduced = reducedMotion ?? false;
+  const reduced = useReducedMotion();
   const sectionInView = inView ?? false;
 
   const [hasBeenVisible, setHasBeenVisible] = useState(false);
@@ -659,6 +706,9 @@ export default function VideoShowcaseSection({
           paused={pauseMarquee}
           reduced={reduced}
           sectionInView={sectionInView}
+          hoverLoop
+          autoPlayWinnerCount={2}
+          autoPlayWinnerCountDesktop={4}
         />
       </div>
 
@@ -672,11 +722,10 @@ export default function VideoShowcaseSection({
         <VideoRow
           videos={row2}
           reverse
-          stillPreview
+          hoverLoop
           paused={pauseMarquee}
           reduced={reduced}
           sectionInView={sectionInView}
-          warmupSlotOffset={row1.length * 2}
         />
       </div>
     </section>

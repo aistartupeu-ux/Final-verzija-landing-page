@@ -1,15 +1,14 @@
 "use client";
 
-import { motion, useInView, useReducedMotion } from "framer-motion";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, type CSSProperties } from "react";
 import { Eye, Users, Play, BookOpen, Award, Zap } from "lucide-react";
+import { useInView } from "@/lib/use-in-view";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
-// ── Waitlist: startujemo od ~1200 ljudi, max ~50 dnevno, kroz ceo dan po +1 do +3 ──
-const START_DATE = new Date(2026, 2, 11, 0, 0, 0); // 11. mart 2026
+const START_DATE = new Date(2026, 2, 11, 0, 0, 0);
 const START_VALUE = 1200;
 
-// ── Progress bar: krece malo vise od pola (58%), puni se do zadnjeg sata/minuta/sekunde ──
-const COUNTDOWN_END = new Date(2026, 3, 15, 0, 0, 0); // 15. april 00:00 — kurs se otvara, isti kao Hero
+const COUNTDOWN_END = new Date(2026, 3, 15, 0, 0, 0);
 const BAR_START_PCT = 58;
 
 function getBarProgress(): number {
@@ -31,14 +30,12 @@ function getDaysSinceStart(d: Date): number {
   return Math.floor((day - start) / 86400000);
 }
 
-/** Dnevni limit: max 40 ljudi (deterministički po danu) */
 function getDailyLimit(dayIndex: number): number {
-  const base = 25;      // minimalno 25
-  const spread = 16;    // 25–40 ljudi dnevno
+  const base = 25;
+  const spread = 16;
   return base + ((dayIndex * 7919 + 31) % spread);
 }
 
-/** Ease-in-out za glatak rast kroz dan */
 function easeInOut(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 }
@@ -61,8 +58,6 @@ function getWaitlistCount(): number {
 
   const computed = baseAtMidnight + todayAdded;
 
-  // Ne dozvoljavamo da broj ide unazad u ovom browseru:
-  // upoređujemo sa lokalno sačuvanim maksimumom i uvek vraćamo veću vrednost.
   try {
     const key = "aha_waitlist_max_v1";
     const storedRaw = window.localStorage.getItem(key);
@@ -75,7 +70,6 @@ function getWaitlistCount(): number {
   }
 }
 
-// ── Ticker data ───────────────────────────────────────────────────────────────
 const ticks = [
   { icon: Eye,      value: "2.1M+", label: "Pregleda",    color: "#00d4ff" },
   { icon: Users,    value: "48K+",  label: "Pratilaca",   color: "#a855f7" },
@@ -85,12 +79,11 @@ const ticks = [
   { icon: Zap,      value: "100%",  label: "Prakticno",   color: "#22c55e" },
 ];
 
-// ── Main component ────────────────────────────────────────────────────────────
 export default function SocialProofSection() {
-  const ref    = useRef(null);
+  const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: false, amount: 0.15 });
-  const reduced = useReducedMotion();
-  const heavyOk = inView && !reduced;
+  const reducedHook = useReducedMotion();
+  const heavyOk = inView && !reducedHook;
 
   const [waitlist, setWaitlist] = useState(() => {
     if (typeof window === "undefined") return START_VALUE;
@@ -98,7 +91,6 @@ export default function SocialProofSection() {
   });
   const [barProgress, setBarProgress] = useState(() => getBarProgress());
 
-  // Osveži svakih 2–4 min da broj raste po +1 do +3 kroz dan
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>;
     const tick = () => {
@@ -109,10 +101,8 @@ export default function SocialProofSection() {
     return () => clearTimeout(t);
   }, []);
 
-  // Progress bar: osvežava svake sekunde (do zadnjeg sata, minuta, sekunde → 100%)
   useEffect(() => {
     const r = window.setTimeout(() => setBarProgress(getBarProgress()), 0);
-    // When offscreen / low-end: refresh less frequently to reduce main-thread work.
     const ms = heavyOk ? 1000 : 10000;
     const i = setInterval(() => setBarProgress(getBarProgress()), ms);
     return () => {
@@ -121,17 +111,15 @@ export default function SocialProofSection() {
     };
   }, [heavyOk]);
 
-  // Duplicate for seamless loop
   const tickItems = heavyOk ? [...ticks, ...ticks, ...ticks] : ticks;
+  const barWidth = inView ? barProgress : BAR_START_PCT;
+  const iv = inView || reducedHook;
 
   return (
-    <section ref={ref} style={{ position: "relative", zIndex: 10, padding: "80px 0 100px", overflow: "hidden", contentVisibility: "auto", containIntrinsicSize: "auto 600px" }}>
+    <section ref={ref} className={reducedHook ? "sr-nomotion" : undefined} style={{ position: "relative", zIndex: 10, padding: "80px 0 100px", overflow: "hidden", contentVisibility: "auto", containIntrinsicSize: "auto 600px" }}>
 
-      {/* ── TICKER TAPE ──────────────────────────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={inView ? { opacity: 1 } : {}}
-        transition={{ duration: 0.6 }}
+      <div
+        className={`sr-fade sr-ease ${iv ? "sr-inview" : ""}`}
         style={{
           borderTop:    "1px solid rgba(255,255,255,0.05)",
           borderBottom: "1px solid rgba(255,255,255,0.05)",
@@ -141,7 +129,8 @@ export default function SocialProofSection() {
           maskImage:        "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
           WebkitMaskImage:  "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
           overflow: "hidden",
-        }}
+          "--sr-d": "0.6s",
+        } as CSSProperties}
       >
         <style>{`
           @keyframes ticker { from { transform: translateX(0) } to { transform: translateX(-33.333%) } }
@@ -154,7 +143,6 @@ export default function SocialProofSection() {
             const Icon = t.icon;
             return (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 28, paddingRight: 40, flexShrink: 0 }}>
-                {/* Stat pill */}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, whiteSpace: "nowrap" }}>
                   <div style={{
                     width: 30, height: 30, borderRadius: 9,
@@ -170,25 +158,20 @@ export default function SocialProofSection() {
                   }}>{t.value}</span>
                   <span style={{ fontSize: 12, color: "#555", fontWeight: 500 }}>{t.label}</span>
                 </div>
-                {/* Diamond divider */}
                 <div style={{ width: 4, height: 4, borderRadius: 1, background: "rgba(255,255,255,0.1)", transform: "rotate(45deg)", flexShrink: 0 }} />
               </div>
             );
           })}
         </div>
-      </motion.div>
+      </div>
 
-      {/* ── GIANT WAITLIST NUMBER ─────────────────────────────────────────── */}
       <div style={{ textAlign: "center", position: "relative", padding: "0 24px" }}>
 
-        {/* Breathing glow blob */}
         {heavyOk ? (
-          <motion.div
-            animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.65, 0.4] }}
-            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          <div
+            className="sp-glow-blob"
             style={{
               position: "absolute", top: "50%", left: "50%",
-              transform: "translate(-50%, -50%)",
               width: 500, height: 300, borderRadius: "50%",
               background: "radial-gradient(ellipse, rgba(0,212,255,0.12) 0%, rgba(139,92,246,0.06) 50%, transparent 75%)",
               pointerEvents: "none", filter: "blur(30px)",
@@ -196,32 +179,20 @@ export default function SocialProofSection() {
           />
         ) : null}
 
-        {/* UZIVO badge */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 24, position: "relative" }}
+        <div
+          className={`sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 24, position: "relative", transitionDelay: reducedHook ? "0s" : "0.1s" }}
         >
           <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 10, height: 10 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", display: "block", position: "relative", zIndex: 1 }} />
-            {heavyOk ? (
-              <motion.span
-                animate={{ scale: [1, 2.2], opacity: [0.6, 0] }}
-                transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
-                style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(34,197,94,0.5)" }}
-              />
-            ) : null}
+            {heavyOk ? <span className="sp-status-ping" style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(34,197,94,0.5)" }} /> : null}
           </span>
           <span style={{ fontSize: 11, fontWeight: 700, color: "#22c55e", textTransform: "uppercase" as const, letterSpacing: "0.18em" }}>Uzivo</span>
-        </motion.div>
+        </div>
 
-        {/* Giant number */}
-        <motion.div
-          initial={{ opacity: 0, y: 30, scale: 0.92 }}
-          animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
-          transition={{ duration: 0.7, delay: 0.2 }}
-          style={{ position: "relative", lineHeight: 1, marginBottom: 12 }}
+        <div
+          className={`sr-scale-up ${iv ? "sr-inview" : ""}`}
+          style={{ position: "relative", lineHeight: 1, marginBottom: 12, "--sr-delay": reducedHook ? "0s" : "0.2s" } as CSSProperties}
         >
           <span style={{
             fontSize: "clamp(90px, 18vw, 160px)",
@@ -242,60 +213,53 @@ export default function SocialProofSection() {
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
           }}>+</span>
-        </motion.div>
+        </div>
 
-        {/* Label */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={inView ? { opacity: 1 } : {}}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          style={{ fontSize: "clamp(15px,2vw,18px)", color: "#666", marginBottom: 36, fontWeight: 400 }}
+        <div
+          className={`sr-fade ${iv ? "sr-inview" : ""}`}
+          style={{ fontSize: "clamp(15px,2vw,18px)", color: "#666", marginBottom: 36, fontWeight: 400, "--sr-delay": reducedHook ? "0s" : "0.4s", "--sr-d": "0.5s" } as CSSProperties}
         >
           osoba ceka na kurs
-        </motion.div>
+        </div>
 
-        {/* Progress bar — aktivira se dok brojke rastu, krece od 58%, puni do zadnjeg sata/minuta/sekunde */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.5, delay: 0.5 }}
-          style={{ maxWidth: 440, margin: "0 auto 32px" }}
+        <div
+          className={`sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
+          style={{ maxWidth: 440, margin: "0 auto 32px", transitionDelay: reducedHook ? "0s" : "0.5s" }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 12, color: "#555" }}>
             <span>Lista cekanja</span>
             <span style={{ color: "#00d4ff", fontWeight: 600 }}>{waitlist}</span>
           </div>
           <div style={{ height: 5, borderRadius: 99, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-            <motion.div
-              initial={{ width: `${BAR_START_PCT}%` }}
-              animate={inView ? { width: `${barProgress}%` } : { width: `${BAR_START_PCT}%` }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
+            <div
               style={{
-                height: "100%", borderRadius: 99,
+                height: "100%",
+                width: `${barWidth}%`,
+                borderRadius: 99,
                 background: "linear-gradient(90deg, #00d4ff, #8b5cf6)",
                 boxShadow: "0 0 10px rgba(0,212,255,0.5)",
                 position: "relative",
                 overflow: "hidden",
+                transition: reducedHook ? "none" : "width 0.6s ease-out",
               }}
             >
-              <motion.div
-                animate={{ opacity: [0.1, 0.35, 0.1] }}
-                transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-                style={{
-                  position: "absolute", inset: 0, borderRadius: 99,
-                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)",
-                  pointerEvents: "none",
-                }}
-              />
-            </motion.div>
+              {heavyOk ? (
+                <div
+                  className="sp-bar-shimmer"
+                  style={{
+                    position: "absolute", inset: 0, borderRadius: 99,
+                    background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)",
+                    pointerEvents: "none",
+                  }}
+                />
+              ) : null}
+            </div>
           </div>
-        </motion.div>
+        </div>
 
-        {/* CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.5, delay: 0.65 }}
+        <div
+          className={`sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
+          style={{ transitionDelay: reducedHook ? "0s" : "0.65s" }}
         >
           <a
             href="#"
@@ -316,7 +280,7 @@ export default function SocialProofSection() {
           <div style={{ marginTop: 12, fontSize: 12, color: "#3a3a3a" }}>
             Prijava traje 10 sekundi. Bez kreditne kartice.
           </div>
-        </motion.div>
+        </div>
       </div>
     </section>
   );

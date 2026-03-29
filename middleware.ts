@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { verifyAdminSessionToken } from "@/lib/admin-session";
 import { getAdminAnalyticsSecret } from "@/lib/admin-secret";
 import { getCookieFromHeader } from "@/lib/cookie-header";
+import { arePromoLandingPagesEnabled, isPromoLandingPath } from "@/lib/promo-landing-pages";
 
 /**
  * Napomena: agresivna „bot / WAF” pravila na Vercel-u ili drugom edge-u ponekad daju
@@ -21,6 +22,13 @@ function hasAny(searchParams: URLSearchParams, keys: string[]) {
 
 export async function middleware(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
+
+  if (isPromoLandingPath(pathname) && !arePromoLandingPagesEnabled()) {
+    const home = req.nextUrl.clone();
+    home.pathname = "/";
+    home.search = "";
+    return NextResponse.redirect(home);
+  }
 
   if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
     const expected = getAdminAnalyticsSecret();
@@ -50,5 +58,15 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/lp/:path*", "/admin", "/admin/:path*"],
+  matcher: [
+    "/giveaway",
+    "/free-guide",
+    "/promo/giveaway-10-mesta",
+    "/promo/giveaway-10-mesta/:path*",
+    "/promo/lead-magnet",
+    "/promo/lead-magnet/:path*",
+    "/lp/:path*",
+    "/admin",
+    "/admin/:path*",
+  ],
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useInView } from "framer-motion";
+import { useInView } from "@/lib/use-in-view";
 
 const stats = [
   { value: 500, suffix: "+", label: "Polaznika", sublabel: "na čekanju" },
@@ -34,7 +34,7 @@ function CountUp({ target, suffix, active }: { target: number; suffix: string; a
 }
 
 export default function StatsSection() {
-  const ref = useRef(null);
+  const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.3 });
 
   return (

@@ -1,9 +1,10 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
-import { useRef } from "react";
+import { useRef, type CSSProperties } from "react";
 import { UserPlus, Clock, ShoppingCart, Lock } from "lucide-react";
 import EmailForm from "@/components/ui/EmailForm";
+import { useInView } from "@/lib/use-in-view";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 const steps = [
   { icon: UserPlus, step: "Korak 1", title: "Sada — prijave otvorene", desc: "Prijavljuješ se na listu čekanja i obezbeđuješ svoje mesto.", active: true },
@@ -13,13 +14,15 @@ const steps = [
 ];
 
 export default function HowToEnterSection() {
-  const ref = useRef(null);
+  const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.1 });
+  const reduced = useReducedMotion();
+  const iv = inView || reduced;
 
   return (
-    <section ref={ref} id="kako-funkcionise" style={{ position: "relative", zIndex: 10, padding: "120px 24px", textAlign: "center", contentVisibility: "auto", containIntrinsicSize: "auto 650px" }}>
+    <section ref={ref} id="kako-funkcionise" className={reduced ? "sr-nomotion" : undefined} style={{ position: "relative", zIndex: 10, padding: "120px 24px", textAlign: "center", contentVisibility: "auto", containIntrinsicSize: "auto 650px" }}>
       <div className="section-container" style={{ maxWidth: 720 }}>
-        <motion.div initial={{ opacity: 0, y: 25 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.7 }}>
+        <div className={`sr-from-y sr-from-y-xl sr-ease ${iv ? "sr-inview" : ""}`}>
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 8,
             background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)",
@@ -33,14 +36,17 @@ export default function HowToEnterSection() {
             Kako ulaziš <span style={{ color: "#00d4ff" }}>unutra?</span>
           </h2>
           <p style={{ fontSize: 15, color: "#8a8a9a", marginBottom: 52 }}>Prvo se prijavljuješ. Onda imaš kratki prozor da uđeš u kurs.</p>
-        </motion.div>
+        </div>
 
         <div style={{ position: "relative", textAlign: "left" }}>
           <div style={{ position: "absolute", left: 28, top: 0, bottom: 0, width: 2, background: "linear-gradient(to bottom, rgba(0,212,255,0.3), rgba(124,58,237,0.15), transparent)" }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
             {steps.map((s, i) => (
-              <motion.div key={i} initial={{ opacity: 0, x: -20 }} animate={inView ? { opacity: 1, x: 0 } : {}} transition={{ duration: 0.45, delay: 0.1 + i * 0.12 }}
-                style={{ display: "flex", alignItems: "flex-start", gap: 22, position: "relative" }}>
+              <div
+                key={i}
+                className={`sr-from-x-step ${iv ? "sr-inview" : ""}`}
+                style={{ display: "flex", alignItems: "flex-start", gap: 22, position: "relative", "--sr-delay": reduced ? "0s" : `${0.1 + i * 0.12}s` } as CSSProperties}
+              >
 
                 <div style={{
                   width: 58, height: 58, borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative", zIndex: 2,
@@ -64,14 +70,17 @@ export default function HowToEnterSection() {
                   <div style={{ fontSize: 17, fontWeight: 700, color: "#fff", marginBottom: 4 }}>{s.title}</div>
                   <div style={{ fontSize: 14, color: "#888", lineHeight: 1.6 }}>{s.desc}</div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 15 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.5, delay: 0.6 }} style={{ marginTop: 56 }}>
+        <div
+          className={`sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
+          style={{ marginTop: 56, transitionDelay: reduced ? "0s" : "0.6s" }}
+        >
           <EmailForm />
-        </motion.div>
+        </div>
       </div>
     </section>
   );
