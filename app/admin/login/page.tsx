@@ -30,7 +30,7 @@ export default function AdminLoginPage() {
         return;
       }
       // Pun document load da browser sigurno pošalje HttpOnly kolačić u middleware
-      window.location.assign("/admin/live");
+      window.location.assign("/admin/x7k9m2q4");
     } catch {
       setError("Greška u konekciji.");
     } finally {

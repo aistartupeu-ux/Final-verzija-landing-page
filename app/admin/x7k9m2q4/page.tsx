@@ -1,5 +1,5 @@
 import { AdminAnalyticsDashboard } from "@/components/admin/AdminAnalyticsDashboard";
 
 export default function AdminDashPage() {
-  return <AdminAnalyticsDashboard variant="archive" />;
+  return <AdminAnalyticsDashboard />;
 }
