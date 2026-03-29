@@ -52,37 +52,40 @@ const LogoFallback = () => (
   </div>
 );
 
-const DETACH_DELAY_MS = 900;
-/** Marquee pomerа karticu brzo; previsok prag → <video src> se nikad ne zakači. */
-const ATTACH_MIN_RATIO = 0.06;
-const PLAY_MIN_RATIO = 0.04;
-const IO_THRESHOLDS = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.35, 0.5, 0.75, 1];
-
 /**
- * Marquee drži mnogo kartica u DOM-u (duplirani niz). Bez kontrole, skoro sve
- * istovremeno dobiju <video src> (širok rootMargin + threshold 0) → dekodovanje
- * i mreža gutaju CPU/GPU. Učitavamo MP4 samo kad je kartica stvarno u kadru,
- * skidamo src posle kratke pauze kad izađe, i ne učitavamo pri reduced motion.
+ * Kartice žive unutar CSS marquee (transform animacija). ratio iz IO često „treperi“,
+ * pa za puštanje koristimo samo isIntersecting + širok margin. Preload nije „auto“ na
+ * svim instancama — 40+ MP4 odjednom guši mrežu/dekoder; metadata + play() kad uđe u kadar.
  */
+const CARD_PLAY_IO_MARGIN = "140px 0px 140px 0px";
+const CARD_PLAY_THRESHOLDS = [0, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 1];
+
 const VideoCard = memo(function VideoCard({
   src,
-  allowMedia,
+  reduced,
+  sectionInView,
   marqueePaused,
 }: {
   src: string;
-  allowMedia: boolean;
+  reduced: boolean;
+  sectionInView: boolean;
   marqueePaused: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [attachSrc, setAttachSrc] = useState(false);
-  const visibleRef = useRef(false);
-  const ratioRef = useRef(0);
+  const [videoSrc, setVideoSrc] = useState(src);
   const didMarkLoaded = useRef(false);
-  const detachTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const attachSrcRef = useRef(false);
+  const errorRetries = useRef(0);
+
+  useEffect(() => {
+    setVideoSrc(src);
+    errorRetries.current = 0;
+    didMarkLoaded.current = false;
+    setLoaded(false);
+    setFailed(false);
+  }, [src]);
 
   const markLoaded = useCallback(() => {
     if (didMarkLoaded.current) return;
@@ -90,101 +93,76 @@ const VideoCard = memo(function VideoCard({
     setLoaded(true);
   }, []);
 
-  const clearDetachTimer = useCallback(() => {
-    if (detachTimerRef.current != null) {
-      clearTimeout(detachTimerRef.current);
-      detachTimerRef.current = null;
-    }
-  }, []);
-
-  const detachVideo = useCallback(() => {
-    clearDetachTimer();
-    attachSrcRef.current = false;
-    setAttachSrc(false);
+  const tryPlay = useCallback(() => {
     const v = videoRef.current;
-    if (v) {
-      v.pause();
-      v.removeAttribute("src");
-      v.load();
+    if (!v || failed || !loaded) return;
+    if (v.readyState < 2) {
+      try {
+        v.load();
+      } catch {
+        /* ignore */
+      }
     }
-    didMarkLoaded.current = false;
-    setLoaded(false);
-  }, [clearDetachTimer]);
+    v.play().catch(() => {});
+  }, [failed, loaded]);
 
-  useEffect(() => {
-    if (!allowMedia) {
-      const id = requestAnimationFrame(() => {
-        detachVideo();
-      });
-      return () => cancelAnimationFrame(id);
-    }
-  }, [allowMedia, detachVideo]);
-
-  /** Sa preload="none" marquee često skine src pre nego što stigne metadata → loaded ostane false i opacity 0. */
-  useEffect(() => {
-    if (!attachSrc || failed) return;
+  const tryPause = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
-    try {
-      v.load();
-    } catch {
-      /* ignore */
-    }
-  }, [attachSrc, failed, src]);
+    v.pause();
+  }, []);
 
   useEffect(() => {
+    if (reduced || failed) return;
     const card = cardRef.current;
-    if (!card || failed) return;
+    const v = videoRef.current;
+    if (!card || !v) return;
 
     const io = new IntersectionObserver(
       ([entry]) => {
-        const ratio = entry.intersectionRatio;
-        ratioRef.current = ratio;
-        visibleRef.current = entry.isIntersecting && ratio >= PLAY_MIN_RATIO;
-
-        const wantAttach =
-          allowMedia && entry.isIntersecting && ratio >= ATTACH_MIN_RATIO;
-        if (wantAttach) {
-          clearDetachTimer();
-          attachSrcRef.current = true;
-          setAttachSrc(true);
-        } else if (allowMedia && attachSrcRef.current) {
-          if (detachTimerRef.current == null) {
-            detachTimerRef.current = setTimeout(() => {
-              detachTimerRef.current = null;
-              detachVideo();
-            }, DETACH_DELAY_MS);
-          }
-        } else if (!allowMedia) {
-          detachVideo();
-        }
-
-        const v = videoRef.current;
-        if (!v || failed || !loaded) return;
         const wantPlay =
-          allowMedia &&
-          !marqueePaused &&
-          entry.isIntersecting &&
-          ratio >= PLAY_MIN_RATIO;
-        if (wantPlay) v.play().catch(() => {});
-        else v.pause();
+          sectionInView && !marqueePaused && entry.isIntersecting;
+        if (wantPlay) tryPlay();
+        else tryPause();
       },
-      { root: null, rootMargin: "120px 0px", threshold: IO_THRESHOLDS }
+      { root: null, rootMargin: CARD_PLAY_IO_MARGIN, threshold: CARD_PLAY_THRESHOLDS }
     );
 
     io.observe(card);
-    return () => {
-      clearDetachTimer();
-      io.disconnect();
-    };
-  }, [allowMedia, failed, loaded, marqueePaused, clearDetachTimer, detachVideo]);
+    return () => io.disconnect();
+  }, [reduced, failed, sectionInView, marqueePaused, tryPlay, tryPause]);
 
   useEffect(() => {
-    if (!loaded || failed || !allowMedia) return;
-    const v = videoRef.current;
-    if (v && visibleRef.current && !marqueePaused) v.play().catch(() => {});
-    if (v && marqueePaused) v.pause();
-  }, [loaded, failed, allowMedia, marqueePaused]);
+    if (reduced || failed || !loaded) return;
+    if (!sectionInView || marqueePaused) tryPause();
+  }, [sectionInView, marqueePaused, reduced, failed, loaded, tryPause]);
+
+  /** Posle loaded IO se ponekad ne okine odmah tokom marquee-a — jedan play pokušaj. */
+  useEffect(() => {
+    if (!loaded || reduced || failed || !sectionInView || marqueePaused) return;
+    const t = requestAnimationFrame(() => tryPlay());
+    return () => cancelAnimationFrame(t);
+  }, [loaded, reduced, failed, sectionInView, marqueePaused, tryPlay]);
+
+  if (reduced) {
+    return (
+      <div
+        className="video-card"
+        style={{
+          flexShrink: 0,
+          borderRadius: 18,
+          overflow: "hidden",
+          border: "1px solid rgba(255,255,255,0.07)",
+          marginRight: 12,
+          position: "relative",
+          isolation: "isolate",
+          background: VIDEO_CARD_BG,
+        }}
+      >
+        <LogoFallback />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -203,15 +181,41 @@ const VideoCard = memo(function VideoCard({
         background: VIDEO_CARD_BG,
       }}
     >
-      {!failed && attachSrc && (
+      {!failed && (
         <video
           ref={videoRef}
-          src={src}
+          src={videoSrc}
           muted
           loop
           playsInline
           preload="metadata"
-          onError={() => setFailed(true)}
+          onError={() => {
+            if (errorRetries.current >= 1) {
+              setFailed(true);
+              return;
+            }
+            errorRetries.current += 1;
+            didMarkLoaded.current = false;
+            setLoaded(false);
+            try {
+              const u = videoSrc.startsWith("http")
+                ? new URL(videoSrc)
+                : new URL(videoSrc, typeof window !== "undefined" ? window.location.href : "https://local.invalid");
+              u.searchParams.set("_r", String(Date.now()));
+              setVideoSrc(u.href);
+            } catch {
+              setFailed(true);
+            }
+          }}
+          onStalled={() => {
+            const v = videoRef.current;
+            if (!v || failed) return;
+            try {
+              v.load();
+            } catch {
+              /* ignore */
+            }
+          }}
           onLoadedMetadata={() => {
             const v = videoRef.current;
             if (!v) return;
@@ -240,7 +244,7 @@ const VideoCard = memo(function VideoCard({
           }}
         />
       )}
-      {!failed && (!attachSrc || !loaded) && (
+      {!failed && !loaded && (
         <div
           style={{
             position: "absolute",
@@ -262,12 +266,14 @@ function VideoRow({
   videos,
   reverse = false,
   paused = false,
-  allowMedia,
+  reduced,
+  sectionInView,
 }: {
   videos: string[];
   reverse?: boolean;
   paused?: boolean;
-  allowMedia: boolean;
+  reduced: boolean;
+  sectionInView: boolean;
 }) {
   const items = [...videos, ...videos];
   const [dragOffset, setDragOffset] = useState(0);
@@ -316,12 +322,18 @@ function VideoRow({
     }
   };
 
+  const fadeEdge =
+    "linear-gradient(90deg, var(--color-background, #050508) 0%, transparent 100%)";
+  const fadeEdgeR =
+    "linear-gradient(270deg, var(--color-background, #050508) 0%, transparent 100%)";
+
   return (
     <div
       className="video-showcase-row"
       style={{
         overflow: "hidden",
-        contain: "layout paint",
+        position: "relative",
+        contain: "layout",
         transform: "translateZ(0)",
         touchAction: isMobile ? "pan-y" : "auto",
       }}
@@ -340,25 +352,12 @@ function VideoRow({
         }
         @media (max-width: 640px) { .video-card { width: 170px; height: 302px; } }
         @media (min-width: 641px) and (max-width: 768px) { .video-card { width: 185px; height: 329px; } }
-        /* Pun širinski red u odnosu na viewport (parent sekcija već ima overflow: hidden). */
         .video-showcase-section .video-showcase-row {
           width: 100vw !important;
           max-width: 100vw !important;
           margin-left: calc(50% - 50vw) !important;
           margin-right: calc(50% - 50vw) !important;
           box-sizing: border-box !important;
-        }
-        @media (max-width: 768px) {
-          .video-showcase-section .video-showcase-row {
-            mask-image: linear-gradient(90deg, transparent 0%, black 5%, black 95%, transparent 100%) !important;
-            -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 5%, black 95%, transparent 100%) !important;
-          }
-        }
-        @media (min-width: 769px) {
-          .video-showcase-section .video-showcase-row {
-            mask-image: linear-gradient(90deg, transparent 0%, black 1%, black 99%, transparent 100%) !important;
-            -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 1%, black 99%, transparent 100%) !important;
-          }
         }
         @keyframes vsrow-l { from { transform: translate3d(0,0,0); } to { transform: translate3d(-50%,0,0); } }
         @keyframes vsrow-r { from { transform: translate3d(-50%,0,0); } to { transform: translate3d(0,0,0); } }
@@ -367,10 +366,14 @@ function VideoRow({
           width: max-content;
           backface-visibility: hidden;
           transform: translate3d(0,0,0);
+          will-change: auto;
+        }
+        .video-showcase-inview .vs-track-l:not(.paused),
+        .video-showcase-inview .vs-track-r:not(.paused) {
           will-change: transform;
         }
-        .vs-track-l { animation: vsrow-l 64s linear infinite; }
-        .vs-track-r { animation: vsrow-r 60s linear infinite; }
+        .vs-track-l { animation: vsrow-l 72s linear infinite; }
+        .vs-track-r { animation: vsrow-r 68s linear infinite; }
         .vs-track-l.paused, .vs-track-r.paused { animation-play-state: paused; }
         @media (prefers-reduced-motion: reduce) { .vs-track-l, .vs-track-r { animation: none; } }
       `}</style>
@@ -389,11 +392,43 @@ function VideoRow({
             <VideoCard
               key={`${videoSrc}-${i}`}
               src={videoSrc}
-              allowMedia={allowMedia}
+              reduced={reduced}
+              sectionInView={sectionInView}
               marqueePaused={paused}
             />
           ))}
         </div>
+      </div>
+      {/* Isto kao meki ivičnjak kao mask, ali bez skupe mask-kompozicije pri skrolu */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 4,
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: "clamp(28px, 7vw, 88px)",
+            background: fadeEdge,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: "clamp(28px, 7vw, 88px)",
+            background: fadeEdgeR,
+          }}
+        />
       </div>
     </div>
   );
@@ -401,23 +436,24 @@ function VideoRow({
 
 export default function VideoShowcaseSection() {
   const ref = useRef(null);
-  const inView = useInView(ref, { once: false, amount: 0.1 });
-  const reduced = useReducedMotion();
+  const inView = useInView(ref, { once: false, amount: 0.15, margin: "0px" });
+  const reducedMotion = useReducedMotion();
+  const reduced = reducedMotion ?? false;
+  const sectionInView = inView ?? false;
 
-  const pauseMarquee = reduced || !inView;
-  const allowMedia = inView && !reduced;
+  const pauseMarquee = reduced || !sectionInView;
   const t = { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const };
 
   return (
     <section
       ref={ref}
-      className={`video-showcase-section${inView ? " video-showcase-inview" : ""}`}
+      className={`video-showcase-section${sectionInView ? " video-showcase-inview" : ""}`}
       style={{
         position: "relative",
         zIndex: 10,
         padding: "100px 0",
         overflow: "hidden",
-        contain: "layout paint",
+        contain: "layout",
         contentVisibility: "visible",
       }}
     >
@@ -437,7 +473,7 @@ export default function VideoShowcaseSection() {
 
       <motion.div
         initial={{ opacity: reduced ? 1 : 0, y: reduced ? 0 : 16 }}
-        animate={inView ? { opacity: 1, y: 0 } : {}}
+        animate={sectionInView ? { opacity: 1, y: 0 } : {}}
         transition={t}
         style={{ textAlign: "center", padding: "0 24px", marginBottom: 48, position: "relative" }}
       >
@@ -476,20 +512,31 @@ export default function VideoShowcaseSection() {
 
       <motion.div
         initial={{ opacity: reduced ? 1 : 0 }}
-        animate={inView ? { opacity: 1 } : {}}
+        animate={sectionInView ? { opacity: 1 } : {}}
         transition={{ ...t, delay: 0.15 }}
         style={{ marginBottom: 12 }}
       >
-        <VideoRow videos={row1} paused={pauseMarquee} allowMedia={allowMedia} />
+        <VideoRow
+          videos={row1}
+          paused={pauseMarquee}
+          reduced={reduced}
+          sectionInView={sectionInView}
+        />
       </motion.div>
 
       <motion.div
         initial={{ opacity: reduced ? 1 : 0 }}
-        animate={inView ? { opacity: 1 } : {}}
+        animate={sectionInView ? { opacity: 1 } : {}}
         transition={{ ...t, delay: 0.3 }}
         style={{ marginBottom: 0 }}
       >
-        <VideoRow videos={row2} reverse paused={pauseMarquee} allowMedia={allowMedia} />
+        <VideoRow
+          videos={row2}
+          reverse
+          paused={pauseMarquee}
+          reduced={reduced}
+          sectionInView={sectionInView}
+        />
       </motion.div>
     </section>
   );

@@ -17,7 +17,8 @@ export default function PreloadSections() {
         () => import("@/components/sections/ProblemSection"),
         () => import("@/components/sections/SolutionSection"),
         () => import("@/components/sections/BlogSection"),
-        // VideoShowcaseSection: teške kartice — ne prefetchovati u idle; učitava se kad korisnik skroluje
+        // Showcase: chunk + <video preload> što pre — bez novog učitavanja pri skrolu do sekcije
+        () => import("@/components/sections/VideoShowcaseSection"),
         () => import("@/components/sections/SocialProofSection"),
         () => import("@/components/sections/ForWhoSection"),
         () => import("@/components/sections/HowToEnterSection"),

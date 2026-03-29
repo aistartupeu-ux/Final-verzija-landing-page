@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence, useInView } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
-import { Trophy, ChevronDown, ChevronUp, Music2, Briefcase } from "lucide-react";
+import { ChevronDown, ChevronUp, Music2 } from "lucide-react";
 import Image from "next/image";
 
 interface Article {
@@ -67,103 +67,6 @@ const articles: Article[] = [
         <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
           Iz tog iskustva nastala je <strong style={{ color: "#fff" }}>AI Hype Akademija</strong>. Cilj akademije je da pokaže ljudima kako uz pomoć AI alata mogu sami da prave muziku, video sadržaj i moderan digitalni sadržaj, čak i bez velikog produkcijskog tima.
         </p>
-      </>
-    ),
-  },
-  {
-    id: "rok-kadoic",
-    badge: {
-      icon: <Briefcase size={12} color="#22c55e" />,
-      label: "Project manager",
-      color: "#22c55e",
-      bg: "rgba(34,197,94,0.07)",
-      border: "rgba(34,197,94,0.18)",
-    },
-    heroImage: "/blog-rok-kadoic.png",
-    heroImages: ["/blog-rok-kadoic.png", "/blog-rok-3.webp"],
-    heroImagePosition: "center 5%",
-    heroImagePositions: [
-      "center 5%",   // blog-rok-kadoic.png
-      "center 35%",  // blog-rok-3.webp
-    ],
-    title: (
-      <>
-        <a href="https://www.instagram.com/rok_kadoic?igsh=eW1weW81N3Rhbjkw" target="_blank" rel="noopener noreferrer" style={{ display: "block", color: "inherit", textDecoration: "none", transition: "color 0.2s" }} onMouseEnter={e => { e.currentTarget.style.color = "#22c55e"; }} onMouseLeave={e => { e.currentTarget.style.color = "inherit"; }}>Rok Kadoič</a>
-        <span style={{ display: "block", fontSize: "0.85em", fontWeight: 600, color: "#22c55e", marginTop: 4 }}>Reditelj, kreativni producent AI Hype Akademije</span>
-      </>
-    ),
-    date: "2026",
-    intro: (
-      <>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
-          <strong style={{ color: "#fff" }}>Rok Kadoič</strong> je slovenački reditelj, direktor fotografije i kreativni producent koji godinama radi na muzičkim spotovima i vizuelnim projektima za izvođače iz regiona i inostranstva. Njegov rad je prepoznatljiv po snažnoj vizuelnoj estetici i filmskom pristupu video produkciji.
-        </p>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 20 }}>
-          Pored rada u muzici, Rok je deo glavnog video tima MMA borca <strong style={{ color: "#fff" }}>Francisa Ngannoua</strong>, gde učestvuje u produkciji sadržaja i razvoju vizuelne strategije za globalnu publiku.
-        </p>
-      </>
-    ),
-    full: (
-      <>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
-          U poslednje vreme intenzivno radi sa AI tehnologijom u muzici i videu. Njegov AI film „Milivojka“ osvojio je nagradu na AI International Music Video Festivalu u Los Anđelesu, a već ima iskustvo u produkciji potpuno AI muzičkih spotova i AI pesama.
-        </p>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
-          U AI Hype Akademiji, zajedno sa Triletom, deli svoje iskustvo iz video produkcije i rada sa AI alatima kako bi pokazao kako danas mogu da se prave AI spotovi, muzika i video sadržaj na profesionalnom nivou.
-        </p>
-      </>
-    ),
-  },
-  {
-    id: "milivojka",
-    badge: {
-      icon: <Trophy size={12} color="#facc15" fill="#facc15" />,
-      label: "Vest",
-      color: "#facc15",
-      bg: "rgba(250,204,21,0.07)",
-      border: "rgba(250,204,21,0.18)",
-    },
-    heroImage: "/blog-milivojka-thumb.png",
-    overlayLogo: {
-      src: "/blog-festival-logo.jpg",
-      alt: "Festival logo",
-      title: "AI International Music Video Festival",
-      subtitle: "Los Anđeles · mart 2026.",
-    },
-    title: (
-      <>Rok Kadoič osvojio nagradu u Los Anđelesu za AI film{" "}<span style={{ color: "#facc15" }}>&ldquo;Milivojka&rdquo;</span></>
-    ),
-    date: "Los Anđeles, mart 2026.",
-    intro: (
-      <>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
-          Slovenački reditelj <strong style={{ color: "#fff" }}>Rok Kadoič</strong> nagrađen je na AI International Music Video Festival u Los Anđelesu za svoj trominutni AI muzički film <em>Milivojka</em>. Festival, koji okuplja autore iz celog sveta i fokusiran je na spoj muzike, filma i veštačke inteligencije, prepoznaje projekte koji pomeraju granice savremene vizuelne umetnosti.
-        </p>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 20 }}>
-          Film <em>Milivojka</em> <span style={{ color: "#aaa" }}>(Slovenija, 2026, 3 min)</span> duboko je ukorenjen u balkanski, slovenski emotivni pejzaž, oslanjajući se na folklorne senzibilitete kako bi ispričao priču o ljubavi, gubitku i trajnom sećanju.
-        </p>
-      </>
-    ),
-    quote: {
-      text: "Milivojka by Rok Kadoič is unmistakably rooted in a Balkan, Slavic emotional landscape, drawing on folkloric sensibilities to tell a story of love, loss, and enduring memory. The cinematic structure, moving between a younger and older version of the protagonist, provides a clear and emotionally effective narrative arc...",
-      author: "Žiri festivala, AI International Music Video Festival",
-    },
-    full: (
-      <>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
-          Žiri je posebno istakao snažnu emocionalnu atmosferu, povezanost muzike i slike, kao i doslednost u vizuelnom izrazu. Iako su primetili tehnička ograničenja aktuelnih AI alata u prenošenju najdubljih nijansi bola, ukupna realizacija ocenjena je kao koherentna, zrela i umetnički uverljiva.
-        </p>
-        <div style={{ borderRadius: 12, overflow: "hidden", marginBottom: 20, position: "relative", height: 220 }}>
-          <Image src="/blog-theater.jpg" alt="Festival venue" fill style={{ objectFit: "cover" }} sizes="(max-width: 768px) 100vw, 50vw" />
-        </div>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
-          Pored autorskog rada, <strong style={{ color: "#fff" }}>Rok Kadoič</strong> je i produkcijski vođa te autor filmmaking kursa u najvećoj balkanskoj AI edukativnoj platformi{" "}
-          <strong style={{ color: "#00d4ff" }}>AI HYPE Akademija</strong>, gde aktivno edukuje novu generaciju kreatora u oblasti AI filma, vizuelne naracije i savremene produkcije.
-        </p>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75 }}>
-          Nagrada u Los Anđelesu dodatno potvrđuje njegovu poziciju jednog od vodećih regionalnih autora koji uspešno spajaju tradicionalni emotivni narativ sa savremenim AI alatima, stvarajući radove sa međunarodnim odjekom.
-        </p>
-        <p style={{ fontSize: 12, color: "#555", marginTop: 16, fontStyle: "italic" }}>Izvor: AI International Music Video Festival, mart 2026.</p>
       </>
     ),
   },
@@ -353,7 +256,7 @@ export default function BlogSection() {
           </h2>
         </motion.div>
 
-        <style>{`.blog-grid{display:grid;grid-template-columns:1fr;gap:24px}@media(min-width:768px){.blog-grid{grid-template-columns:1fr 1fr}}`}</style>
+        <style>{`.blog-grid{display:grid;grid-template-columns:1fr;gap:24px;max-width:400px;margin:0 auto;width:100%}`}</style>
         {inView && (
           <div className="blog-grid">
             {articles.map((article, i) => (
