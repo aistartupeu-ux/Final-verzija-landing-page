@@ -13,10 +13,12 @@ import { getCdnMediaUrl } from "@/lib/cdn-media";
  */
 export function getServerCdnUrl(path: string, ttlSeconds?: number): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
+  const signingOff =
+    process.env.BUNNY_CDN_SIGNING === "0" || process.env.BUNNY_CDN_SIGNING === "false";
   const tokenKey = process.env.BUNNY_CDN_TOKEN_KEY?.trim() ?? "";
   const baseUrl = process.env.NEXT_PUBLIC_BUNNY_VIDEO_BASE_URL?.trim() ?? "";
 
-  if (!tokenKey || !baseUrl) {
+  if (signingOff || !tokenKey || !baseUrl) {
     return getCdnMediaUrl(path);
   }
 
@@ -28,7 +30,8 @@ export function getServerCdnUrl(path: string, ttlSeconds?: number): string {
     (Number.isFinite(parsedEnvTtl) && parsedEnvTtl > 0 ? parsedEnvTtl : defaultTtl);
 
   const expires = Math.floor(Date.now() / 1000) + Math.max(300, ttl);
-  const hashable = `${tokenKey}${normalized}${expires}`;
+  // Bunny primeri konkateniraju expiration kao ceo broj (isti string kao u query-ju).
+  const hashable = `${tokenKey}${normalized}${String(expires)}`;
   const md5Hash = crypto.createHash("md5").update(hashable, "utf8").digest();
   let token = md5Hash.toString("base64");
   token = token.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");

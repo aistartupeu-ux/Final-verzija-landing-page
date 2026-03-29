@@ -77,7 +77,7 @@ export default function HeroSection({
       window.removeEventListener("scroll", onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, []);
+  }, [HERO_BG_MP4]);
 
   useEffect(() => {
     const video = bgVideoRef.current;
@@ -102,7 +102,7 @@ export default function HeroSection({
       video.removeEventListener("canplay", onCanPlay);
       io.disconnect();
     };
-  }, []);
+  }, [HERO_BG_MP4]);
 
   const togglePlay = useCallback(() => {
     if (!explainerRef.current) return;
@@ -137,7 +137,9 @@ export default function HeroSection({
           />
         ) : (
           <video
+            key={HERO_BG_MP4}
             ref={bgVideoRef}
+            src={HERO_BG_MP4}
             autoPlay
             muted
             loop
@@ -155,9 +157,7 @@ export default function HeroSection({
               willChange: "transform",
               backfaceVisibility: "hidden",
             }}
-          >
-            <source src={HERO_BG_MP4} type="video/mp4" />
-          </video>
+          />
         )}
         <div style={{ position: "absolute", inset: 0, background: "rgba(5,5,8,0.82)" }} />
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "45%", background: "linear-gradient(to top, #050508 0%, rgba(5,5,8,0.7) 50%, transparent 100%)" }} />
@@ -211,6 +211,7 @@ export default function HeroSection({
             }}
           >
             <video
+              key={`${EXPLAINER_MP4}|${EXPLAINER_POSTER}`}
               ref={explainerRef}
               src={EXPLAINER_MP4}
               playsInline

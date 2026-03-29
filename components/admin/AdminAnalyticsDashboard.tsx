@@ -158,9 +158,12 @@ type MetaCampaignCpl = {
   blendedCpl: number | null;
 };
 
+const ADMIN_LEADS_INITIAL_DELAY_MS = 5000;
+
 export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [waitingInitialDelay, setWaitingInitialDelay] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -297,13 +300,37 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     redirectToLogin();
   };
 
-  useEffect(() => {
-    if (from && to && !data && !loading) fetchData();
-  }, [from, to, data, loading, fetchData]);
+  const isFirstLoadPassRef = useRef(true);
+  const lastFetchedRangeRef = useRef<string | null>(null);
+  const firstLoadTimerForKeyRef = useRef<string | null>(null);
 
+  // Prvo učitavanje: 5s pauza (manje opterećenje). Promena datuma posle toga: odmah.
+  // lastFetchedRange sprečava ponovni fetch samo zbog promene reference na fetchData.
   useEffect(() => {
-    if (data && from && to) fetchData(true);
-  }, [from, to, data, fetchData]);
+    if (!from || !to) return;
+    const key = `${from}|${to}`;
+
+    if (isFirstLoadPassRef.current) {
+      if (firstLoadTimerForKeyRef.current === key) return;
+      firstLoadTimerForKeyRef.current = key;
+      setWaitingInitialDelay(true);
+      const t = setTimeout(() => {
+        isFirstLoadPassRef.current = false;
+        setWaitingInitialDelay(false);
+        lastFetchedRangeRef.current = key;
+        void fetchData();
+      }, ADMIN_LEADS_INITIAL_DELAY_MS);
+      return () => {
+        clearTimeout(t);
+        setWaitingInitialDelay(false);
+        firstLoadTimerForKeyRef.current = null;
+      };
+    }
+
+    if (lastFetchedRangeRef.current === key) return;
+    lastFetchedRangeRef.current = key;
+    void fetchData();
+  }, [from, to, fetchData]);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -320,7 +347,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
           fetchDebounceRef.current = setTimeout(() => {
             fetchData(true);
             fetchDebounceRef.current = null;
-          }, 800);
+          }, 2500);
         }
       ).subscribe();
       return () => {
@@ -332,7 +359,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
 
   useEffect(() => {
     if (legacy || !data) return;
-    const id = setInterval(() => fetchData(true), 30000);
+    const id = setInterval(() => fetchData(true), 90_000);
     return () => clearInterval(id);
   }, [legacy, data, fetchData]);
 
@@ -401,10 +428,10 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
               </span>
             </div>
             <div className="admin-buttons-row">
-              <button type="button" onClick={handleRefresh} disabled={loading} className="admin-btn admin-btn-refresh">
-                <RefreshCw size={14} style={{ opacity: loading ? 0.5 : 1 }} /> Osveži
+              <button type="button" onClick={handleRefresh} disabled={loading || waitingInitialDelay} className="admin-btn admin-btn-refresh">
+                <RefreshCw size={14} style={{ opacity: loading || waitingInitialDelay ? 0.5 : 1 }} /> Osveži
               </button>
-              <button type="button" onClick={() => fetchData(false, true)} disabled={loading} className="admin-btn admin-btn-debug">
+              <button type="button" onClick={() => fetchData(false, true)} disabled={loading || waitingInitialDelay} className="admin-btn admin-btn-debug">
                 Debug
               </button>
               <button type="button" onClick={handleLogout} className="admin-btn admin-btn-logout">
@@ -420,9 +447,26 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
           </div>
         )}
 
-        {loading ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 60 }}>
+        {loading || waitingInitialDelay ? (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 12,
+              padding: 60,
+              color: "#888",
+              fontSize: 14,
+              textAlign: "center",
+            }}
+          >
             <Loader2 size={32} color="#00d4ff" style={{ animation: "spin 1s linear infinite", willChange: "transform" }} />
+            {waitingInitialDelay && !loading ? (
+              <span style={{ maxWidth: 320, lineHeight: 1.5 }}>
+                Kratak delay pre učitavanja leadova (manje opterećenje servera)…
+              </span>
+            ) : null}
           </div>
         ) : data ? (
           <>
