@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useInView, useReducedMotion } from "framer-motion";
+import { useInView, useReducedMotion } from "framer-motion";
 import { useRef, useEffect, useState, memo, useCallback } from "react";
 import Image from "next/image";
 import { Sparkles } from "lucide-react";
@@ -45,9 +45,10 @@ const LogoFallback = () => (
 const CARD_PLAY_IO_MARGIN = "180px 0px 180px 0px";
 const CARD_PLAY_THRESHOLDS = [0, 0.02, 0.08, 0.2, 0.45, 0.75, 1];
 const PAUSE_DEBOUNCE_MS = 260;
-const PLAY_NUDGE_MS = 1600;
-const WARMUP_STAGGER_MS = 55;
-const WARMUP_MAX_DELAY_MS = 4800;
+const WARMUP_STAGGER_MS = 140;
+/** Posle ovog mirnog prozora ponovo puštamo CSS marquee (manje GPU pri skrolu). */
+const SCROLL_IDLE_RESUME_MS = 420;
+const WARMUP_MAX_DELAY_MS = 9000;
 const LOAD_REVEAL_FALLBACK_MS = 12_000;
 
 const VideoCard = memo(function VideoCard({
@@ -112,7 +113,7 @@ const VideoCard = memo(function VideoCard({
     if (!card || !v) return;
 
     const kickPlay = () => {
-      if (v.readyState < 2) {
+      if (v.readyState === HTMLMediaElement.HAVE_NOTHING) {
         try {
           v.load();
         } catch {
@@ -162,19 +163,6 @@ const VideoCard = memo(function VideoCard({
     }
   }, [sectionInView, marqueePaused, reduced, failed, hardPause, clearPauseDebounce]);
 
-  /** Dok je sekcija aktivna, umerni pokušaj play-a ako marquee IO kratko „ispusti“ karticu. */
-  useEffect(() => {
-    if (reduced || failed || !sectionInView || marqueePaused) return;
-    const id = window.setInterval(() => {
-      const v = videoRef.current;
-      if (!v || !wantPlayRef.current) return;
-      if (!v.paused) return;
-      if (v.readyState < 1) return;
-      void v.play().catch(() => {});
-    }, PLAY_NUDGE_MS);
-    return () => clearInterval(id);
-  }, [reduced, failed, sectionInView, marqueePaused]);
-
   /** Forsiraj skidanje metapodataka za off-screen kartice u marquee-u. */
   useEffect(() => {
     if (reduced || failed || !sectionInView) return;
@@ -182,10 +170,17 @@ const VideoCard = memo(function VideoCard({
     if (!v) return;
     const delay = Math.min(warmupIndex * WARMUP_STAGGER_MS, WARMUP_MAX_DELAY_MS);
     const t = window.setTimeout(() => {
-      try {
-        v.load();
-      } catch {
-        /* ignore */
+      const run = () => {
+        try {
+          v.load();
+        } catch {
+          /* ignore */
+        }
+      };
+      if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(run, { timeout: 10_000 });
+      } else {
+        run();
       }
     }, delay);
     return () => clearTimeout(t);
@@ -244,6 +239,7 @@ const VideoCard = memo(function VideoCard({
           muted
           loop
           playsInline
+          disableRemotePlayback
           preload={heavyPreload ? "auto" : "metadata"}
           onError={() => {
             if (errorRetries.current >= 1) {
@@ -439,11 +435,6 @@ function VideoRow({
           width: max-content;
           backface-visibility: hidden;
           transform: translate3d(0,0,0);
-          will-change: auto;
-        }
-        .video-showcase-inview .vs-track-l:not(.paused),
-        .video-showcase-inview .vs-track-r:not(.paused) {
-          will-change: transform;
         }
         .vs-track-l { animation: vsrow-l 72s linear infinite; }
         .vs-track-r { animation: vsrow-r 68s linear infinite; }
@@ -518,13 +509,57 @@ export default function VideoShowcaseSection({
   const row1 = row1Srcs;
   const row2 = row2Srcs;
   const ref = useRef(null);
-  const inView = useInView(ref, { once: false, amount: 0.15, margin: "0px" });
+  /** Širi „prozor“ da se play/pause ne okida na border skrola (manje treperenja). */
+  const inView = useInView(ref, { once: false, amount: 0.08, margin: "140px 0px 200px 0px" });
   const reducedMotion = useReducedMotion();
   const reduced = reducedMotion ?? false;
   const sectionInView = inView ?? false;
 
-  const pauseMarquee = reduced || !sectionInView;
-  const t = { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const };
+  const [hasBeenVisible, setHasBeenVisible] = useState(false);
+  useEffect(() => {
+    if (reduced) setHasBeenVisible(true);
+  }, [reduced]);
+  useEffect(() => {
+    if (sectionInView) setHasBeenVisible(true);
+  }, [sectionInView]);
+  const reveal = reduced || hasBeenVisible;
+  const revealEase = "cubic-bezier(0.22, 1, 0.36, 1)";
+
+  const [marqueeScrollHold, setMarqueeScrollHold] = useState(false);
+  const marqueeScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sectionInViewRef = useRef(false);
+  useEffect(() => {
+    sectionInViewRef.current = sectionInView;
+  }, [sectionInView]);
+
+  /** Dok korisnik skroluje dok je showcase u kadru, pauziraj CSS marquee (najjeftinije za skrol). */
+  useEffect(() => {
+    const bump = () => {
+      if (!sectionInViewRef.current) return;
+      setMarqueeScrollHold(true);
+      if (marqueeScrollTimerRef.current != null) {
+        clearTimeout(marqueeScrollTimerRef.current);
+      }
+      marqueeScrollTimerRef.current = setTimeout(() => {
+        marqueeScrollTimerRef.current = null;
+        setMarqueeScrollHold(false);
+      }, SCROLL_IDLE_RESUME_MS);
+    };
+    window.addEventListener("scroll", bump, { passive: true });
+    window.addEventListener("wheel", bump, { passive: true });
+    window.addEventListener("touchmove", bump, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", bump);
+      window.removeEventListener("wheel", bump);
+      window.removeEventListener("touchmove", bump);
+      if (marqueeScrollTimerRef.current != null) {
+        clearTimeout(marqueeScrollTimerRef.current);
+        marqueeScrollTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const pauseMarquee = reduced || !sectionInView || marqueeScrollHold;
 
   return (
     <section
@@ -535,8 +570,9 @@ export default function VideoShowcaseSection({
         zIndex: 10,
         padding: "100px 0",
         overflow: "hidden",
-        contain: "layout",
-        contentVisibility: "visible",
+        contain: "layout paint",
+        contentVisibility: "auto",
+        containIntrinsicSize: "0 820px",
       }}
     >
       <div
@@ -553,11 +589,16 @@ export default function VideoShowcaseSection({
         }}
       />
 
-      <motion.div
-        initial={{ opacity: reduced ? 1 : 0, y: reduced ? 0 : 16 }}
-        animate={sectionInView ? { opacity: 1, y: 0 } : {}}
-        transition={t}
-        style={{ textAlign: "center", padding: "0 24px", marginBottom: 48, position: "relative" }}
+      <div
+        style={{
+          textAlign: "center",
+          padding: "0 24px",
+          marginBottom: 48,
+          position: "relative",
+          opacity: reveal ? 1 : 0,
+          transform: reveal ? "translateY(0)" : "translateY(16px)",
+          transition: `opacity 0.55s ${revealEase}, transform 0.55s ${revealEase}`,
+        }}
       >
         <div
           style={{
@@ -590,13 +631,14 @@ export default function VideoShowcaseSection({
         <p style={{ fontSize: 15, color: "#8a8a9a", maxWidth: 440, margin: "0 auto", lineHeight: 1.7 }}>
           Sve je napravljeno pomocu AI alata koje ces nauciti. Bez prethodnog iskustva.
         </p>
-      </motion.div>
+      </div>
 
-      <motion.div
-        initial={{ opacity: reduced ? 1 : 0 }}
-        animate={sectionInView ? { opacity: 1 } : {}}
-        transition={{ ...t, delay: 0.15 }}
-        style={{ marginBottom: 12 }}
+      <div
+        style={{
+          marginBottom: 12,
+          opacity: reveal ? 1 : 0,
+          transition: `opacity 0.55s ${revealEase} 0.12s`,
+        }}
       >
         <VideoRow
           videos={row1}
@@ -604,13 +646,14 @@ export default function VideoShowcaseSection({
           reduced={reduced}
           sectionInView={sectionInView}
         />
-      </motion.div>
+      </div>
 
-      <motion.div
-        initial={{ opacity: reduced ? 1 : 0 }}
-        animate={sectionInView ? { opacity: 1 } : {}}
-        transition={{ ...t, delay: 0.3 }}
-        style={{ marginBottom: 0 }}
+      <div
+        style={{
+          marginBottom: 0,
+          opacity: reveal ? 1 : 0,
+          transition: `opacity 0.55s ${revealEase} 0.22s`,
+        }}
       >
         <VideoRow
           videos={row2}
@@ -620,7 +663,7 @@ export default function VideoShowcaseSection({
           sectionInView={sectionInView}
           warmupSlotOffset={row1.length * 2}
         />
-      </motion.div>
+      </div>
     </section>
   );
 }

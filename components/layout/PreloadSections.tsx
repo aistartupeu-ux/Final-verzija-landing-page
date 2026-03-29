@@ -32,7 +32,7 @@ export default function PreloadSections() {
       const tick = () => {
         if (i >= imports.length) return;
         imports[i++]();
-        setTimeout(tick, 250);
+        setTimeout(tick, 380);
       };
       tick();
     };

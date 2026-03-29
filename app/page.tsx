@@ -1,6 +1,7 @@
 import dynamic from "next/dynamic";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import SectionChunkFallback from "@/components/layout/SectionChunkFallback";
 import HeroSection from "@/components/sections/HeroSection";
 import { getServerCdnUrl } from "@/lib/bunny-cdn-sign";
 import {
@@ -11,17 +12,35 @@ import {
   CDN_PATH_SHOWCASE_ROW2,
 } from "@/lib/video-cdn-paths";
 
-// Below-fold sections loaded lazily to reduce initial JS bundle
-const ProblemSection = dynamic(() => import("@/components/sections/ProblemSection"));
-const SolutionSection = dynamic(() => import("@/components/sections/SolutionSection"));
-const SocialProofSection = dynamic(() => import("@/components/sections/SocialProofSection"));
-const ForWhoSection = dynamic(() => import("@/components/sections/ForWhoSection"));
-const HowToEnterSection = dynamic(() => import("@/components/sections/HowToEnterSection"));
-const FAQSection = dynamic(() => import("@/components/sections/FAQSection"));
-const FinalCTASection = dynamic(() => import("@/components/sections/FinalCTASection"));
-const BlogSection = dynamic(() => import("@/components/sections/BlogSection"));
-const AffiliateSection = dynamic(() => import("@/components/sections/AffiliateSection"));
-const VideoShowcaseSection = dynamic(() => import("@/components/sections/VideoShowcaseSection"));
+const sectionLoad = () => <SectionChunkFallback />;
+
+// Below-fold: chunk + placeholder da skrol ne „puca“ na prazno
+const ProblemSection = dynamic(() => import("@/components/sections/ProblemSection"), {
+  loading: sectionLoad,
+});
+const SolutionSection = dynamic(() => import("@/components/sections/SolutionSection"), {
+  loading: sectionLoad,
+});
+const SocialProofSection = dynamic(() => import("@/components/sections/SocialProofSection"), {
+  loading: sectionLoad,
+});
+const ForWhoSection = dynamic(() => import("@/components/sections/ForWhoSection"), {
+  loading: sectionLoad,
+});
+const HowToEnterSection = dynamic(() => import("@/components/sections/HowToEnterSection"), {
+  loading: sectionLoad,
+});
+const FAQSection = dynamic(() => import("@/components/sections/FAQSection"), { loading: sectionLoad });
+const FinalCTASection = dynamic(() => import("@/components/sections/FinalCTASection"), {
+  loading: sectionLoad,
+});
+const BlogSection = dynamic(() => import("@/components/sections/BlogSection"), { loading: sectionLoad });
+const AffiliateSection = dynamic(() => import("@/components/sections/AffiliateSection"), {
+  loading: sectionLoad,
+});
+const VideoShowcaseSection = dynamic(() => import("@/components/sections/VideoShowcaseSection"), {
+  loading: sectionLoad,
+});
 
 /** Osvežavanje HTML-a da Bunny token u media URL-ovima ne istekne (getServerCdnUrl koristi Date). */
 export const revalidate = 3600;

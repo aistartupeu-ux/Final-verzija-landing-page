@@ -53,6 +53,7 @@ export default function HeroSection({
     let raf = 0;
     let sectionTop = 0;
     let sectionHeight = 0;
+    let heroNearViewport = true;
     const updateMetrics = () => {
       const rect = section.getBoundingClientRect();
       sectionTop = rect.top + window.scrollY;
@@ -61,7 +62,15 @@ export default function HeroSection({
     updateMetrics();
     const ro = new ResizeObserver(updateMetrics);
     ro.observe(section);
+    const visIo = new IntersectionObserver(
+      ([e]) => {
+        heroNearViewport = e.isIntersecting;
+      },
+      { threshold: 0, rootMargin: "120px 0px" }
+    );
+    visIo.observe(section);
     const onScroll = () => {
+      if (!heroNearViewport) return;
       if (raf) return;
       raf = requestAnimationFrame(() => {
         const scrollY = window.scrollY;
@@ -74,6 +83,7 @@ export default function HeroSection({
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       ro.disconnect();
+      visIo.disconnect();
       window.removeEventListener("scroll", onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
@@ -154,7 +164,6 @@ export default function HeroSection({
               width: "auto", height: "auto",
               transform: "translate(-50%, -50%) scale(1.12) translateZ(0)",
               objectFit: "cover",
-              willChange: "transform",
               backfaceVisibility: "hidden",
             }}
           />

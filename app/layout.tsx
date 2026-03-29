@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import TrackingScripts from "@/components/layout/TrackingScripts";
 import AffiliateTracker from "@/components/AffiliateTracker";
+import PreloadSections from "@/components/layout/PreloadSections";
 
 const inter = Inter({ subsets: ["latin", "latin-ext"], variable: "--font-inter" });
 
@@ -62,6 +63,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <AffiliateTracker />
         <div style={{ overflowX: "hidden", maxWidth: "100vw" }}>
           {children}
+          <PreloadSections />
         </div>
       </body>
     </html>
