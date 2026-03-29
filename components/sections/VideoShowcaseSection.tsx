@@ -38,25 +38,31 @@ const LogoFallback = () => (
 );
 
 /**
- * Marquee (CSS transform) često kratko skine isIntersecting → video stane ako odmah pauziramo.
- * Pauza je odložena (~260 ms). play() ne čeka „loaded“ — buffer ide kroz metadata + load().
- * preload=auto samo posle prvog ulaska u kadar (ne na svim karticama od starta).
+ * Marquee: kartice daleko levo/desno nisu „isIntersecting“, pa browser često ne vuče MP4.
+ * Kad je sekcija u kadru, po kartici zakazujemo load() sa stagger-om (ne odjednom 48 req).
+ * IO samo za play/pause; pauza i dalje odložena da ne treperi na transform animaciji.
  */
 const CARD_PLAY_IO_MARGIN = "180px 0px 180px 0px";
 const CARD_PLAY_THRESHOLDS = [0, 0.02, 0.08, 0.2, 0.45, 0.75, 1];
 const PAUSE_DEBOUNCE_MS = 260;
 const PLAY_NUDGE_MS = 1600;
+const WARMUP_STAGGER_MS = 55;
+const WARMUP_MAX_DELAY_MS = 4800;
+const LOAD_REVEAL_FALLBACK_MS = 12_000;
 
 const VideoCard = memo(function VideoCard({
   src,
   reduced,
   sectionInView,
   marqueePaused,
+  warmupIndex,
 }: {
   src: string;
   reduced: boolean;
   sectionInView: boolean;
   marqueePaused: boolean;
+  /** Redosled provere učitavanja kad je sekcija u kadru (širi raspored u vremenu). */
+  warmupIndex: number;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -168,6 +174,31 @@ const VideoCard = memo(function VideoCard({
     }, PLAY_NUDGE_MS);
     return () => clearInterval(id);
   }, [reduced, failed, sectionInView, marqueePaused]);
+
+  /** Forsiraj skidanje metapodataka za off-screen kartice u marquee-u. */
+  useEffect(() => {
+    if (reduced || failed || !sectionInView) return;
+    const v = videoRef.current;
+    if (!v) return;
+    const delay = Math.min(warmupIndex * WARMUP_STAGGER_MS, WARMUP_MAX_DELAY_MS);
+    const t = window.setTimeout(() => {
+      try {
+        v.load();
+      } catch {
+        /* ignore */
+      }
+    }, delay);
+    return () => clearTimeout(t);
+  }, [sectionInView, reduced, failed, warmupIndex, src]);
+
+  /** Ako CDN sporije odgovara, ipak skloni logo da ne stoji zauvek. */
+  useEffect(() => {
+    if (reduced || failed || !sectionInView || loaded) return;
+    const t = window.setTimeout(() => {
+      if (!didMarkLoaded.current) markLoaded();
+    }, LOAD_REVEAL_FALLBACK_MS);
+    return () => clearTimeout(t);
+  }, [sectionInView, reduced, failed, loaded, markLoaded]);
 
   if (reduced) {
     return (
@@ -307,12 +338,15 @@ function VideoRow({
   paused = false,
   reduced,
   sectionInView,
+  warmupSlotOffset = 0,
 }: {
   videos: string[];
   reverse?: boolean;
   paused?: boolean;
   reduced: boolean;
   sectionInView: boolean;
+  /** Indeksi za stagger load-a u drugom redu (row1.length * 2). */
+  warmupSlotOffset?: number;
 }) {
   const items = [...videos, ...videos];
   const [dragOffset, setDragOffset] = useState(0);
@@ -434,6 +468,7 @@ function VideoRow({
               reduced={reduced}
               sectionInView={sectionInView}
               marqueePaused={paused}
+              warmupIndex={warmupSlotOffset + i}
             />
           ))}
         </div>
@@ -583,6 +618,7 @@ export default function VideoShowcaseSection({
           paused={pauseMarquee}
           reduced={reduced}
           sectionInView={sectionInView}
+          warmupSlotOffset={row1.length * 2}
         />
       </motion.div>
     </section>
