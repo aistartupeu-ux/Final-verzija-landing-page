@@ -1,48 +1,60 @@
 /**
- * Lokalna provera Bunny Basic token URL-a (isto kao lib/bunny-cdn-sign.ts).
- * Pokretanje: node --env-file=.env.local scripts/verify-bunny-token.mjs
- * (Node 20+; bez .env.local samo koristi trenutni environ)
+ * Provera Bunny token URL-a: prvo MD5 (Basic), pa SHA256 (Advanced minimal).
+ * Pokretanje: npm run verify:bunny  (Node 20+, .env.local sa BUNNY_CDN_TOKEN_KEY + NEXT_PUBLIC_BUNNY_VIDEO_BASE_URL)
  */
 import crypto from "node:crypto";
 
 const tokenKey = process.env.BUNNY_CDN_TOKEN_KEY?.trim() ?? "";
 const baseUrl = process.env.NEXT_PUBLIC_BUNNY_VIDEO_BASE_URL?.trim() ?? "";
-const path = "/hero-vsl.mp4";
+const testPath = "/hero-vsl.mp4";
 const ttl = 3600;
 
-function sign(pathOnly, key, base, ttlSec) {
+function b64url(buf) {
+  return buf
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function buildSignedUrl(pathOnly, key, base, ttlSec, algo) {
   const normalized = pathOnly.startsWith("/") ? pathOnly : `/${pathOnly}`;
-  if (!key || !base) return { url: null, error: "Nedostaje BUNNY_CDN_TOKEN_KEY ili NEXT_PUBLIC_BUNNY_VIDEO_BASE_URL" };
   const expires = Math.floor(Date.now() / 1000) + ttlSec;
   const hashable = `${key}${normalized}${String(expires)}`;
-  const md5Hash = crypto.createHash("md5").update(hashable, "utf8").digest();
-  let token = md5Hash.toString("base64");
-  token = token.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+  const digest =
+    algo === "sha256"
+      ? crypto.createHash("sha256").update(hashable, "utf8").digest()
+      : crypto.createHash("md5").update(hashable, "utf8").digest();
+  const token = b64url(digest);
   const baseTrim = base.replace(/\/+$/, "");
-  return { url: `${baseTrim}${normalized}?token=${token}&expires=${expires}`, error: null };
+  return `${baseTrim}${normalized}?token=${token}&expires=${expires}`;
 }
 
-const { url, error } = sign(path, tokenKey, baseUrl, ttl);
-if (error) {
-  console.error(error);
+if (!tokenKey || !baseUrl) {
+  console.error("Nedostaje BUNNY_CDN_TOKEN_KEY ili NEXT_PUBLIC_BUNNY_VIDEO_BASE_URL u .env.local");
   process.exit(1);
 }
 
-console.log("Generisan URL (prvih 80 zn.):", url.slice(0, 80) + "…");
+for (const algo of ["md5", "sha256"]) {
+  const url = buildSignedUrl(testPath, tokenKey, baseUrl, ttl, algo);
+  const label = algo === "md5" ? "Basic (MD5)" : "Advanced-min (SHA256)";
+  process.stdout.write(`${label}: HEAD … `);
+  const res = await fetch(url, { method: "HEAD", redirect: "manual" });
+  console.log(res.status, res.statusText);
+  if (res.status === 200 || res.status === 206) {
+    console.log("\n→ Ovo radi. Na Vercel postavi:");
+    console.log(`   BUNNY_CDN_TOKEN_HASH=${algo === "md5" ? "md5" : "sha256"}`);
+    if (algo === "sha256") console.log("   (ili advanced)");
+    process.exit(0);
+  }
+}
 
-const res = await fetch(url, { method: "HEAD", redirect: "manual" });
-console.log("HEAD status:", res.status, res.statusText);
-if (res.status === 403) {
-  console.error(
-    "\n403: token ili Bunny podešavanje ne odgovara.\n" +
-      "- U Bunny Pull Zone → Security mora biti Basic Token Authentication (MD5), ne Advanced.\n" +
-      "- Security key mora biti isti kao BUNNY_CDN_TOKEN_KEY na Vercel-u.\n" +
-      "- Host u NEXT_PUBLIC_BUNNY_VIDEO_BASE_URL mora biti ta pull zona."
-  );
-  process.exit(1);
-}
-if (res.status === 200 || res.status === 206) {
-  console.log("OK: Bunny prihvata potpisani zahtev.");
-  process.exit(0);
-}
-console.warn("Neočekivan status (proveri da li fajl postoji na CDN-u):", res.status);
+console.error(
+  "\nOba algoritma vraćaju grešku. Proveri:\n" +
+    "1) Isti ključ kao „URL Token Authentication Key” u Bunny → Pull zone → Security\n" +
+    "2) NEXT_PUBLIC_BUNNY_VIDEO_BASE_URL je hostname te pull zone (npr. https://xyz.b-cdn.net)\n" +
+    "3) Fajl /hero-vsl.mp4 postoji na originu te zone\n" +
+    "4) Na Vercel SU oba env-a (često imaš Bunny uključeno ali BUNNY_CDN_TOKEN_KEY nedostaje → HTML bez tokena → 403)\n" +
+    "5) Probaj BUNNY_CDN_TOKEN_PATH_NO_LEADING_SLASH=1 ako Bunny očekuje putanju bez vodećeg / u hash-u"
+);
+process.exit(1);

@@ -3,14 +3,24 @@ import crypto from "node:crypto";
 import { getCdnMediaUrl } from "@/lib/cdn-media";
 
 /**
- * Bunny CDN Basic Token Authentication (MD5).
- * @see https://docs.bunny.net/docs/cdn-token-authentication-basic
+ * Bunny CDN token URL (Pull Zone → Security → Token Authentication).
+ * @see https://docs.bunny.net/docs/cdn-token-authentication-basic (MD5)
+ * @see https://docs.bunny.net/cdn/security/token-authentication/advanced (SHA256)
  *
- * Na pull zone u Bunny dashboard-u uključi token kao **Basic (MD5)** — ne Advanced (SHA256).
- * Security key stavi u BUNNY_CDN_TOKEN_KEY (nikad NEXT_PUBLIC_*).
+ * Podrazumevano: MD5 (Basic). Ako videi ne rade (403): na Vercel dodaj
+ * `BUNNY_CDN_TOKEN_HASH=sha256` (Advanced sa praznim IP i bez token_path — isti string key+path+expires).
  *
- * Bez ključa: ponašanje kao getCdnMediaUrl (lokalni dev, fallback).
+ * `BUNNY_CDN_TOKEN_KEY` — isti kao URL Token Authentication Key u Bunny-ju.
+ * `NEXT_PUBLIC_BUNNY_VIDEO_BASE_URL` — mora biti postavljen da bi se uopšte potpisivalo.
  */
+function base64UrlToken(buf: Buffer): string {
+  return buf
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
 export function getServerCdnUrl(path: string, ttlSeconds?: number): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   const signingOff =
@@ -30,11 +40,23 @@ export function getServerCdnUrl(path: string, ttlSeconds?: number): string {
     (Number.isFinite(parsedEnvTtl) && parsedEnvTtl > 0 ? parsedEnvTtl : defaultTtl);
 
   const expires = Math.floor(Date.now() / 1000) + Math.max(300, ttl);
-  // Bunny primeri konkateniraju expiration kao ceo broj (isti string kao u query-ju).
-  const hashable = `${tokenKey}${normalized}${String(expires)}`;
-  const md5Hash = crypto.createHash("md5").update(hashable, "utf8").digest();
-  let token = md5Hash.toString("base64");
-  token = token.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+
+  const pathForHash =
+    process.env.BUNNY_CDN_TOKEN_PATH_NO_LEADING_SLASH === "1" ||
+    process.env.BUNNY_CDN_TOKEN_PATH_NO_LEADING_SLASH === "true"
+      ? normalized.replace(/^\//, "")
+      : normalized;
+
+  const hashable = `${tokenKey}${pathForHash}${String(expires)}`;
+  const hashMode = (process.env.BUNNY_CDN_TOKEN_HASH ?? "md5").toLowerCase();
+  const useSha256 = hashMode === "sha256" || hashMode === "advanced";
+
+  const digest = useSha256
+    ? crypto.createHash("sha256").update(hashable, "utf8").digest()
+    : crypto.createHash("md5").update(hashable, "utf8").digest();
+
+  const token = base64UrlToken(digest);
   const base = baseUrl.replace(/\/+$/, "");
+  // Ostaje kao u Bunny primerima (token je base64url, ne zahteva encode u praksi)
   return `${base}${normalized}?token=${token}&expires=${expires}`;
 }
