@@ -19,6 +19,16 @@ const TARGET_DATE = new Date("2026-04-15T00:00:00+02:00");
 /** Ispod ovog učestka hero sekcije u viewportu — pauziraj VSL, ugasi „heavy“ režim, izađi iz fullscreena. */
 const HERO_VISIBLE_MIN_RATIO = 0.1;
 
+/** Safari iOS često ne iscrta prvi kadar dok se jednom ne pusti dekodiranje — kratki muted play/pause to rešava. */
+function isAppleTouchSafariFamily(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (/iPhone|iPod/i.test(ua)) return true;
+  if (/iPad/i.test(ua)) return true;
+  if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) return true;
+  return false;
+}
+
 const DEFAULT_HERO_MEDIA = {
   bgMp4: getCdnMediaUrl(CDN_PATH_HERO_BG),
   explainerMp4: getCdnMediaUrl(CDN_PATH_EXPLAINER_MP4),
@@ -45,6 +55,9 @@ export default function HeroSection({
   /** Kad je jednom krenuo repro — sklanja preview (logo + providni sloj), pun video. */
   const [explainerHasPlayed, setExplainerHasPlayed] = useState(false);
   const primeExplainerFrameRef = useRef(true);
+  /** Jednokratni iOS/WebKit „prime“ (play→pause); ne sme da okine UI kao pravo puštanje. */
+  const explainerIosPrimeDoneRef = useRef(false);
+  const suppressExplainerPlayUiRef = useRef(false);
 
   /** BG video + VSL: pauza kad hero nije dovoljno u kadru; skrol dole gasi explainer i sve „heavy“ efekte na stranici. */
   useEffect(() => {
@@ -122,6 +135,7 @@ export default function HeroSection({
     setExplainerHasPlayed(false);
     setPlaying(false);
     primeExplainerFrameRef.current = true;
+    explainerIosPrimeDoneRef.current = false;
   }, [EXPLAINER_MP4]);
 
   useEffect(() => {
@@ -155,6 +169,50 @@ export default function HeroSection({
       setPlaying(true);
     }
   }, [playing, explainerFailed]);
+
+  const tryPrimeExplainerFirstFrame = useCallback(
+    (v: HTMLVideoElement) => {
+      if (
+        explainerFailed ||
+        !primeExplainerFrameRef.current ||
+        explainerIosPrimeDoneRef.current ||
+        !isAppleTouchSafariFamily()
+      ) {
+        return;
+      }
+      explainerIosPrimeDoneRef.current = true;
+      suppressExplainerPlayUiRef.current = true;
+      v.muted = true;
+      const done = () => {
+        suppressExplainerPlayUiRef.current = false;
+      };
+      const fail = () => {
+        suppressExplainerPlayUiRef.current = false;
+        explainerIosPrimeDoneRef.current = false;
+      };
+      try {
+        const p = v.play();
+        if (p !== undefined) {
+          void p
+            .then(() => {
+              v.pause();
+              try {
+                v.currentTime = 0.001;
+              } catch {
+                /* ignore */
+              }
+              done();
+            })
+            .catch(fail);
+        } else {
+          fail();
+        }
+      } catch {
+        fail();
+      }
+    },
+    [explainerFailed]
+  );
 
   return (
     <section
@@ -260,6 +318,7 @@ export default function HeroSection({
               onLoadedMetadata={(e) => {
                 if (!primeExplainerFrameRef.current) return;
                 const v = e.currentTarget;
+                if (isAppleTouchSafariFamily()) return;
                 try {
                   v.currentTime = 0.001;
                   v.pause();
@@ -270,6 +329,10 @@ export default function HeroSection({
               onLoadedData={(e) => {
                 if (!primeExplainerFrameRef.current) return;
                 const v = e.currentTarget;
+                if (isAppleTouchSafariFamily()) {
+                  requestAnimationFrame(() => tryPrimeExplainerFirstFrame(v));
+                  return;
+                }
                 try {
                   v.currentTime = 0.001;
                   v.pause();
@@ -277,7 +340,14 @@ export default function HeroSection({
                   /* ignore */
                 }
               }}
+              onCanPlay={(e) => {
+                if (!primeExplainerFrameRef.current || explainerIosPrimeDoneRef.current) return;
+                const v = e.currentTarget;
+                if (!isAppleTouchSafariFamily()) return;
+                requestAnimationFrame(() => tryPrimeExplainerFirstFrame(v));
+              }}
               onPlay={() => {
+                if (suppressExplainerPlayUiRef.current) return;
                 primeExplainerFrameRef.current = false;
                 setExplainerHasPlayed(true);
               }}
