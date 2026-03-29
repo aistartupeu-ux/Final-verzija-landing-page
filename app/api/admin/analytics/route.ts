@@ -17,6 +17,21 @@ export async function GET(req: NextRequest) {
   const url = req.nextUrl ?? new URL(req.url);
   const debug = url.searchParams.get("debug") === "1";
   const todayOnly = url.searchParams.get("today") === "1";
+  const legacyMode = url.searchParams.get("legacy") === "1";
+  let legacyCutoffDate: Date | null = null;
+  if (legacyMode) {
+    const raw = process.env.ADMIN_ANALYTICS_LEGACY_CUTOFF_ISO?.trim();
+    if (!raw) {
+      return NextResponse.json(
+        { error: "Legacy mode requires ADMIN_ANALYTICS_LEGACY_CUTOFF_ISO" },
+        { status: 503 }
+      );
+    }
+    legacyCutoffDate = new Date(raw);
+    if (isNaN(legacyCutoffDate.getTime())) {
+      return NextResponse.json({ error: "Invalid ADMIN_ANALYTICS_LEGACY_CUTOFF_ISO" }, { status: 400 });
+    }
+  }
   let from = url.searchParams.get("from");
   let to = url.searchParams.get("to");
 
@@ -81,6 +96,7 @@ export async function GET(req: NextRequest) {
       endOfDay.setHours(23, 59, 59, 999);
       if (d > endOfDay) continue;
     }
+    if (legacyCutoffDate && d && !isNaN(d.getTime()) && d.getTime() > legacyCutoffDate.getTime()) continue;
     const day = row.date
       ? (row.date.match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? new Date(row.date).toISOString().slice(0, 10))
       : "";
@@ -94,10 +110,19 @@ export async function GET(req: NextRequest) {
   if (fromDate && !isNaN(fromDate.getTime())) {
     query = query.gte("created_at", fromDate.toISOString());
   }
+  let upperBound: Date | null = null;
   if (toDate && !isNaN(toDate.getTime())) {
     const endOfDay = new Date(toDate);
     endOfDay.setHours(23, 59, 59, 999);
-    query = query.lte("created_at", endOfDay.toISOString());
+    upperBound = endOfDay;
+  }
+  if (legacyCutoffDate) {
+    if (!upperBound || upperBound.getTime() > legacyCutoffDate.getTime()) {
+      upperBound = legacyCutoffDate;
+    }
+  }
+  if (upperBound) {
+    query = query.lte("created_at", upperBound.toISOString());
   }
   const { data: leadsSupabase } = await query.order("created_at", { ascending: false });
   const listSupabase = (leadsSupabase ?? []) as {
@@ -140,6 +165,9 @@ export async function GET(req: NextRequest) {
     direct: bySource["direct"] ?? 0,
     affiliate: bySource["affiliate"] ?? 0,
   };
+  if (legacyMode && legacyCutoffDate) {
+    payload.legacyCutoffAt = legacyCutoffDate.toISOString();
+  }
 
   if (todayOnly) {
     const parts = new Intl.DateTimeFormat("en-CA", {

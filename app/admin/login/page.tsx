@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ADMIN_ANALYTICS_LIVE_PATH } from "@/lib/admin-routes";
 
 export default function AdminLoginPage() {
   const [secret, setSecret] = useState("");
@@ -30,7 +31,7 @@ export default function AdminLoginPage() {
         return;
       }
       // Pun document load da browser sigurno pošalje HttpOnly kolačić u middleware
-      window.location.assign("/admin/x7k9m2q4");
+      window.location.assign(ADMIN_ANALYTICS_LIVE_PATH);
     } catch {
       setError("Greška u konekciji.");
     } finally {

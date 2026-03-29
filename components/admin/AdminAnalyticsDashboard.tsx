@@ -24,6 +24,7 @@ function TikTokIcon({ size = 20, color = "#00f2ea" }: { size?: number; color?: s
   );
 }
 import { createClient } from "@supabase/supabase-js";
+import { getBelgradeTimeAndCountdown } from "@/lib/belgrade-clock";
 
 type AnalyticsData = {
   total: number;
@@ -32,6 +33,8 @@ type AnalyticsData = {
   tiktokLeads: number;
   direct: number;
   affiliate: number;
+  /** Samo kod legacy=1 — leadovi se broje samo do ovog trenutka. */
+  legacyCutoffAt?: string;
   secondsUntilMidnight?: number;
   belgradeTime?: string;
   debug?: {
@@ -96,6 +99,43 @@ function CountdownDisplay({
   );
 }
 
+/** Stari admin: sat i odbrojavanje uživo na klijentu; lead brojevi ostaju iz API-ja (presek). */
+function LegacyDanasClock({ onMidnight }: { onMidnight: () => void }) {
+  const [, setTick] = useState(0);
+  const prevSecRef = useRef<number | null>(null);
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const { belgradeTime, secondsUntilMidnight } = getBelgradeTimeAndCountdown();
+  useEffect(() => {
+    const prev = prevSecRef.current;
+    if (prev !== null && prev < 180 && secondsUntilMidnight > 86000) {
+      onMidnight();
+    }
+    prevSecRef.current = secondsUntilMidnight;
+  }, [secondsUntilMidnight, onMidnight]);
+  const hh = Math.floor(secondsUntilMidnight / 3600);
+  const mm = Math.floor((secondsUntilMidnight % 3600) / 60);
+  const ss = secondsUntilMidnight % 60;
+  return (
+    <>
+      <div className="admin-danas-time">{belgradeTime}</div>
+      <div
+        style={{
+          fontSize: "clamp(14px, 4vw, 18px)",
+          fontWeight: 700,
+          color: "#00d4ff",
+          fontVariantNumeric: "tabular-nums",
+          contain: "layout",
+        }}
+      >
+        {hh}h {mm}m {ss}s
+      </div>
+    </>
+  );
+}
+
 function redirectToLogin() {
   window.location.href = "/admin/login";
 }
@@ -118,7 +158,7 @@ type MetaCampaignCpl = {
   blendedCpl: number | null;
 };
 
-export function AdminAnalyticsDashboard() {
+export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -154,15 +194,23 @@ export function AdminAnalyticsDashboard() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    setFrom((f) => f || firstDay.toISOString().slice(0, 10));
-    setTo((t) => t || now.toISOString().slice(0, 10));
-  }, []);
+    const todayYmd = now.toISOString().slice(0, 10);
+    if (legacy) {
+      // Stari prikaz: ceo opseg do preseka — ne samo tekući mesec (inače „prethodni” meseci nestanu).
+      setFrom((f) => f || "2020-01-01");
+      setTo((t) => t || todayYmd);
+      return;
+    }
+    const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
+    setFrom((f) => f || firstDayOfYear.toISOString().slice(0, 10));
+    setTo((t) => t || todayYmd);
+  }, [legacy]);
 
   const fetchTodayData = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       params.set("today", "1");
+      if (legacy) params.set("legacy", "1");
       const res = await fetch(`/api/admin/analytics?${params}`, { credentials: "include" });
       if (res.status === 401) {
         redirectToLogin();
@@ -175,7 +223,7 @@ export function AdminAnalyticsDashboard() {
     } catch {
       // opciono
     }
-  }, []);
+  }, [legacy]);
 
   const fetchData = useCallback(async (silent = false, withDebug = false) => {
     if (!silent) setLoading(true);
@@ -185,6 +233,7 @@ export function AdminAnalyticsDashboard() {
       if (from) params.set("from", from);
       if (to) params.set("to", to);
       if (withDebug) params.set("debug", "1");
+      if (legacy) params.set("legacy", "1");
       const res = await fetch(`/api/admin/analytics?${params}`, { credentials: "include" });
       if (res.status === 401) {
         redirectToLogin();
@@ -237,7 +286,7 @@ export function AdminAnalyticsDashboard() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [from, to, fetchTodayData]);
+  }, [legacy, from, to, fetchTodayData]);
 
   const handleLogout = async () => {
     try {
@@ -258,7 +307,7 @@ export function AdminAnalyticsDashboard() {
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!data) return;
+    if (legacy || !data) return;
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (url && key) {
@@ -279,13 +328,13 @@ export function AdminAnalyticsDashboard() {
         client.removeChannel(ch);
       };
     }
-  }, [data, fetchData]);
+  }, [legacy, data, fetchData]);
 
   useEffect(() => {
-    if (!data) return;
+    if (legacy || !data) return;
     const id = setInterval(() => fetchData(true), 30000);
     return () => clearInterval(id);
-  }, [data, fetchData]);
+  }, [legacy, data, fetchData]);
 
   const handleRefresh = () => fetchData();
   const handleCountdownReset = useCallback(() => {
@@ -347,6 +396,9 @@ export function AdminAnalyticsDashboard() {
                 onChange={(e) => setTo(e.target.value)}
                 className="admin-date-input"
               />
+              <span className="admin-period-hint" title="Brojevi uključuju samo leadove čiji datum pada u ovaj interval.">
+                samo ovaj opseg
+              </span>
             </div>
             <div className="admin-buttons-row">
               <button type="button" onClick={handleRefresh} disabled={loading} className="admin-btn admin-btn-refresh">
@@ -383,14 +435,24 @@ export function AdminAnalyticsDashboard() {
                     <div className="admin-danas-sub">Leadova danas · reset u ponoć</div>
                   </div>
                   <div className="admin-danas-countdown" style={{ contain: "layout" }}>
-                    {todayData.belgradeTime && (
-                      <div className="admin-danas-time">{todayData.belgradeTime}</div>
-                    )}
-                    {todayData.secondsUntilMidnight != null && todayData.secondsUntilMidnight > 0 && (
-                      <CountdownDisplay
-                        initialSeconds={todayData.secondsUntilMidnight}
-                        onReset={handleCountdownReset}
+                    {legacy ? (
+                      <LegacyDanasClock
+                        onMidnight={() => {
+                          void fetchTodayData();
+                        }}
                       />
+                    ) : (
+                      <>
+                        {todayData.belgradeTime && (
+                          <div className="admin-danas-time">{todayData.belgradeTime}</div>
+                        )}
+                        {todayData.secondsUntilMidnight != null && todayData.secondsUntilMidnight > 0 && (
+                          <CountdownDisplay
+                            initialSeconds={todayData.secondsUntilMidnight}
+                            onReset={handleCountdownReset}
+                          />
+                        )}
+                      </>
                     )}
                     <div className="admin-danas-reset-label">do resetovanja</div>
                   </div>
@@ -696,6 +758,7 @@ export function AdminAnalyticsDashboard() {
         .admin-live-badge { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #22c55e; }
         .admin-period-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .admin-period-label { font-size: 12px; color: #555; }
+        .admin-period-hint { font-size: 11px; color: #666; max-width: 140px; line-height: 1.3; }
         .admin-date-input { padding: 10px 12px; min-height: 44px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 14px; touch-action: manipulation; }
         .admin-buttons-row { display: flex; flex-wrap: wrap; gap: 8px; }
         .admin-btn { min-height: 44px; min-width: 44px; padding: 10px 14px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-family: inherit; border: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
