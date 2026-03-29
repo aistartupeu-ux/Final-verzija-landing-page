@@ -38,9 +38,8 @@ const LogoFallback = () => (
 );
 
 /**
- * Marquee: kartice daleko levo/desno nisu „isIntersecting“, pa browser često ne vuče MP4.
- * Kad je sekcija u kadru, po kartici zakazujemo load() sa stagger-om (ne odjednom 48 req).
- * IO samo za play/pause; pauza i dalje odložena da ne treperi na transform animaciji.
+ * Gornji red: pun video (play + heavy preload kad je u kadru).
+ * Donji red ista marquee animacija; kartice su „still“ — isti MP4 fajl, samo prvi kadar (metadata), bez puštanja.
  */
 const CARD_PLAY_IO_MARGIN = "180px 0px 180px 0px";
 const CARD_PLAY_THRESHOLDS = [0, 0.02, 0.08, 0.2, 0.45, 0.75, 1];
@@ -57,6 +56,7 @@ const VideoCard = memo(function VideoCard({
   sectionInView,
   marqueePaused,
   warmupIndex,
+  stillPreview = false,
 }: {
   src: string;
   reduced: boolean;
@@ -64,6 +64,8 @@ const VideoCard = memo(function VideoCard({
   marqueePaused: boolean;
   /** Redosled provere učitavanja kad je sekcija u kadru (širi raspored u vremenu). */
   warmupIndex: number;
+  /** Samo statičan kadar (bez play / auto buffer) — ista MP4 putanja. */
+  stillPreview?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -107,7 +109,7 @@ const VideoCard = memo(function VideoCard({
   }, []);
 
   useEffect(() => {
-    if (reduced || failed) return;
+    if (reduced || failed || stillPreview) return;
     const card = cardRef.current;
     const v = videoRef.current;
     if (!card || !v) return;
@@ -152,23 +154,24 @@ const VideoCard = memo(function VideoCard({
       clearPauseDebounce();
       io.disconnect();
     };
-  }, [reduced, failed, sectionInView, marqueePaused, clearPauseDebounce]);
+  }, [reduced, failed, stillPreview, sectionInView, marqueePaused, clearPauseDebounce]);
 
   useEffect(() => {
-    if (reduced || failed) return;
+    if (reduced || failed || stillPreview) return;
     if (!sectionInView || marqueePaused) {
       clearPauseDebounce();
       wantPlayRef.current = false;
       hardPause();
     }
-  }, [sectionInView, marqueePaused, reduced, failed, hardPause, clearPauseDebounce]);
+  }, [sectionInView, marqueePaused, reduced, failed, stillPreview, hardPause, clearPauseDebounce]);
 
-  /** Forsiraj skidanje metapodataka za off-screen kartice u marquee-u. */
+  /** Forsiraj skidanje metapodataka za off-screen kartice u marquee-u (still: samo lagano). */
   useEffect(() => {
     if (reduced || failed || !sectionInView) return;
     const v = videoRef.current;
     if (!v) return;
     const delay = Math.min(warmupIndex * WARMUP_STAGGER_MS, WARMUP_MAX_DELAY_MS);
+    const idleTimeout = stillPreview ? 14_000 : 10_000;
     const t = window.setTimeout(() => {
       const run = () => {
         try {
@@ -178,13 +181,13 @@ const VideoCard = memo(function VideoCard({
         }
       };
       if (typeof window.requestIdleCallback === "function") {
-        window.requestIdleCallback(run, { timeout: 10_000 });
+        window.requestIdleCallback(run, { timeout: idleTimeout });
       } else {
         run();
       }
     }, delay);
     return () => clearTimeout(t);
-  }, [sectionInView, reduced, failed, warmupIndex, src]);
+  }, [sectionInView, reduced, failed, stillPreview, warmupIndex, src]);
 
   /** Ako CDN sporije odgovara, ipak skloni logo da ne stoji zauvek. */
   useEffect(() => {
@@ -237,10 +240,10 @@ const VideoCard = memo(function VideoCard({
           ref={videoRef}
           src={videoSrc}
           muted
-          loop
+          loop={!stillPreview}
           playsInline
           disableRemotePlayback
-          preload={heavyPreload ? "auto" : "metadata"}
+          preload={stillPreview ? "metadata" : heavyPreload ? "auto" : "metadata"}
           onError={() => {
             if (errorRetries.current >= 1) {
               setFailed(true);
@@ -261,7 +264,7 @@ const VideoCard = memo(function VideoCard({
           }}
           onStalled={() => {
             const v = videoRef.current;
-            if (!v || failed) return;
+            if (!v || failed || stillPreview) return;
             try {
               v.load();
             } catch {
@@ -270,7 +273,7 @@ const VideoCard = memo(function VideoCard({
           }}
           onWaiting={() => {
             const v = videoRef.current;
-            if (!v || failed || !wantPlayRef.current) return;
+            if (!v || failed || stillPreview || !wantPlayRef.current) return;
             void v.play().catch(() => {});
           }}
           onProgress={() => {
@@ -287,13 +290,20 @@ const VideoCard = memo(function VideoCard({
             if (!v) return;
             try {
               v.currentTime = 0.001;
+              if (stillPreview) v.pause();
             } catch {
               /* ignore */
             }
             markLoaded();
           }}
-          onLoadedData={() => markLoaded()}
-          onCanPlay={() => markLoaded()}
+          onLoadedData={() => {
+            if (stillPreview) videoRef.current?.pause();
+            markLoaded();
+          }}
+          onCanPlay={() => {
+            if (stillPreview) videoRef.current?.pause();
+            markLoaded();
+          }}
           style={{
             width: "100%",
             height: "100%",
@@ -335,6 +345,7 @@ function VideoRow({
   reduced,
   sectionInView,
   warmupSlotOffset = 0,
+  stillPreview = false,
 }: {
   videos: string[];
   reverse?: boolean;
@@ -343,6 +354,8 @@ function VideoRow({
   sectionInView: boolean;
   /** Indeksi za stagger load-a u drugom redu (row1.length * 2). */
   warmupSlotOffset?: number;
+  /** Donji red: isti marquee, ali kartice kao statičan kadar bez puštanja videa. */
+  stillPreview?: boolean;
 }) {
   const items = [...videos, ...videos];
   const [dragOffset, setDragOffset] = useState(0);
@@ -460,6 +473,7 @@ function VideoRow({
               sectionInView={sectionInView}
               marqueePaused={paused}
               warmupIndex={warmupSlotOffset + i}
+              stillPreview={stillPreview}
             />
           ))}
         </div>
@@ -658,6 +672,7 @@ export default function VideoShowcaseSection({
         <VideoRow
           videos={row2}
           reverse
+          stillPreview
           paused={pauseMarquee}
           reduced={reduced}
           sectionInView={sectionInView}

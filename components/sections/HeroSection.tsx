@@ -7,11 +7,10 @@ import Image from "next/image";
 import CountdownTimer from "@/components/ui/CountdownTimer";
 import EmailForm from "@/components/ui/EmailForm";
 import { getCdnMediaUrl } from "@/lib/cdn-media";
-import {
-  CDN_PATH_HERO_BG,
-  CDN_PATH_EXPLAINER_MP4,
-  CDN_PATH_EXPLAINER_POSTER,
-} from "@/lib/video-cdn-paths";
+import { CDN_PATH_HERO_BG, CDN_PATH_EXPLAINER_MP4 } from "@/lib/video-cdn-paths";
+
+/** Poster pre prvog play-a — isti logo kao u headeru (`public/logo.png`). */
+const HERO_VSL_POSTER_SRC = "/logo.png";
 
 // Perioda giveawaya 2.–14. apr. 2026, Europe/Belgrade (CEST = UTC+2 u aprilu).
 // Tajmer do kraja 14. apr. = 15. apr. 00:00 lokalno. Isto za hero / giveaway LP.
@@ -20,13 +19,11 @@ const TARGET_DATE = new Date("2026-04-15T00:00:00+02:00");
 const DEFAULT_HERO_MEDIA = {
   bgMp4: getCdnMediaUrl(CDN_PATH_HERO_BG),
   explainerMp4: getCdnMediaUrl(CDN_PATH_EXPLAINER_MP4),
-  explainerPoster: getCdnMediaUrl(CDN_PATH_EXPLAINER_POSTER),
 };
 
 export type HeroSectionMediaUrls = {
   bgMp4: string;
   explainerMp4: string;
-  explainerPoster: string;
 };
 
 export default function HeroSection({
@@ -34,8 +31,7 @@ export default function HeroSection({
 }: {
   mediaUrls?: HeroSectionMediaUrls;
 }) {
-  const { bgMp4: HERO_BG_MP4, explainerMp4: EXPLAINER_MP4, explainerPoster: EXPLAINER_POSTER } =
-    mediaUrls;
+  const { bgMp4: HERO_BG_MP4, explainerMp4: EXPLAINER_MP4 } = mediaUrls;
   const bgVideoRef = useRef<HTMLVideoElement>(null);
   const explainerRef = useRef<HTMLVideoElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
@@ -43,6 +39,9 @@ export default function HeroSection({
   const [hovering, setHovering] = useState(false);
   const [bgFailed, setBgFailed] = useState(false);
   const [explainerFailed, setExplainerFailed] = useState(false);
+  /** Kad je jednom krenuo repro — sklanja preview (logo + providni sloj), pun video. */
+  const [explainerHasPlayed, setExplainerHasPlayed] = useState(false);
+  const primeExplainerFrameRef = useRef(true);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -114,16 +113,43 @@ export default function HeroSection({
     };
   }, [HERO_BG_MP4]);
 
+  useEffect(() => {
+    setExplainerHasPlayed(false);
+    setPlaying(false);
+    primeExplainerFrameRef.current = true;
+  }, [EXPLAINER_MP4]);
+
+  useEffect(() => {
+    if (explainerFailed) return;
+    const v = explainerRef.current;
+    if (!v) return;
+    if (playing) {
+      void v.play().catch(() => setPlaying(false));
+    } else {
+      v.pause();
+    }
+  }, [playing, explainerFailed, EXPLAINER_MP4]);
+
+  /** Jedan dekoder manje dok gledaju VSL. */
+  useEffect(() => {
+    const bg = bgVideoRef.current;
+    if (!bg || bgFailed) return;
+    if (playing) {
+      bg.pause();
+    } else {
+      void bg.play().catch(() => {});
+    }
+  }, [playing, bgFailed]);
+
   const togglePlay = useCallback(() => {
-    if (!explainerRef.current) return;
+    if (!explainerRef.current || explainerFailed) return;
     if (playing) {
       explainerRef.current.pause();
       setPlaying(false);
     } else {
-      explainerRef.current.play();
       setPlaying(true);
     }
-  }, [playing]);
+  }, [playing, explainerFailed]);
 
   return (
     <section
@@ -208,42 +234,72 @@ export default function HeroSection({
         >
           <div
             onClick={togglePlay}
+            className="hero-vsl-frame"
             style={{
-              position: "relative", borderRadius: 16, overflow: "hidden",
-              aspectRatio: "16 / 9", cursor: "pointer",
+              position: "relative",
+              borderRadius: 16,
+              overflow: "hidden",
+              aspectRatio: "16 / 9",
+              cursor: "pointer",
               background: "linear-gradient(145deg, #12182a 0%, #0a0d18 45%, #050508 100%)",
               border: "1px solid rgba(0,212,255,0.2)",
-              boxShadow: hovering
-                ? "0 0 0 1px rgba(0,212,255,0.3), 0 20px 60px rgba(0,0,0,0.7), 0 0 50px rgba(0,212,255,0.08)"
-                : "0 16px 50px rgba(0,0,0,0.6)",
-              transition: "box-shadow 0.3s ease",
+              contain: "layout paint",
             }}
           >
             <video
-              key={`${EXPLAINER_MP4}|${EXPLAINER_POSTER}`}
+              key={EXPLAINER_MP4}
               ref={explainerRef}
               src={EXPLAINER_MP4}
               playsInline
-              preload="none"
-              poster={EXPLAINER_POSTER}
+              preload="metadata"
+              disableRemotePlayback
+              onLoadedMetadata={(e) => {
+                if (!primeExplainerFrameRef.current) return;
+                const v = e.currentTarget;
+                try {
+                  v.currentTime = 0.001;
+                  v.pause();
+                } catch {
+                  /* ignore */
+                }
+              }}
+              onPlay={() => {
+                primeExplainerFrameRef.current = false;
+                setExplainerHasPlayed(true);
+              }}
               onError={() => setExplainerFailed(true)}
               onEnded={() => setPlaying(false)}
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                objectPosition: "center",
+                display: "block",
+                zIndex: 0,
+              }}
             />
-            {/* Overlay */}
+            {/* Pre play: providan sloj + logo; video (prvi kadar) vidljiv ispod. Posle play — bez overlaya. Pauza: samo play + blagi film. */}
             {!playing && (
-              <div style={{
-                position: "absolute", inset: 0,
-                background: "rgba(5,5,12,0.52)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 2,
+                  background: !explainerHasPlayed
+                    ? "linear-gradient(180deg, rgba(5,8,20,0.32) 0%, rgba(5,5,14,0.48) 100%)"
+                    : "rgba(0,0,0,0.32)",
+                  pointerEvents: "auto",
+                }}
+              >
                 {explainerFailed ? (
                   <div style={{
                     position: "absolute",
                     bottom: 14,
                     left: 14,
                     right: 14,
-                    zIndex: 3,
+                    zIndex: 4,
                     padding: "10px 12px",
                     borderRadius: 12,
                     border: "1px solid rgba(255,255,255,0.12)",
@@ -257,32 +313,79 @@ export default function HeroSection({
                     Video se trenutno ne učitava (404). Prikazujemo fallback dok ne sredimo hostovanje.
                   </div>
                 ) : null}
-                {/* Pulse ring */}
-                <div style={{
-                  position: "absolute", width: 96, height: 96, borderRadius: "50%",
-                  border: "2px solid rgba(0,212,255,0.3)",
-                  animation: "hero-vring 2s ease-out infinite",
-                }} />
-                <div style={{
-                  width: 64, height: 64, borderRadius: "50%",
-                  background: "linear-gradient(135deg,#00d4ff,#0090c0)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  boxShadow: "0 0 40px rgba(0,212,255,0.6)",
-                  transform: hovering ? "scale(1.08)" : "scale(1)",
-                  transition: "transform 0.2s ease",
-                  position: "relative", zIndex: 2,
-                }}>
-                  <Play size={24} color="#050508" fill="#050508" style={{ marginLeft: 4 }} />
-                </div>
+                {!explainerHasPlayed && !explainerFailed ? (
+                  <img
+                    src={HERO_VSL_POSTER_SRC}
+                    alt="AI Hype Academy"
+                    decoding="async"
+                    fetchPriority="high"
+                    draggable={false}
+                    style={{
+                      position: "absolute",
+                      left: "50%",
+                      top: "clamp(12px, 10%, 40px)",
+                      transform: "translateX(-50%)",
+                      width: "min(260px, 62%)",
+                      height: "auto",
+                      objectFit: "contain",
+                      filter: "drop-shadow(0 4px 28px rgba(0,0,0,0.75))",
+                      zIndex: 3,
+                      pointerEvents: "none",
+                    }}
+                  />
+                ) : null}
+                {!explainerFailed ? (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      zIndex: 3,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <div
+                      className="hero-vsl-pulse-ring"
+                      style={{
+                        position: "absolute",
+                        width: 96,
+                        height: 96,
+                        borderRadius: "50%",
+                        border: "2px solid rgba(0,212,255,0.35)",
+                        animation: "hero-vring 2s ease-out infinite",
+                      }}
+                    />
+                    <div style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: "50%",
+                      background: "linear-gradient(135deg,#00d4ff,#0090c0)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: "0 0 40px rgba(0,212,255,0.5)",
+                      transform: hovering ? "scale(1.08)" : "scale(1)",
+                      transition: "transform 0.2s ease",
+                      position: "relative",
+                      zIndex: 1,
+                    }}>
+                      <Play size={24} color="#050508" fill="#050508" style={{ marginLeft: 4 }} />
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
             {/* Pause overlay */}
             {playing && hovering && (
               <div style={{
                 position: "absolute", inset: 0,
+                zIndex: 5,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 background: "rgba(0,0,0,0.2)",
-              }}>
+              }}
+              >
                 <div style={{
                   width: 52, height: 52, borderRadius: "50%",
                   background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)",

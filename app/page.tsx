@@ -7,7 +7,6 @@ import { getServerCdnUrl } from "@/lib/bunny-cdn-sign";
 import {
   CDN_PATH_HERO_BG,
   CDN_PATH_EXPLAINER_MP4,
-  CDN_PATH_EXPLAINER_POSTER,
   CDN_PATH_SHOWCASE_ROW1,
   CDN_PATH_SHOWCASE_ROW2,
 } from "@/lib/video-cdn-paths";
@@ -45,12 +44,27 @@ const VideoShowcaseSection = dynamic(() => import("@/components/sections/VideoSh
 /** Osvežavanje HTML-a da Bunny token u media URL-ovima ne istekne (getServerCdnUrl koristi Date). */
 export const revalidate = 3600;
 
+function publicAsset(path: string) {
+  return path.startsWith("/") ? path : `/${path}`;
+}
+
+/** Hero iz `public/` (isti pathovi kao u Bunny-ju) — .env: NEXT_PUBLIC_LOCAL_HERO_MEDIA=true */
+function useLocalHeroMedia() {
+  const v = process.env.NEXT_PUBLIC_LOCAL_HERO_MEDIA?.trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
 export default function Home() {
-  const heroMedia = {
-    bgMp4: getServerCdnUrl(CDN_PATH_HERO_BG),
-    explainerMp4: getServerCdnUrl(CDN_PATH_EXPLAINER_MP4),
-    explainerPoster: getServerCdnUrl(CDN_PATH_EXPLAINER_POSTER),
-  };
+  const heroFromPublic = useLocalHeroMedia();
+  const heroMedia = heroFromPublic
+    ? {
+        bgMp4: publicAsset(CDN_PATH_HERO_BG),
+        explainerMp4: publicAsset(CDN_PATH_EXPLAINER_MP4),
+      }
+    : {
+        bgMp4: getServerCdnUrl(CDN_PATH_HERO_BG),
+        explainerMp4: getServerCdnUrl(CDN_PATH_EXPLAINER_MP4),
+      };
   const showcaseRow1Urls = CDN_PATH_SHOWCASE_ROW1.map((p) => getServerCdnUrl(p));
   const showcaseRow2Urls = CDN_PATH_SHOWCASE_ROW2.map((p) => getServerCdnUrl(p));
 
