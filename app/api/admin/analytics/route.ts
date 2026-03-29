@@ -106,10 +106,7 @@ export async function GET(req: NextRequest) {
   }
 
   // 2) Supabase — dopuna (leadovi koji nisu u Sheet-u)
-  let query = supabase.from("leads").select("id, created_at, source_tag, utm_source, utm_medium, utm_campaign, email");
-  if (fromDate && !isNaN(fromDate.getTime())) {
-    query = query.gte("created_at", fromDate.toISOString());
-  }
+  // PostgREST podrazumevano max 1000 redova po zahtevu — mora paginacija.
   let upperBound: Date | null = null;
   if (toDate && !isNaN(toDate.getTime())) {
     const endOfDay = new Date(toDate);
@@ -121,11 +118,8 @@ export async function GET(req: NextRequest) {
       upperBound = legacyCutoffDate;
     }
   }
-  if (upperBound) {
-    query = query.lte("created_at", upperBound.toISOString());
-  }
-  const { data: leadsSupabase } = await query.order("created_at", { ascending: false });
-  const listSupabase = (leadsSupabase ?? []) as {
+
+  type LeadRow = {
     id: string;
     created_at: string;
     source_tag: string | null;
@@ -133,7 +127,27 @@ export async function GET(req: NextRequest) {
     utm_medium?: string | null;
     utm_campaign?: string | null;
     email?: string;
-  }[];
+  };
+
+  const PAGE = 1000;
+  const listSupabase: LeadRow[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    let q = supabase.from("leads").select("id, created_at, source_tag, utm_source, utm_medium, utm_campaign, email");
+    if (fromDate && !isNaN(fromDate.getTime())) {
+      q = q.gte("created_at", fromDate.toISOString());
+    }
+    if (upperBound) {
+      q = q.lte("created_at", upperBound.toISOString());
+    }
+    const { data: batch, error } = await q.order("created_at", { ascending: false }).range(offset, offset + PAGE - 1);
+    if (error) {
+      console.error("admin analytics leads:", error.message);
+      break;
+    }
+    const rows = (batch ?? []) as LeadRow[];
+    listSupabase.push(...rows);
+    if (rows.length < PAGE) break;
+  }
   for (const lead of listSupabase) {
     const day = lead.created_at?.slice(0, 10) ?? "";
     const key = `${(lead.email ?? lead.id).toString().toLowerCase()}_${day}`;
@@ -196,6 +210,7 @@ export async function GET(req: NextRequest) {
     }
     payload.debug = {
       sheetRowsTotal: sheetRows.length,
+      supabaseLeadsFetched: listSupabase.length,
       sheetBySource,
       sheetSample: sheetRows.slice(0, 5).map((r) => ({
         date: r.date,
