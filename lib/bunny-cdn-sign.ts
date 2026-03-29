@@ -6,8 +6,8 @@ import { getCdnMediaUrl } from "@/lib/cdn-media";
  * Bunny CDN Basic Token Authentication (MD5).
  * @see https://docs.bunny.net/docs/cdn-token-authentication-basic
  *
- * Na pull zone u Bunny dashboard-u uključi "Token authentication" i isti ključ
- * stavi u BUNNY_CDN_TOKEN_KEY (nikad NEXT_PUBLIC_*).
+ * Na pull zone u Bunny dashboard-u uključi token kao **Basic (MD5)** — ne Advanced (SHA256).
+ * Security key stavi u BUNNY_CDN_TOKEN_KEY (nikad NEXT_PUBLIC_*).
  *
  * Bez ključa: ponašanje kao getCdnMediaUrl (lokalni dev, fallback).
  */

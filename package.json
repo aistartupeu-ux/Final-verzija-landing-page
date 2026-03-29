@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:bunny": "node --env-file=.env.local scripts/verify-bunny-token.mjs"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
