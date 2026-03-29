@@ -121,6 +121,27 @@ body {
   transform: translate3d(0, -2px, 0);
 }
 
+/* Gold CTA — isti jezik kao giveaway forma / tokeni */
+.glow-btn--gold {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 52%, #d97706 100%);
+  color: #050508;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  box-shadow:
+    0 0 22px rgba(251,191,36,0.32),
+    0 0 52px rgba(251,191,36,0.12),
+    0 4px 16px rgba(0,0,0,0.35);
+}
+.glow-btn--gold:hover {
+  background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 40%, #f59e0b 100%);
+  box-shadow:
+    0 0 34px rgba(251,191,36,0.45),
+    0 0 72px rgba(251,191,36,0.14),
+    0 4px 20px rgba(0,0,0,0.42);
+  transform: translate3d(0, -2px, 0);
+}
+
 .text-glow {
   text-shadow: 0 0 60px rgba(0,212,255,0.12), 0 0 120px rgba(0,212,255,0.05);
 }
@@ -283,4 +304,218 @@ input::placeholder {
 }
 input:focus::placeholder {
   color: #777;
+}
+
+/* ─── Giveaway LP — vizuelni identitet (tokeni + pozadina) ─── */
+.giveaway-page {
+  --gv-bg: #050508;
+  --gv-text-primary: #ffffff;
+  --gv-text-secondary: #e2e8f0;
+  --gv-text-muted: rgba(255, 255, 255, 0.5);
+  --gv-gold-primary: #fbbf24;
+  --gv-gold-secondary: #f59e0b;
+  --gv-gold-dark: #d97706;
+  --gv-gold-glow: rgba(251, 191, 36, 0.1);
+  --gv-gold-border: rgba(251, 191, 36, 0.2);
+  --gv-purple: #8b5cf6;
+  --gv-success: #4ade80;
+  background-color: var(--gv-bg);
+  position: relative;
+  overflow-x: clip;
+  min-height: 100vh;
+}
+
+.giveaway-page__bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: var(--gv-bg);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.giveaway-page__glow-gold {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 600px;
+  height: 500px;
+  transform: translate(-50%, -50%);
+  margin-left: 0;
+  background: radial-gradient(ellipse, rgba(251, 191, 36, 1) 0%, transparent 68%);
+  opacity: 0.05;
+  animation: giveawayGoldPulse 6s ease-in-out infinite;
+  will-change: opacity;
+}
+
+.giveaway-page__glow-violet {
+  position: absolute;
+  left: 60%;
+  top: 30%;
+  width: 400px;
+  height: 350px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(ellipse, rgba(139, 92, 246, 1) 0%, transparent 70%);
+  opacity: 0.05;
+}
+
+@keyframes giveawayGoldPulse {
+  0%, 100% { opacity: 0.05; }
+  50% { opacity: 0.09; }
+}
+
+@keyframes giveawaySparkleFloat {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(4px, -14px); }
+}
+
+.giveaway-page__sparkles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.giveaway-page__sparkle {
+  position: absolute;
+  border-radius: 50%;
+  animation: giveawaySparkleFloat 6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.giveaway-page__sparkle--0 { left: 12%; top: 16%; width: 3px; height: 3px; background: var(--gv-gold-primary); opacity: 0.1; animation-duration: 5.2s; }
+.giveaway-page__sparkle--1 { left: 78%; top: 22%; width: 2px; height: 2px; background: #fff; opacity: 0.08; animation-duration: 6.5s; animation-delay: -1s; }
+.giveaway-page__sparkle--2 { left: 22%; top: 42%; width: 2px; height: 2px; background: var(--gv-gold-secondary); opacity: 0.12; animation-duration: 5.5s; animation-delay: -2s; }
+.giveaway-page__sparkle--3 { left: 88%; top: 48%; width: 3px; height: 3px; background: #fff; opacity: 0.07; animation-duration: 7s; animation-delay: -0.5s; }
+.giveaway-page__sparkle--4 { left: 8%; top: 62%; width: 2px; height: 2px; background: var(--gv-gold-primary); opacity: 0.09; animation-duration: 5.8s; }
+.giveaway-page__sparkle--5 { left: 52%; top: 12%; width: 2px; height: 2px; background: #fff; opacity: 0.06; animation-duration: 6.2s; animation-delay: -3s; }
+.giveaway-page__sparkle--6 { left: 66%; top: 68%; width: 3px; height: 3px; background: var(--gv-gold-secondary); opacity: 0.11; animation-duration: 5.4s; animation-delay: -1.5s; }
+.giveaway-page__sparkle--7 { left: 34%; top: 78%; width: 2px; height: 2px; background: #fff; opacity: 0.08; animation-duration: 6.8s; }
+
+.giveaway-page__main {
+  position: relative;
+  z-index: 1;
+}
+
+.giveaway-page__headline {
+  font-weight: 800;
+  font-size: clamp(32px, 4.2vw, 42px);
+  line-height: 1.12;
+  margin: 0 auto 12px;
+  max-width: 720px;
+  background: linear-gradient(135deg, var(--gv-gold-primary) 0%, var(--gv-gold-secondary) 45%, var(--gv-gold-dark) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 2px 24px var(--gv-gold-glow));
+}
+
+.giveaway-page__subtitle {
+  margin: 0 auto;
+  max-width: 640px;
+  color: rgba(255, 239, 209, 0.78);
+  font-weight: 700;
+  font-size: clamp(17px, 1.9vw, 20px);
+  line-height: 1.55;
+}
+
+.giveaway-page__card {
+  max-width: 640px;
+  margin: 0 auto;
+  border-radius: 28px;
+  border: 1px solid var(--gv-gold-border);
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.08) 0%, rgba(5, 5, 8, 0.92) 55%);
+  box-shadow:
+    0 18px 80px rgba(0, 0, 0, 0.48),
+    0 0 60px var(--gv-gold-glow);
+  padding: 28px 24px;
+}
+
+@media (max-width: 640px) {
+  .giveaway-page__section {
+    padding: 92px 16px 92px !important;
+  }
+
+  .giveaway-page__headline {
+    font-size: clamp(28px, 9vw, 34px);
+    line-height: 1.14;
+    margin-bottom: 10px;
+  }
+
+  .giveaway-page__subtitle {
+    font-size: clamp(15px, 4.6vw, 17px);
+    line-height: 1.45;
+    max-width: 34ch;
+  }
+
+  .giveaway-page__card {
+    border-radius: 22px;
+    padding: 18px 14px 16px;
+    box-shadow:
+      0 14px 46px rgba(0, 0, 0, 0.44),
+      0 0 36px var(--gv-gold-glow);
+  }
+
+  .giveaway-page__glow-gold {
+    width: 430px;
+    height: 360px;
+    top: 35%;
+  }
+
+  .giveaway-page__glow-violet {
+    width: 280px;
+    height: 230px;
+    top: 28%;
+    left: 58%;
+  }
+
+  .giveaway-page__sparkle--3,
+  .giveaway-page__sparkle--6,
+  .giveaway-page__sparkle--7 {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .giveaway-page__glow-gold {
+    animation: none;
+    opacity: 0.07;
+  }
+  .giveaway-page__sparkle {
+    animation: none;
+  }
+}
+
+/* Lead magnet (/free-guide) — pozadinske animacije (bez styled-jsx) */
+@keyframes lmGlowPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+@keyframes lmParticleFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+.lead-magnet-wrapper .lm-glow-pulse {
+  animation: lmGlowPulse 6s ease-in-out infinite;
+}
+.lead-magnet-wrapper .lm-glow-pulse--delay {
+  animation-delay: 2s;
+}
+.lead-magnet-wrapper .lm-glow-pulse--delay-2 {
+  animation-delay: 4s;
+}
+.lead-magnet-wrapper .lm-particle-float {
+  animation: lmParticleFloat 6s ease-in-out infinite;
+}
+.lead-magnet-wrapper ::selection {
+  background: rgba(139, 92, 246, 0.3);
+  color: #ffffff;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lead-magnet-wrapper .lm-glow-pulse,
+  .lead-magnet-wrapper .lm-particle-float {
+    animation: none !important;
+  }
 }

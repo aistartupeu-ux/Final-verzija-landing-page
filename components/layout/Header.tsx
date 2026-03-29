@@ -1,12 +1,23 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import Image from "next/image";
 
 const NAV_SECTIONS = ["blog", "kako-funkcionise"];
+const GIVEAWAY_PREFIXES = ["/giveaway", "/promo/giveaway-10-mesta"];
+const LEAD_MAGNET_PREFIXES = ["/free-guide", "/promo/lead-magnet"];
+
+function pathMatchesPrefixes(pathname: string, prefixes: string[]): boolean {
+  return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
 
 export default function Header() {
+  const pathname = usePathname();
+  const isGiveawayPage = pathMatchesPrefixes(pathname, GIVEAWAY_PREFIXES);
+  const isLeadMagnetPage = pathMatchesPrefixes(pathname, LEAD_MAGNET_PREFIXES);
+  const hideHomeSectionNav = isGiveawayPage || isLeadMagnetPage;
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState("");
@@ -58,6 +69,10 @@ export default function Header() {
 
   const jump = () => {
     setOpen(false);
+    if (hideHomeSectionNav) {
+      window.location.assign("/#final-cta");
+      return;
+    }
     document.getElementById("final-cta")?.scrollIntoView({ behavior: "smooth" });
   };
 
@@ -74,32 +89,53 @@ export default function Header() {
       }}
     >
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 72 }}>
-        <a href="#" style={{ textDecoration: "none", display: "flex", alignItems: "center" }}>
+        <a href={hideHomeSectionNav ? "/" : "#"} style={{ textDecoration: "none", display: "flex", alignItems: "center" }}>
           <Image src="/logo.png" alt="AI Hype Academy" width={140} height={44} style={{ height: 44, width: "auto", objectFit: "contain" }} priority />
         </a>
 
         <nav style={{ display: "flex", alignItems: "center", gap: 32 }} className="hide-mobile">
-          {[
-            { href: "#blog", label: "O nama", id: "blog" },
-            { href: "#kako-funkcionise", label: "Kako funkcioniše", id: "kako-funkcionise" },
-          ].map(link => (
-            <a key={link.id} href={link.href} style={{
-              fontSize: 14, textDecoration: "none", transition: "color 0.2s",
-              color: active === link.id ? "#00d4ff" : "#8a8a9a",
-              position: "relative",
-            }}>
-              {link.label}
-              {active === link.id && (
-                <span style={{
-                  position: "absolute", bottom: -4, left: "50%", transform: "translateX(-50%)",
-                  width: 4, height: 4, borderRadius: "50%", background: "#00d4ff",
-                  boxShadow: "0 0 6px #00d4ff",
-                  display: "block",
-                }} />
-              )}
-            </a>
-          ))}
-          <button onClick={jump} className="glow-btn" style={{ padding: "10px 24px", fontSize: 12, borderRadius: 10 }}>Join The Hype</button>
+          {!hideHomeSectionNav &&
+            [
+              { href: "#blog", label: "O nama", id: "blog" },
+              { href: "#kako-funkcionise", label: "Kako funkcioniše", id: "kako-funkcionise" },
+            ].map((link) => (
+              <a
+                key={link.id}
+                href={link.href}
+                style={{
+                  fontSize: 14,
+                  textDecoration: "none",
+                  transition: "color 0.2s",
+                  color: active === link.id ? "#00d4ff" : "#8a8a9a",
+                  position: "relative",
+                }}
+              >
+                {link.label}
+                {active === link.id && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      bottom: -4,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      width: 4,
+                      height: 4,
+                      borderRadius: "50%",
+                      background: "#00d4ff",
+                      boxShadow: "0 0 6px #00d4ff",
+                      display: "block",
+                    }}
+                  />
+                )}
+              </a>
+            ))}
+          <button
+            onClick={jump}
+            className={isGiveawayPage ? "glow-btn glow-btn--gold" : "glow-btn"}
+            style={{ padding: "10px 24px", fontSize: 12, borderRadius: 10 }}
+          >
+            Join The Hype
+          </button>
         </nav>
 
         <button onClick={() => setOpen(!open)} className="show-mobile" style={{ background: "none", border: "none", color: "#8a8a9a", cursor: "pointer", padding: 8 }}>
@@ -109,9 +145,19 @@ export default function Header() {
 
       {open && (
         <div className="show-mobile" style={{ background: "rgba(5,5,8,0.98)", borderTop: "1px solid rgba(0,212,255,0.08)", padding: "20px 24px", flexDirection: "column", fontFamily: "inherit" }}>
-          <a href="#blog" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 14, color: "#8a8a9a", textDecoration: "none", padding: "10px 0", fontFamily: "inherit" }}>O nama</a>
-          <a href="#kako-funkcionise" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 14, color: "#8a8a9a", textDecoration: "none", padding: "10px 0", fontFamily: "inherit" }}>Kako funkcioniše</a>
-          <button onClick={jump} className="glow-btn" style={{ width: "100%", marginTop: 12, borderRadius: 10, fontFamily: "inherit" }}>Join The Hype</button>
+          {!hideHomeSectionNav && (
+            <>
+              <a href="#blog" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 14, color: "#8a8a9a", textDecoration: "none", padding: "10px 0", fontFamily: "inherit" }}>O nama</a>
+              <a href="#kako-funkcionise" onClick={() => setOpen(false)} style={{ display: "block", fontSize: 14, color: "#8a8a9a", textDecoration: "none", padding: "10px 0", fontFamily: "inherit" }}>Kako funkcioniše</a>
+            </>
+          )}
+          <button
+            onClick={jump}
+            className={isGiveawayPage ? "glow-btn glow-btn--gold" : "glow-btn"}
+            style={{ width: "100%", marginTop: 12, borderRadius: 10, fontFamily: "inherit" }}
+          >
+            Join The Hype
+          </button>
         </div>
       )}
 
