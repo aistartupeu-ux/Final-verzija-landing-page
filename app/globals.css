@@ -695,6 +695,16 @@ html[data-hero-vsl-heavy="1"] .ticker-track.ticker-anim {
   }
 }
 
+/* Vertikalni / „telefonski“ snimak u 16:9 okviru: na uskim ekranima contain = ceo kadar vidljiv (cover iseče). */
+.hero-vsl-explainer-video {
+  object-fit: cover;
+}
+@media (max-width: 768px) {
+  .hero-vsl-explainer-video {
+    object-fit: contain;
+  }
+}
+
 /* Hero VSL: box-shadow samo preko CSS :hover — manje React re-rendera na mousemove */
 .hero-vsl-frame {
   box-shadow: 0 16px 50px rgba(0, 0, 0, 0.6);

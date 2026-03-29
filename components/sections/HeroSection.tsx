@@ -250,6 +250,7 @@ export default function HeroSection({
             <video
               key={EXPLAINER_MP4}
               ref={explainerRef}
+              className="hero-vsl-explainer-video"
               src={EXPLAINER_MP4}
               playsInline
               preload="auto"
@@ -285,14 +286,13 @@ export default function HeroSection({
                 inset: 0,
                 width: "100%",
                 height: "100%",
-                objectFit: "cover",
                 objectPosition: "center",
                 display: "block",
                 zIndex: 0,
-                backgroundColor: "transparent",
+                backgroundColor: "#0a0d18",
               }}
             />
-            {/* Pre prvog play-a: pun kadar videa + veliki providni beli watermark (kao starom mobilnom izgledu) + natpis ispod. Pauza: blagi film. */}
+            {/* Pre prvog play-a: watermark preko preview kadra; na uskim ekranima video je contain da vertikalni snimak bude ceo vidljiv. */}
             {!playing && (
               <>
                 {explainerHasPlayed && !explainerFailed ? (
@@ -307,71 +307,35 @@ export default function HeroSection({
                   />
                 ) : null}
                 {!explainerHasPlayed && !explainerFailed ? (
-                  <>
-                    <div
-                      aria-hidden
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      zIndex: 2,
+                      pointerEvents: "none",
+                      padding: "min(14vw, 56px) min(6vw, 20px)",
+                    }}
+                  >
+                    <img
+                      src={HERO_VSL_WATERMARK_SRC}
+                      alt=""
+                      decoding="async"
+                      fetchPriority="high"
+                      draggable={false}
                       style={{
-                        position: "absolute",
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        height: "22%",
-                        zIndex: 2,
-                        pointerEvents: "none",
-                        background:
-                          "linear-gradient(to top, rgba(5,5,12,0.88) 0%, rgba(5,5,12,0.35) 45%, transparent 100%)",
+                        width: "min(92%, 400px)",
+                        maxHeight: "58%",
+                        height: "auto",
+                        objectFit: "contain",
+                        opacity: 0.4,
+                        filter:
+                          "brightness(0) invert(1) drop-shadow(0 4px 28px rgba(0,0,0,0.5))",
                       }}
                     />
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 2,
-                        pointerEvents: "none",
-                        padding: "min(14vw, 56px) min(6vw, 20px)",
-                      }}
-                    >
-                      <img
-                        src={HERO_VSL_WATERMARK_SRC}
-                        alt=""
-                        decoding="async"
-                        fetchPriority="high"
-                        draggable={false}
-                        style={{
-                          width: "min(92%, 400px)",
-                          maxHeight: "58%",
-                          height: "auto",
-                          objectFit: "contain",
-                          opacity: 0.4,
-                          filter:
-                            "brightness(0) invert(1) drop-shadow(0 4px 28px rgba(0,0,0,0.5))",
-                        }}
-                      />
-                    </div>
-                    <p
-                      style={{
-                        position: "absolute",
-                        left: 12,
-                        right: 12,
-                        bottom: 10,
-                        margin: 0,
-                        textAlign: "center",
-                        fontSize: "clamp(11px, 3.1vw, 13px)",
-                        fontWeight: 600,
-                        letterSpacing: "0.02em",
-                        color: "rgba(255,255,255,0.95)",
-                        textShadow: "0 1px 10px rgba(0,0,0,0.9)",
-                        zIndex: 3,
-                        pointerEvents: "none",
-                        lineHeight: 1.35,
-                      }}
-                    >
-                      Ova osoba koju gledate
-                    </p>
-                  </>
+                  </div>
                 ) : null}
                 {explainerFailed ? (
                   <div
