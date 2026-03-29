@@ -42,22 +42,22 @@ const nextConfig: NextConfig = {
         ],
       },
       { source: "/:path*", headers: securityHeaders },
-      // Aggressive caching for static assets
+      // Statički fajlovi: bez "immutable" da pregledač/CDN mogu da dobiju noviju verziju istog imena posle deploy-a.
       {
         source: "/avatars/:path*",
-        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+        headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }],
       },
       {
         source: "/:path*.webp",
-        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
       },
       {
         source: "/:path*.mp4",
-        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+        headers: [{ key: "Cache-Control", value: "public, max-age=3600, stale-while-revalidate=86400" }],
       },
       {
         source: "/:path*.zip",
-        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
       },
     ];
   },
