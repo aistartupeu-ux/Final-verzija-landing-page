@@ -38,12 +38,14 @@ const LogoFallback = () => (
 );
 
 /**
- * Kartice žive unutar CSS marquee (transform animacija). ratio iz IO često „treperi“,
- * pa za puštanje koristimo samo isIntersecting + širok margin. Preload nije „auto“ na
- * svim instancama — 40+ MP4 odjednom guši mrežu/dekoder; metadata + play() kad uđe u kadar.
+ * Marquee (CSS transform) često kratko skine isIntersecting → video stane ako odmah pauziramo.
+ * Pauza je odložena (~260 ms). play() ne čeka „loaded“ — buffer ide kroz metadata + load().
+ * preload=auto samo posle prvog ulaska u kadar (ne na svim karticama od starta).
  */
-const CARD_PLAY_IO_MARGIN = "140px 0px 140px 0px";
-const CARD_PLAY_THRESHOLDS = [0, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 1];
+const CARD_PLAY_IO_MARGIN = "180px 0px 180px 0px";
+const CARD_PLAY_THRESHOLDS = [0, 0.02, 0.08, 0.2, 0.45, 0.75, 1];
+const PAUSE_DEBOUNCE_MS = 260;
+const PLAY_NUDGE_MS = 1600;
 
 const VideoCard = memo(function VideoCard({
   src,
@@ -61,8 +63,12 @@ const VideoCard = memo(function VideoCard({
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [videoSrc, setVideoSrc] = useState(src);
+  const [heavyPreload, setHeavyPreload] = useState(false);
   const didMarkLoaded = useRef(false);
   const errorRetries = useRef(0);
+  const wantPlayRef = useRef(false);
+  const pauseDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heavyPreloadBoostedRef = useRef(false);
 
   useEffect(() => {
     setVideoSrc(src);
@@ -70,6 +76,8 @@ const VideoCard = memo(function VideoCard({
     didMarkLoaded.current = false;
     setLoaded(false);
     setFailed(false);
+    setHeavyPreload(false);
+    heavyPreloadBoostedRef.current = false;
   }, [src]);
 
   const markLoaded = useCallback(() => {
@@ -78,23 +86,17 @@ const VideoCard = memo(function VideoCard({
     setLoaded(true);
   }, []);
 
-  const tryPlay = useCallback(() => {
-    const v = videoRef.current;
-    if (!v || failed || !loaded) return;
-    if (v.readyState < 2) {
-      try {
-        v.load();
-      } catch {
-        /* ignore */
-      }
-    }
-    v.play().catch(() => {});
-  }, [failed, loaded]);
-
-  const tryPause = useCallback(() => {
+  const hardPause = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
     v.pause();
+  }, []);
+
+  const clearPauseDebounce = useCallback(() => {
+    if (pauseDebounceRef.current != null) {
+      clearTimeout(pauseDebounceRef.current);
+      pauseDebounceRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -103,31 +105,69 @@ const VideoCard = memo(function VideoCard({
     const v = videoRef.current;
     if (!card || !v) return;
 
+    const kickPlay = () => {
+      if (v.readyState < 2) {
+        try {
+          v.load();
+        } catch {
+          /* ignore */
+        }
+      }
+      void v.play().catch(() => {});
+    };
+
     const io = new IntersectionObserver(
       ([entry]) => {
         const wantPlay =
           sectionInView && !marqueePaused && entry.isIntersecting;
-        if (wantPlay) tryPlay();
-        else tryPause();
+        wantPlayRef.current = wantPlay;
+
+        if (wantPlay) {
+          clearPauseDebounce();
+          if (!heavyPreloadBoostedRef.current) {
+            heavyPreloadBoostedRef.current = true;
+            setHeavyPreload(true);
+          }
+          kickPlay();
+        } else {
+          clearPauseDebounce();
+          pauseDebounceRef.current = setTimeout(() => {
+            pauseDebounceRef.current = null;
+            if (!wantPlayRef.current) v.pause();
+          }, PAUSE_DEBOUNCE_MS);
+        }
       },
       { root: null, rootMargin: CARD_PLAY_IO_MARGIN, threshold: CARD_PLAY_THRESHOLDS }
     );
 
     io.observe(card);
-    return () => io.disconnect();
-  }, [reduced, failed, sectionInView, marqueePaused, tryPlay, tryPause]);
+    return () => {
+      clearPauseDebounce();
+      io.disconnect();
+    };
+  }, [reduced, failed, sectionInView, marqueePaused, clearPauseDebounce]);
 
   useEffect(() => {
-    if (reduced || failed || !loaded) return;
-    if (!sectionInView || marqueePaused) tryPause();
-  }, [sectionInView, marqueePaused, reduced, failed, loaded, tryPause]);
+    if (reduced || failed) return;
+    if (!sectionInView || marqueePaused) {
+      clearPauseDebounce();
+      wantPlayRef.current = false;
+      hardPause();
+    }
+  }, [sectionInView, marqueePaused, reduced, failed, hardPause, clearPauseDebounce]);
 
-  /** Posle loaded IO se ponekad ne okine odmah tokom marquee-a — jedan play pokušaj. */
+  /** Dok je sekcija aktivna, umerni pokušaj play-a ako marquee IO kratko „ispusti“ karticu. */
   useEffect(() => {
-    if (!loaded || reduced || failed || !sectionInView || marqueePaused) return;
-    const t = requestAnimationFrame(() => tryPlay());
-    return () => cancelAnimationFrame(t);
-  }, [loaded, reduced, failed, sectionInView, marqueePaused, tryPlay]);
+    if (reduced || failed || !sectionInView || marqueePaused) return;
+    const id = window.setInterval(() => {
+      const v = videoRef.current;
+      if (!v || !wantPlayRef.current) return;
+      if (!v.paused) return;
+      if (v.readyState < 1) return;
+      void v.play().catch(() => {});
+    }, PLAY_NUDGE_MS);
+    return () => clearInterval(id);
+  }, [reduced, failed, sectionInView, marqueePaused]);
 
   if (reduced) {
     return (
@@ -173,7 +213,7 @@ const VideoCard = memo(function VideoCard({
           muted
           loop
           playsInline
-          preload="metadata"
+          preload={heavyPreload ? "auto" : "metadata"}
           onError={() => {
             if (errorRetries.current >= 1) {
               setFailed(true);
@@ -197,6 +237,20 @@ const VideoCard = memo(function VideoCard({
             if (!v || failed) return;
             try {
               v.load();
+            } catch {
+              /* ignore */
+            }
+          }}
+          onWaiting={() => {
+            const v = videoRef.current;
+            if (!v || failed || !wantPlayRef.current) return;
+            void v.play().catch(() => {});
+          }}
+          onProgress={() => {
+            const el = videoRef.current;
+            if (!el || failed || didMarkLoaded.current) return;
+            try {
+              if (el.buffered.length > 0 && el.buffered.end(0) > 0.05) markLoaded();
             } catch {
               /* ignore */
             }
