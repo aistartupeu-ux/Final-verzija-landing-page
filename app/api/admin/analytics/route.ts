@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getLeadsFromSheet } from "@/lib/leads-sheet";
 import { isAdminApiAuthorized } from "@/lib/admin-api-auth";
+import {
+  extractYmdFromSheetDate,
+  lastInclusiveBelgradeYmdForLegacyCutoff,
+  queryParamToYmd,
+  sheetRowYmdAllowedForLegacy,
+  sheetRowYmdInPeriod,
+} from "@/lib/analytics-legacy";
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminApiAuthorized(req))) {
@@ -53,6 +60,9 @@ export async function GET(req: NextRequest) {
   if (from) fromDate = new Date(from);
   if (to) toDate = new Date(to);
 
+  const fromYmd = queryParamToYmd(from);
+  const toYmd = queryParamToYmd(to);
+
   const supabase = createClient(supabaseUrl, supabaseKey);
   const leadByKey = new Map<string, string>(); // key -> normalized source_tag
 
@@ -87,19 +97,16 @@ export async function GET(req: NextRequest) {
   }
 
   // 1) Leads by Source Sheet — primarni izvor (pouzdaniji)
+  // Datum: YYYY-MM-DD u Beogradu + period Od–Do + legacy presek (ne mešati sa Date() u lokalnom TZ servera).
   const sheetRows = await getLeadsFromSheet();
+  let sheetRowsUsed = 0;
   for (const row of sheetRows) {
-    const d = row.date ? new Date(row.date) : null;
-    if (fromDate && d && !isNaN(d.getTime()) && d < fromDate) continue;
-    if (toDate && d && !isNaN(d.getTime())) {
-      const endOfDay = new Date(toDate);
-      endOfDay.setHours(23, 59, 59, 999);
-      if (d > endOfDay) continue;
-    }
-    if (legacyCutoffDate && d && !isNaN(d.getTime()) && d.getTime() > legacyCutoffDate.getTime()) continue;
-    const day = row.date
-      ? (row.date.match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? new Date(row.date).toISOString().slice(0, 10))
-      : "";
+    const rowYmd = extractYmdFromSheetDate(row.date);
+    if (!rowYmd) continue;
+    if (!sheetRowYmdInPeriod(rowYmd, fromYmd, toYmd)) continue;
+    if (legacyCutoffDate && !sheetRowYmdAllowedForLegacy(rowYmd, legacyCutoffDate)) continue;
+    sheetRowsUsed += 1;
+    const day = rowYmd;
     const key = `${(row.email ?? "").toLowerCase()}_${day}`;
     const tag = normalizeSourceTag(row.source_tag, row.utm_source, row.utm_medium, row.utm_campaign);
     leadByKey.set(key, tag);
@@ -181,6 +188,7 @@ export async function GET(req: NextRequest) {
   };
   if (legacyMode && legacyCutoffDate) {
     payload.legacyCutoffAt = legacyCutoffDate.toISOString();
+    payload.legacyLastInclusiveSheetYmd = lastInclusiveBelgradeYmdForLegacyCutoff(legacyCutoffDate);
   }
 
   if (todayOnly) {
@@ -210,7 +218,13 @@ export async function GET(req: NextRequest) {
     }
     payload.debug = {
       sheetRowsTotal: sheetRows.length,
+      sheetRowsAfterFilter: sheetRowsUsed,
       supabaseLeadsFetched: listSupabase.length,
+      mergedUniqueKeys: leadByKey.size,
+      legacyMode,
+      legacyLastInclusiveSheetYmd: legacyCutoffDate
+        ? lastInclusiveBelgradeYmdForLegacyCutoff(legacyCutoffDate)
+        : null,
       sheetBySource,
       sheetSample: sheetRows.slice(0, 5).map((r) => ({
         date: r.date,
