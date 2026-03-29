@@ -3,6 +3,12 @@ import { verifyAdminSessionToken } from "@/lib/admin-session";
 import { getAdminAnalyticsSecret } from "@/lib/admin-secret";
 import { getCookieFromHeader } from "@/lib/cookie-header";
 
+/**
+ * Napomena: agresivna „bot / WAF” pravila na Vercel-u ili drugom edge-u ponekad daju
+ * osećaj punog reload-a ili „pucanja” taba na desktopu. Za CDN zloupotrebu smanji
+ * hotlink kroz Bunny token URL-ove (BUNNY_CDN_TOKEN_KEY), ne kroz dodatni bot-filter ovde.
+ */
+
 const CLICK_ID_PARAMS = ["fbclid", "gclid", "ttclid"];
 const UTM_PARAMS = ["utm_source", "utm_medium", "utm_campaign"];
 

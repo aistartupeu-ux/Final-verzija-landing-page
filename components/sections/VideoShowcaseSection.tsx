@@ -5,25 +5,10 @@ import { useRef, useEffect, useState, memo, useCallback } from "react";
 import Image from "next/image";
 import { Sparkles } from "lucide-react";
 import { getCdnMediaUrl } from "@/lib/cdn-media";
+import { CDN_PATH_SHOWCASE_ROW1, CDN_PATH_SHOWCASE_ROW2 } from "@/lib/video-cdn-paths";
 
-/* Row 1: V11 + v12–v17 (bez v15) | Row 2: v1–v10 (optimizovani) */
-const row1 = [
-  getCdnMediaUrl("/examples/v11.mp4"),
-  getCdnMediaUrl("/examples/v12.mp4"),
-  getCdnMediaUrl("/examples/v13.mp4"),
-  getCdnMediaUrl("/examples/v14.mp4"),
-  getCdnMediaUrl("/examples/v16.mp4"),
-  getCdnMediaUrl("/examples/v17.mp4"),
-];
-
-const row2 = [
-  getCdnMediaUrl("/examples/v1.mp4"),
-  getCdnMediaUrl("/examples/v2.mp4"),
-  getCdnMediaUrl("/examples/v3.mp4"),
-  getCdnMediaUrl("/examples/v4.mp4"),
-  getCdnMediaUrl("/examples/v5.mp4"),
-  getCdnMediaUrl("/examples/v6.mp4"),
-];
+const DEFAULT_ROW1 = CDN_PATH_SHOWCASE_ROW1.map((p) => getCdnMediaUrl(p));
+const DEFAULT_ROW2 = CDN_PATH_SHOWCASE_ROW2.map((p) => getCdnMediaUrl(p));
 
 const VIDEO_CARD_BG =
   "linear-gradient(135deg, rgba(15,15,28,0.95) 0%, rgba(25,20,45,0.9) 100%)";
@@ -434,7 +419,15 @@ function VideoRow({
   );
 }
 
-export default function VideoShowcaseSection() {
+export default function VideoShowcaseSection({
+  row1Srcs = DEFAULT_ROW1,
+  row2Srcs = DEFAULT_ROW2,
+}: {
+  row1Srcs?: string[];
+  row2Srcs?: string[];
+}) {
+  const row1 = row1Srcs;
+  const row2 = row2Srcs;
   const ref = useRef(null);
   const inView = useInView(ref, { once: false, amount: 0.15, margin: "0px" });
   const reducedMotion = useReducedMotion();

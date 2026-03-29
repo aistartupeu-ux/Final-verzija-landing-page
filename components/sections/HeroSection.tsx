@@ -7,16 +7,35 @@ import Image from "next/image";
 import CountdownTimer from "@/components/ui/CountdownTimer";
 import EmailForm from "@/components/ui/EmailForm";
 import { getCdnMediaUrl } from "@/lib/cdn-media";
+import {
+  CDN_PATH_HERO_BG,
+  CDN_PATH_EXPLAINER_MP4,
+  CDN_PATH_EXPLAINER_POSTER,
+} from "@/lib/video-cdn-paths";
 
 // Perioda giveawaya 2.–14. apr. 2026, Europe/Belgrade (CEST = UTC+2 u aprilu).
 // Tajmer do kraja 14. apr. = 15. apr. 00:00 lokalno. Isto za hero / giveaway LP.
 const TARGET_DATE = new Date("2026-04-15T00:00:00+02:00");
 
-const HERO_BG_MP4 = getCdnMediaUrl("/hero-vsl.mp4");
-const EXPLAINER_MP4 = getCdnMediaUrl("/explainer-vsl.mp4");
-const EXPLAINER_POSTER = getCdnMediaUrl("/video-poster.webp");
+const DEFAULT_HERO_MEDIA = {
+  bgMp4: getCdnMediaUrl(CDN_PATH_HERO_BG),
+  explainerMp4: getCdnMediaUrl(CDN_PATH_EXPLAINER_MP4),
+  explainerPoster: getCdnMediaUrl(CDN_PATH_EXPLAINER_POSTER),
+};
 
-export default function HeroSection() {
+export type HeroSectionMediaUrls = {
+  bgMp4: string;
+  explainerMp4: string;
+  explainerPoster: string;
+};
+
+export default function HeroSection({
+  mediaUrls = DEFAULT_HERO_MEDIA,
+}: {
+  mediaUrls?: HeroSectionMediaUrls;
+}) {
+  const { bgMp4: HERO_BG_MP4, explainerMp4: EXPLAINER_MP4, explainerPoster: EXPLAINER_POSTER } =
+    mediaUrls;
   const bgVideoRef = useRef<HTMLVideoElement>(null);
   const explainerRef = useRef<HTMLVideoElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
