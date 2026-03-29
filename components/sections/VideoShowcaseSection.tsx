@@ -6,6 +6,7 @@ import { useReducedMotion } from "@/lib/use-reduced-motion";
 import Image from "next/image";
 import { Sparkles } from "lucide-react";
 import { getCdnMediaUrl } from "@/lib/cdn-media";
+import { useDocumentHtmlDataFlag } from "@/lib/use-html-data-flag";
 import { CDN_PATH_SHOWCASE_ROW1, CDN_PATH_SHOWCASE_ROW2 } from "@/lib/video-cdn-paths";
 
 const DEFAULT_ROW1 = CDN_PATH_SHOWCASE_ROW1.map((p) => getCdnMediaUrl(p));
@@ -575,6 +576,7 @@ export default function VideoShowcaseSection({
   const inView = useInView(ref, { once: false, amount: 0.08, margin: "140px 0px 200px 0px" });
   const reduced = useReducedMotion();
   const sectionInView = inView ?? false;
+  const heroVslHeavy = useDocumentHtmlDataFlag("data-hero-vsl-heavy");
 
   const [hasBeenVisible, setHasBeenVisible] = useState(false);
   useEffect(() => {
@@ -620,7 +622,7 @@ export default function VideoShowcaseSection({
     };
   }, []);
 
-  const pauseMarquee = reduced || !sectionInView || marqueeScrollHold;
+  const pauseMarquee = reduced || !sectionInView || marqueeScrollHold || heroVslHeavy;
 
   return (
     <section

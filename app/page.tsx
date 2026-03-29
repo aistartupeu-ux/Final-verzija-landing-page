@@ -46,10 +46,18 @@ function publicAsset(path: string) {
   return path.startsWith("/") ? path : `/${path}`;
 }
 
-/** Hero iz `public/` (isti pathovi kao u Bunny-ju) — .env: NEXT_PUBLIC_LOCAL_HERO_MEDIA=true */
+/**
+ * Hero iz `public/` (isti pathovi kao na Bunny-ju).
+ * Eksplicitno: NEXT_PUBLIC_LOCAL_HERO_MEDIA=true
+ * Dev fallback: ako nema NEXT_PUBLIC_BUNNY_VIDEO_BASE_URL, koristi public/ da VSL radi na localhostu bez CDN-a.
+ */
 function useLocalHeroMedia() {
   const v = process.env.NEXT_PUBLIC_LOCAL_HERO_MEDIA?.trim().toLowerCase();
-  return v === "1" || v === "true" || v === "yes";
+  if (v === "1" || v === "true" || v === "yes") return true;
+  if (v === "0" || v === "false" || v === "no") return false;
+  const bunny = process.env.NEXT_PUBLIC_BUNNY_VIDEO_BASE_URL?.trim();
+  if (process.env.NODE_ENV === "development" && !bunny) return true;
+  return false;
 }
 
 export default function Home() {

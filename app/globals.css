@@ -317,6 +317,34 @@ body {
   .hero-vsl-pulse-ring { animation: none !important; opacity: 0.35; }
 }
 
+/* Hero VSL u repro / fullscreen: pauziraj beskonačne animacije da dekodiranje ne secka */
+html[data-hero-vsl-heavy="1"] .video-showcase-section .vs-track-l,
+html[data-hero-vsl-heavy="1"] .video-showcase-section .vs-track-r {
+  animation-play-state: paused !important;
+}
+html[data-hero-vsl-heavy="1"] .marquee-track,
+html[data-hero-vsl-heavy="1"] .marquee-track-reverse {
+  animation-play-state: paused !important;
+}
+html[data-hero-vsl-heavy="1"] .gradient-text {
+  animation: none !important;
+}
+html[data-hero-vsl-heavy="1"] .hero-vsl-pulse-ring {
+  animation: none !important;
+  opacity: 0.35;
+}
+html[data-hero-vsl-heavy="1"] .section-chunk-fallback {
+  animation: none !important;
+}
+html[data-hero-vsl-heavy="1"] .sp-glow-blob,
+html[data-hero-vsl-heavy="1"] .sp-status-ping,
+html[data-hero-vsl-heavy="1"] .sp-bar-shimmer {
+  animation: none !important;
+}
+html[data-hero-vsl-heavy="1"] .ticker-track.ticker-anim {
+  animation: none !important;
+}
+
 /* ─── Landing: scroll-reveal (CSS, bez framer-motion) ─── */
 .sr-ease {
   --sr-ease: cubic-bezier(0.22, 1, 0.36, 1);

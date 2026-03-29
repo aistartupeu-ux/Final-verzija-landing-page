@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState, type CSSProperties } from "react";
 import { Eye, Users, Play, BookOpen, Award, Zap } from "lucide-react";
 import { useInView } from "@/lib/use-in-view";
+import { useDocumentHtmlDataFlag } from "@/lib/use-html-data-flag";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 const START_DATE = new Date(2026, 2, 11, 0, 0, 0);
@@ -83,7 +84,8 @@ export default function SocialProofSection() {
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: false, amount: 0.15 });
   const reducedHook = useReducedMotion();
-  const heavyOk = inView && !reducedHook;
+  const heroVslHeavy = useDocumentHtmlDataFlag("data-hero-vsl-heavy");
+  const heavyOk = inView && !reducedHook && !heroVslHeavy;
 
   const [waitlist, setWaitlist] = useState(() => {
     if (typeof window === "undefined") return START_VALUE;

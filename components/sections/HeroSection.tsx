@@ -6,15 +6,18 @@ import Image from "next/image";
 import CountdownTimer from "@/components/ui/CountdownTimer";
 import EmailForm from "@/components/ui/EmailForm";
 import { getCdnMediaUrl } from "@/lib/cdn-media";
-import { arePromoLandingPagesEnabled } from "@/lib/promo-landing-pages";
+import { isHeroCountdownEnabled } from "@/lib/promo-landing-pages";
 import { CDN_PATH_HERO_BG, CDN_PATH_EXPLAINER_MP4 } from "@/lib/video-cdn-paths";
 
-/** Poster pre prvog play-a — isti logo kao u headeru (`public/logo.png`). */
-const HERO_VSL_POSTER_SRC = "/logo.png";
+/** Watermark preko VSL preview-a — isti fajl kao header (`public/logo.png`), vizuelno beli + providan kao na mobilnom referenci. */
+const HERO_VSL_WATERMARK_SRC = "/logo.png";
 
 // Perioda giveawaya 2.–14. apr. 2026, Europe/Belgrade (CEST = UTC+2 u aprilu).
 // Tajmer do kraja 14. apr. = 15. apr. 00:00 lokalno. Isto za hero / giveaway LP.
 const TARGET_DATE = new Date("2026-04-15T00:00:00+02:00");
+
+/** Ispod ovog učestka hero sekcije u viewportu — pauziraj VSL, ugasi „heavy“ režim, izađi iz fullscreena. */
+const HERO_VISIBLE_MIN_RATIO = 0.1;
 
 const DEFAULT_HERO_MEDIA = {
   bgMp4: getCdnMediaUrl(CDN_PATH_HERO_BG),
@@ -43,27 +46,77 @@ export default function HeroSection({
   const [explainerHasPlayed, setExplainerHasPlayed] = useState(false);
   const primeExplainerFrameRef = useRef(true);
 
-  /** Pozadinski video je iznad preklopa — bez lazy IO/load() (to je pravilo seckanje + „prazan“ hero na startu). Samo pauza kad nije u kadru. */
+  /** BG video + VSL: pauza kad hero nije dovoljno u kadru; skrol dole gasi explainer i sve „heavy“ efekte na stranici. */
   useEffect(() => {
-    const video = bgVideoRef.current;
     const section = sectionRef.current;
-    if (!video || !section) return;
-    const onCanPlay = () => video.play().catch(() => {});
-    video.addEventListener("canplay", onCanPlay, { once: true });
-    if (video.readyState >= 3) void video.play().catch(() => {});
+    if (!section) return;
+    const video = bgVideoRef.current;
+
+    const onCanPlay = () => video?.play().catch(() => {});
+    if (video && !bgFailed) {
+      video.addEventListener("canplay", onCanPlay, { once: true });
+      if (video.readyState >= 3) void video.play().catch(() => {});
+    }
+
     const io = new IntersectionObserver(
       ([e]) => {
-        if (e.isIntersecting) void video.play().catch(() => {});
-        else video.pause();
+        if (!e) return;
+        const bg = bgVideoRef.current;
+        const visibleEnough =
+          e.isIntersecting && e.intersectionRatio >= HERO_VISIBLE_MIN_RATIO;
+
+        if (bg && !bgFailed) {
+          if (visibleEnough) void bg.play().catch(() => {});
+          else bg.pause();
+        }
+
+        if (!visibleEnough) {
+          setPlaying(false);
+          const v = explainerRef.current;
+          if (v) {
+            v.pause();
+            try {
+              if (document.fullscreenElement === v) {
+                void document.exitFullscreen();
+              }
+            } catch {
+              /* ignore */
+            }
+          }
+          document.documentElement.removeAttribute("data-hero-vsl-heavy");
+        }
       },
-      { threshold: 0, rootMargin: "0px" }
+      {
+        threshold: [0, 0.05, 0.08, 0.1, 0.12, 0.2, 0.35, 0.5],
+        rootMargin: "0px",
+      }
     );
     io.observe(section);
     return () => {
-      video.removeEventListener("canplay", onCanPlay);
+      video?.removeEventListener("canplay", onCanPlay);
       io.disconnect();
     };
-  }, [HERO_BG_MP4]);
+  }, [HERO_BG_MP4, bgFailed]);
+
+  /** Dok je VSL u repro ili u fullscreenu — smanji opterećenje ostatka stranice (CSS + ostale sekcije slušaju isti flag). */
+  useEffect(() => {
+    const syncHeavy = () => {
+      const v = explainerRef.current;
+      const inFs = Boolean(v && document.fullscreenElement === v);
+      const heavy = playing || inFs;
+      if (heavy) {
+        document.documentElement.setAttribute("data-hero-vsl-heavy", "1");
+      } else {
+        document.documentElement.removeAttribute("data-hero-vsl-heavy");
+      }
+    };
+    syncHeavy();
+    document.addEventListener("fullscreenchange", syncHeavy);
+    return () => {
+      document.removeEventListener("fullscreenchange", syncHeavy);
+      document.documentElement.removeAttribute("data-hero-vsl-heavy");
+    };
+  }, [playing]);
 
   useEffect(() => {
     setExplainerHasPlayed(false);
@@ -187,7 +240,10 @@ export default function HeroSection({
               overflow: "hidden",
               aspectRatio: "16 / 9",
               cursor: "pointer",
-              background: "linear-gradient(145deg, #12182a 0%, #0a0d18 45%, #050508 100%)",
+              /* Pre prvog play-a: providno ispod videa da se vidi alfa / svetli početak klipa; posle — tamniji okvir. */
+              background: explainerHasPlayed
+                ? "linear-gradient(145deg, #12182a 0%, #0a0d18 45%, #050508 100%)"
+                : "transparent",
               border: "1px solid rgba(0,212,255,0.2)",
             }}
           >
@@ -196,9 +252,19 @@ export default function HeroSection({
               ref={explainerRef}
               src={EXPLAINER_MP4}
               playsInline
-              preload="none"
+              preload="auto"
               disableRemotePlayback
               onLoadedMetadata={(e) => {
+                if (!primeExplainerFrameRef.current) return;
+                const v = e.currentTarget;
+                try {
+                  v.currentTime = 0.001;
+                  v.pause();
+                } catch {
+                  /* ignore */
+                }
+              }}
+              onLoadedData={(e) => {
                 if (!primeExplainerFrameRef.current) return;
                 const v = e.currentTarget;
                 try {
@@ -223,61 +289,112 @@ export default function HeroSection({
                 objectPosition: "center",
                 display: "block",
                 zIndex: 0,
+                backgroundColor: "transparent",
               }}
             />
-            {/* Pre play: providan sloj + logo; video (prvi kadar) vidljiv ispod. Posle play — bez overlaya. Pauza: samo play + blagi film. */}
+            {/* Pre prvog play-a: pun kadar videa + veliki providni beli watermark (kao starom mobilnom izgledu) + natpis ispod. Pauza: blagi film. */}
             {!playing && (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  zIndex: 2,
-                  background: !explainerHasPlayed
-                    ? "linear-gradient(180deg, rgba(5,8,20,0.32) 0%, rgba(5,5,14,0.48) 100%)"
-                    : "rgba(0,0,0,0.32)",
-                  pointerEvents: "auto",
-                }}
-              >
-                {explainerFailed ? (
-                  <div style={{
-                    position: "absolute",
-                    bottom: 14,
-                    left: 14,
-                    right: 14,
-                    zIndex: 4,
-                    padding: "10px 12px",
-                    borderRadius: 12,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(0,0,0,0.55)",
-                    color: "rgba(255,255,255,0.85)",
-                    fontSize: 12,
-                    lineHeight: 1.4,
-                    textAlign: "left",
-                    backdropFilter: "blur(8px)",
-                  }}>
-                    Video se trenutno ne učitava (404). Prikazujemo fallback dok ne sredimo hostovanje.
-                  </div>
-                ) : null}
-                {!explainerHasPlayed && !explainerFailed ? (
-                  <img
-                    src={HERO_VSL_POSTER_SRC}
-                    alt="AI Hype Academy"
-                    decoding="async"
-                    fetchPriority="high"
-                    draggable={false}
+              <>
+                {explainerHasPlayed && !explainerFailed ? (
+                  <div
                     style={{
                       position: "absolute",
-                      left: "50%",
-                      top: "clamp(12px, 10%, 40px)",
-                      transform: "translateX(-50%)",
-                      width: "min(260px, 62%)",
-                      height: "auto",
-                      objectFit: "contain",
-                      filter: "drop-shadow(0 4px 28px rgba(0,0,0,0.75))",
-                      zIndex: 3,
+                      inset: 0,
+                      zIndex: 2,
+                      background: "rgba(0,0,0,0.3)",
                       pointerEvents: "none",
                     }}
                   />
+                ) : null}
+                {!explainerHasPlayed && !explainerFailed ? (
+                  <>
+                    <div
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: "22%",
+                        zIndex: 2,
+                        pointerEvents: "none",
+                        background:
+                          "linear-gradient(to top, rgba(5,5,12,0.88) 0%, rgba(5,5,12,0.35) 45%, transparent 100%)",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 2,
+                        pointerEvents: "none",
+                        padding: "min(14vw, 56px) min(6vw, 20px)",
+                      }}
+                    >
+                      <img
+                        src={HERO_VSL_WATERMARK_SRC}
+                        alt=""
+                        decoding="async"
+                        fetchPriority="high"
+                        draggable={false}
+                        style={{
+                          width: "min(92%, 400px)",
+                          maxHeight: "58%",
+                          height: "auto",
+                          objectFit: "contain",
+                          opacity: 0.4,
+                          filter:
+                            "brightness(0) invert(1) drop-shadow(0 4px 28px rgba(0,0,0,0.5))",
+                        }}
+                      />
+                    </div>
+                    <p
+                      style={{
+                        position: "absolute",
+                        left: 12,
+                        right: 12,
+                        bottom: 10,
+                        margin: 0,
+                        textAlign: "center",
+                        fontSize: "clamp(11px, 3.1vw, 13px)",
+                        fontWeight: 600,
+                        letterSpacing: "0.02em",
+                        color: "rgba(255,255,255,0.95)",
+                        textShadow: "0 1px 10px rgba(0,0,0,0.9)",
+                        zIndex: 3,
+                        pointerEvents: "none",
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      Ova osoba koju gledate
+                    </p>
+                  </>
+                ) : null}
+                {explainerFailed ? (
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: 14,
+                      left: 14,
+                      right: 14,
+                      zIndex: 4,
+                      padding: "10px 12px",
+                      borderRadius: 12,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "rgba(0,0,0,0.55)",
+                      color: "rgba(255,255,255,0.85)",
+                      fontSize: 12,
+                      lineHeight: 1.4,
+                      textAlign: "left",
+                      backdropFilter: "blur(8px)",
+                    }}
+                  >
+                    Video se trenutno ne učitava (404). Proveri da postoji{" "}
+                    <code style={{ fontSize: 11 }}>public/examples/explainer-vsl.mp4</code> (localhost) ili Bunny env na produkciji.
+                  </div>
                 ) : null}
                 {!explainerFailed ? (
                   <div
@@ -287,7 +404,7 @@ export default function HeroSection({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      zIndex: 3,
+                      zIndex: 4,
                       pointerEvents: "none",
                     }}
                   >
@@ -295,32 +412,34 @@ export default function HeroSection({
                       className="hero-vsl-pulse-ring"
                       style={{
                         position: "absolute",
-                        width: 96,
-                        height: 96,
+                        width: "clamp(88px, 26vw, 112px)",
+                        height: "clamp(88px, 26vw, 112px)",
                         borderRadius: "50%",
-                        border: "2px solid rgba(0,212,255,0.35)",
+                        border: "2px solid rgba(0,212,255,0.38)",
                         animation: "hero-vring 2s ease-out infinite",
                       }}
                     />
-                    <div style={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: "50%",
-                      background: "linear-gradient(135deg,#00d4ff,#0090c0)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      boxShadow: "0 0 40px rgba(0,212,255,0.5)",
-                      transform: hovering ? "scale(1.08)" : "scale(1)",
-                      transition: "transform 0.2s ease",
-                      position: "relative",
-                      zIndex: 1,
-                    }}>
-                      <Play size={24} color="#050508" fill="#050508" style={{ marginLeft: 4 }} />
+                    <div
+                      style={{
+                        width: "clamp(58px, 18vw, 76px)",
+                        height: "clamp(58px, 18vw, 76px)",
+                        borderRadius: "50%",
+                        background: "linear-gradient(135deg,#00d4ff,#0090c0)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 0 40px rgba(0,212,255,0.55)",
+                        transform: hovering ? "scale(1.08)" : "scale(1)",
+                        transition: "transform 0.2s ease",
+                        position: "relative",
+                        zIndex: 1,
+                      }}
+                    >
+                      <Play size={28} color="#050508" fill="#050508" style={{ marginLeft: 5 }} />
                     </div>
                   </div>
                 ) : null}
-              </div>
+              </>
             )}
             {/* Pause overlay */}
             {playing && hovering && (
@@ -376,8 +495,8 @@ export default function HeroSection({
           <EmailForm />
         </div>
 
-        {/* 3. Tajmer — samo kad su giveaway / promo stranice aktivne (vidi NEXT_PUBLIC_PROMO_LANDING_PAGES) */}
-        {arePromoLandingPagesEnabled() ? (
+        {/* 3. Tajmer — na produkciji uključen po defaultu; isključi NEXT_PUBLIC_HERO_COUNTDOWN=false */}
+        {isHeroCountdownEnabled() ? (
           <div style={{ marginBottom: 36 }}>
             <CountdownTimer targetDate={TARGET_DATE} />
           </div>
