@@ -93,11 +93,29 @@ function parseRow(cells: string[]): LeadsSourceRow | null {
   if (!email) return null;
 
   const source_tag = findSourceTag(cells);
-  // Sheet: A=date, B=email, C=phone, D=name, E=source_tag, F=platforma(ig/fb/tiktok), G=utm_campaign, H=affiliate_code
-  const utm_source = (cells[5] && String(cells[5]).trim()) || ""; // F = platforma
-  const utm_medium = (cells[6] && String(cells[6]).trim()) || ""; // G = utm_campaign
-  const utm_campaign = (cells[6] && String(cells[6]).trim()) || "";
-  const affiliate_code = (cells[7] && String(cells[7]).trim()) || ""; // H = affiliate_code
+  /**
+   * appendLeadsToSheet upisuje A–I:
+   * A datum, B email, C telefon, D ime, E source_tag, F utm_source, G utm_medium, H utm_campaign, I affiliate_code
+   * Stari redovi (8 kolona): … F utm_source, G utm_campaign, H affiliate (bez medium kolone)
+   */
+  const n = cells.length;
+  let utm_source = "";
+  let utm_medium = "";
+  let utm_campaign = "";
+  let affiliate_code = "";
+  if (n >= 9) {
+    utm_source = String(cells[5] ?? "").trim();
+    utm_medium = String(cells[6] ?? "").trim();
+    utm_campaign = String(cells[7] ?? "").trim();
+    affiliate_code = String(cells[8] ?? "").trim();
+  } else if (n >= 8) {
+    utm_source = String(cells[5] ?? "").trim();
+    utm_medium = "";
+    utm_campaign = String(cells[6] ?? "").trim();
+    affiliate_code = String(cells[7] ?? "").trim();
+  } else if (n >= 6) {
+    utm_source = String(cells[5] ?? "").trim();
+  }
 
   return {
     date: date || new Date().toISOString().slice(0, 10),

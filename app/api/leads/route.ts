@@ -72,8 +72,22 @@ function normalizeSourceTag(
   const rawCampaign = String(utmCampaign ?? "").trim().toLowerCase();
   const probe = `${rawTag} ${rawSource} ${rawMedium} ${rawCampaign}`;
 
-  if (probe.includes("instagram") || probe.includes("insta") || rawTag === "ig" || rawSource === "ig") return "instagram";
-  if (probe.includes("facebook") || rawTag === "fb" || rawSource === "fb" || probe.includes("fb_")) return "facebook";
+  if (
+    probe.includes("instagram") ||
+    probe.includes("insta") ||
+    rawTag === "ig" ||
+    rawSource === "ig" ||
+    rawMedium === "ig"
+  )
+    return "instagram";
+  if (
+    probe.includes("facebook") ||
+    rawTag === "fb" ||
+    rawSource === "fb" ||
+    rawMedium === "fb" ||
+    probe.includes("fb_")
+  )
+    return "facebook";
   if (probe.includes("tiktok") || rawTag === "tt" || rawSource === "tt" || rawMedium === "tt") return "tiktok";
   if (!rawTag || rawTag === "meta") return "direct";
   return rawTag;

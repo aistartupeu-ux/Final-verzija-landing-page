@@ -11,10 +11,7 @@ import {
   Facebook,
   Share2,
   Radio,
-  Pause,
-  Save,
 } from "lucide-react";
-import { getBelgradeTimeAndCountdown } from "@/lib/belgrade-clock";
 
 function TikTokIcon({ size = 20, color = "#00f2ea" }: { size?: number; color?: string }) {
   return (
@@ -43,17 +40,6 @@ type AnalyticsData = {
     sheetSample: { date: string; source_tag: string; utm_source: string; utm_medium: string }[];
   };
 };
-
-const FROZEN_EMPTY: AnalyticsData = {
-  total: 0,
-  bySource: {},
-  sumBySource: 0,
-  tiktokLeads: 0,
-  direct: 0,
-  affiliate: 0,
-};
-
-const FROZEN_SNAPSHOT_KEY = "admin_frozen_snapshot_v1";
 
 const SOURCE_LABELS: Record<string, string> = {
   instagram: "Instagram",
@@ -110,37 +96,8 @@ function CountdownDisplay({
   );
 }
 
-function redirectToLiveLogin() {
-  window.location.href = "/admin/live/login";
-}
-
-/** Zamrznut režim: sat i odbrojavanje do ponoći bez API-ja; jedan izvor, bez resetovanja CountdownDisplay-a. */
-function FrozenBelgradeClock() {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick((x) => x + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
-  const { belgradeTime, secondsUntilMidnight } = getBelgradeTimeAndCountdown();
-  const h = Math.floor(secondsUntilMidnight / 3600);
-  const m = Math.floor((secondsUntilMidnight % 3600) / 60);
-  const s = secondsUntilMidnight % 60;
-  return (
-    <>
-      <div className="admin-danas-time">{belgradeTime}</div>
-      <div
-        style={{
-          fontSize: "clamp(14px, 4vw, 18px)",
-          fontWeight: 700,
-          color: "#00d4ff",
-          fontVariantNumeric: "tabular-nums",
-          contain: "layout",
-        }}
-      >
-        {h}h {m}m {s}s
-      </div>
-    </>
-  );
+function redirectToLogin() {
+  window.location.href = "/admin/login";
 }
 
 type TikTokCampaignCpl = {
@@ -161,44 +118,7 @@ type MetaCampaignCpl = {
   blendedCpl: number | null;
 };
 
-type AdminFrozenSnapshotV1 = {
-  v: 1;
-  savedAt: string;
-  from: string;
-  to: string;
-  data: AnalyticsData;
-  todayData: AnalyticsData | null;
-  metaAds: {
-    configured?: boolean;
-    instagram: { spend: number; leads: number; cpl: number | null };
-    facebook: { spend: number; leads: number; cpl: number | null };
-    campaigns?: MetaCampaignCpl[];
-    error?: string;
-    _debug?: {
-      dataRows: number;
-      activeCampaigns?: number;
-      campaignFilter?: string | null;
-      campaignId?: string | null;
-      campaignsInResponse?: number;
-    };
-  } | null;
-  tiktokAds: {
-    configured?: boolean;
-    spend: number;
-    leadsFromAds: number;
-    cpl: number | null;
-    campaigns: TikTokCampaignCpl[];
-    error?: string;
-    startDate?: string;
-    endDate?: string;
-  } | null;
-  tiktokSpend: string;
-};
-
-export function AdminAnalyticsDashboard({ frozen = false }: { frozen?: boolean }) {
-  const [frozenHydrated, setFrozenHydrated] = useState(!frozen);
-  const [snapshotSavedAtLabel, setSnapshotSavedAtLabel] = useState<string | null>(null);
-  const [saveArchiveHint, setSaveArchiveHint] = useState<string | null>(null);
+export function AdminAnalyticsDashboard() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -232,71 +152,20 @@ export function AdminAnalyticsDashboard({ frozen = false }: { frozen?: boolean }
   const [todayData, setTodayData] = useState<AnalyticsData | null>(null);
 
   useEffect(() => {
-    if (!frozen) return;
     if (typeof window === "undefined") return;
-    try {
-      const raw = localStorage.getItem(FROZEN_SNAPSHOT_KEY);
-      if (!raw) {
-        setSnapshotSavedAtLabel(null);
-        return;
-      }
-      const snap = JSON.parse(raw) as AdminFrozenSnapshotV1;
-      if (snap.v !== 1 || !snap.data || typeof snap.data.total !== "number") {
-        setSnapshotSavedAtLabel(null);
-        return;
-      }
-      setData(snap.data);
-      setTodayData(snap.todayData ?? null);
-      setMetaAds(snap.metaAds ?? null);
-      setTiktokAds(
-        snap.tiktokAds ?? {
-          configured: false,
-          spend: 0,
-          leadsFromAds: 0,
-          cpl: null,
-          campaigns: [],
-        }
-      );
-      setFrom(snap.from || "");
-      setTo(snap.to || "");
-      setTiktokSpend(snap.tiktokSpend ?? "");
-      try {
-        const d = new Date(snap.savedAt);
-        setSnapshotSavedAtLabel(
-          Number.isFinite(d.getTime())
-            ? new Intl.DateTimeFormat("sr-Latn-RS", {
-                dateStyle: "medium",
-                timeStyle: "short",
-                timeZone: "Europe/Belgrade",
-              }).format(d)
-            : snap.savedAt
-        );
-      } catch {
-        setSnapshotSavedAtLabel(snap.savedAt);
-      }
-    } catch {
-      setSnapshotSavedAtLabel(null);
-    } finally {
-      setFrozenHydrated(true);
-    }
-  }, [frozen]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || frozen) return;
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     setFrom((f) => f || firstDay.toISOString().slice(0, 10));
     setTo((t) => t || now.toISOString().slice(0, 10));
-  }, [frozen]);
+  }, []);
 
   const fetchTodayData = useCallback(async () => {
-    if (frozen) return;
     try {
       const params = new URLSearchParams();
       params.set("today", "1");
       const res = await fetch(`/api/admin/analytics?${params}`, { credentials: "include" });
       if (res.status === 401) {
-        redirectToLiveLogin();
+        redirectToLogin();
         return;
       }
       if (res.ok) {
@@ -306,10 +175,9 @@ export function AdminAnalyticsDashboard({ frozen = false }: { frozen?: boolean }
     } catch {
       // opciono
     }
-  }, [frozen]);
+  }, []);
 
   const fetchData = useCallback(async (silent = false, withDebug = false) => {
-    if (frozen) return;
     if (!silent) setLoading(true);
     setError(null);
     try {
@@ -319,7 +187,7 @@ export function AdminAnalyticsDashboard({ frozen = false }: { frozen?: boolean }
       if (withDebug) params.set("debug", "1");
       const res = await fetch(`/api/admin/analytics?${params}`, { credentials: "include" });
       if (res.status === 401) {
-        redirectToLiveLogin();
+        redirectToLogin();
         return;
       }
       if (!res.ok) throw new Error(await res.text());
@@ -347,7 +215,7 @@ export function AdminAnalyticsDashboard({ frozen = false }: { frozen?: boolean }
       try {
         const ttRes = await fetch(`/api/admin/tiktok-ads?${mp}&debug=1`, { credentials: "include" });
         if (ttRes.status === 401) {
-          redirectToLiveLogin();
+          redirectToLogin();
           return;
         }
         const ttJson = await ttRes.json();
@@ -369,69 +237,28 @@ export function AdminAnalyticsDashboard({ frozen = false }: { frozen?: boolean }
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [frozen, from, to, fetchTodayData]);
+  }, [from, to, fetchTodayData]);
 
   const handleLogout = async () => {
-    const which = frozen ? "archive" : "live";
     try {
-      await fetch("/api/admin/logout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ which }),
-        credentials: "include",
-      });
+      await fetch("/api/admin/logout", { method: "POST", credentials: "include" });
     } catch {
       // ignore
     }
-    window.location.href = frozen ? "/admin/login" : "/admin/live/login";
+    redirectToLogin();
   };
 
-  const saveArchiveSnapshot = useCallback(() => {
-    if (frozen || !data) {
-      setSaveArchiveHint("Nema učitanih podataka za snimak.");
-      setTimeout(() => setSaveArchiveHint(null), 3500);
-      return;
-    }
-    const snap: AdminFrozenSnapshotV1 = {
-      v: 1,
-      savedAt: new Date().toISOString(),
-      from,
-      to,
-      data,
-      todayData,
-      metaAds,
-      tiktokAds: tiktokAds ?? {
-        configured: false,
-        spend: 0,
-        leadsFromAds: 0,
-        cpl: null,
-        campaigns: [],
-      },
-      tiktokSpend,
-    };
-    try {
-      localStorage.setItem(FROZEN_SNAPSHOT_KEY, JSON.stringify(snap));
-      setSaveArchiveHint("Snimak sačuvan. Arhiva (/admin/x7k9m2q4) sada prikazuje ove brojke.");
-      setTimeout(() => setSaveArchiveHint(null), 5000);
-    } catch {
-      setSaveArchiveHint("Greška pri čuvanju (localStorage).");
-      setTimeout(() => setSaveArchiveHint(null), 4000);
-    }
-  }, [frozen, data, from, to, todayData, metaAds, tiktokAds, tiktokSpend]);
-
   useEffect(() => {
-    if (frozen) return;
     if (from && to && !data && !loading) fetchData();
-  }, [from, to, frozen, data, loading, fetchData]);
+  }, [from, to, data, loading, fetchData]);
 
   useEffect(() => {
-    if (frozen) return;
     if (data && from && to) fetchData(true);
-  }, [from, to, frozen, data, fetchData]);
+  }, [from, to, data, fetchData]);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (frozen || !data) return;
+    if (!data) return;
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (url && key) {
@@ -452,21 +279,18 @@ export function AdminAnalyticsDashboard({ frozen = false }: { frozen?: boolean }
         client.removeChannel(ch);
       };
     }
-  }, [frozen, data, fetchData]);
+  }, [data, fetchData]);
 
   useEffect(() => {
-    if (frozen || !data) return;
+    if (!data) return;
     const id = setInterval(() => fetchData(true), 30000);
     return () => clearInterval(id);
-  }, [frozen, data, fetchData]);
+  }, [data, fetchData]);
 
   const handleRefresh = () => fetchData();
   const handleCountdownReset = useCallback(() => {
-    if (frozen) return;
     void fetchTodayData();
-  }, [frozen, fetchTodayData]);
-
-  const displayToday = todayData ?? FROZEN_EMPTY;
+  }, [fetchTodayData]);
 
   const tiktokSpendNum = parseFloat(tiktokSpend.replace(",", ".")) || 0;
   const totalLeads = data?.total ?? 0;
@@ -503,22 +327,9 @@ export function AdminAnalyticsDashboard({ frozen = false }: { frozen?: boolean }
             <Link href="/" className="admin-link-back">
               <ArrowLeft size={14} /> Nazad
             </Link>
-            <span className="admin-live-badge" style={frozen ? { color: "#94a3b8" } : undefined}>
-              {frozen ? (
-                <>
-                  <Pause size={12} /> Zamrznuto
-                </>
-              ) : (
-                <>
-                  <Radio size={12} /> Live
-                </>
-              )}
+            <span className="admin-live-badge">
+              <Radio size={12} /> Live
             </span>
-            {!frozen && (
-              <Link href="/admin/x7k9m2q4" style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>
-                Arhiva (zamrznuto)
-              </Link>
-            )}
           </div>
           <div className="admin-toolbar-right">
             <div className="admin-period-row">
@@ -528,8 +339,6 @@ export function AdminAnalyticsDashboard({ frozen = false }: { frozen?: boolean }
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
                 className="admin-date-input"
-                readOnly={frozen}
-                aria-readonly={frozen}
               />
               <span style={{ color: "#555" }}>—</span>
               <input
@@ -537,31 +346,13 @@ export function AdminAnalyticsDashboard({ frozen = false }: { frozen?: boolean }
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
                 className="admin-date-input"
-                readOnly={frozen}
-                aria-readonly={frozen}
               />
             </div>
             <div className="admin-buttons-row">
-              <button onClick={handleRefresh} disabled={loading || frozen} className="admin-btn admin-btn-refresh">
+              <button onClick={handleRefresh} disabled={loading} className="admin-btn admin-btn-refresh">
                 <RefreshCw size={14} style={{ opacity: loading ? 0.5 : 1 }} /> Osveži
               </button>
-              {!frozen && (
-                <button
-                  type="button"
-                  onClick={saveArchiveSnapshot}
-                  disabled={loading || !data}
-                  className="admin-btn"
-                  style={{
-                    background: "rgba(148,163,184,0.15)",
-                    border: "1px solid rgba(148,163,184,0.35)",
-                    color: "#cbd5e1",
-                  }}
-                  title="Upisuje trenutni prikaz u pregledač; arhiva čita isti snimak"
-                >
-                  <Save size={14} /> Snimak → arhiva
-                </button>
-              )}
-              <button onClick={() => fetchData(false, true)} disabled={loading || frozen} className="admin-btn admin-btn-debug">
+              <button onClick={() => fetchData(false, true)} disabled={loading} className="admin-btn admin-btn-debug">
                 Debug
               </button>
               <button onClick={handleLogout} className="admin-btn admin-btn-logout">
@@ -571,105 +362,47 @@ export function AdminAnalyticsDashboard({ frozen = false }: { frozen?: boolean }
           </div>
         </div>
 
-        {saveArchiveHint && !frozen && (
-          <div
-            style={{
-              marginBottom: 16,
-              padding: 12,
-              borderRadius: 12,
-              background: "rgba(34,197,94,0.1)",
-              border: "1px solid rgba(34,197,94,0.3)",
-              color: "#86efac",
-              fontSize: 13,
-            }}
-          >
-            {saveArchiveHint}
-          </div>
-        )}
-
-        {frozen && (
-          <div
-            style={{
-              marginBottom: 16,
-              padding: 14,
-              borderRadius: 12,
-              background: "rgba(148,163,184,0.1)",
-              border: "1px solid rgba(148,163,184,0.25)",
-              color: "#94a3b8",
-              fontSize: 13,
-              lineHeight: 1.5,
-            }}
-          >
-            Prikaz iz snimka{snapshotSavedAtLabel ? ` · sačuvano ${snapshotSavedAtLabel}` : ""}. Brojevi se ne menjaju; sat i
-            odbrojavanje do ponoći (Beograd) teku u realnom vremenu. Za nov snimak uđi u live konzolu (poseban URL i kod) i
-            klikni „Snimak → arhiva”.
-          </div>
-        )}
-
         {error && (
           <div style={{ padding: 16, borderRadius: 14, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#ef4444", marginBottom: 24 }}>
             {error}
           </div>
         )}
 
-        {(loading && !frozen) || (frozen && !frozenHydrated) ? (
+        {loading ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 60 }}>
             <Loader2 size={32} color="#00d4ff" style={{ animation: "spin 1s linear infinite", willChange: "transform" }} />
           </div>
-        ) : frozen && !data ? (
-          <div
-            style={{
-              padding: 28,
-              borderRadius: 14,
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              color: "#888",
-              fontSize: 14,
-              lineHeight: 1.6,
-            }}
-          >
-            <p style={{ color: "#fff", fontWeight: 600, marginBottom: 10 }}>Nema sačuvanog snimka za arhivu</p>
-            <p style={{ marginBottom: 12 }}>
-              Uđi u <strong style={{ color: "#cbd5e1" }}>live</strong> admin (poseban link i <strong>ADMIN_LIVE_CONSOLE_SECRET</strong>),
-              učitaj podatke, zatim klikni <strong>„Snimak → arhiva”</strong>. Ovaj pregledač će zapamtiti brojeve; ovde će ostati
-              zamrznuti dok ne snimiš nov snimak.
-            </p>
-          </div>
         ) : data ? (
           <>
-            <div className="admin-danas-card">
-              <div className="admin-danas-row">
-                <div>
-                  <h2 className="admin-danas-title">Danas (Beograd · CET)</h2>
-                  <div className="admin-danas-num">{displayToday.total}</div>
-                  <div className="admin-danas-sub">Leadova danas · reset u ponoć</div>
+            {todayData && (
+              <div className="admin-danas-card">
+                <div className="admin-danas-row">
+                  <div>
+                    <h2 className="admin-danas-title">Danas (Beograd · CET)</h2>
+                    <div className="admin-danas-num">{todayData.total}</div>
+                    <div className="admin-danas-sub">Leadova danas · reset u ponoć</div>
+                  </div>
+                  <div className="admin-danas-countdown" style={{ contain: "layout" }}>
+                    {todayData.belgradeTime && (
+                      <div className="admin-danas-time">{todayData.belgradeTime}</div>
+                    )}
+                    {todayData.secondsUntilMidnight != null && todayData.secondsUntilMidnight > 0 && (
+                      <CountdownDisplay
+                        initialSeconds={todayData.secondsUntilMidnight}
+                        onReset={handleCountdownReset}
+                      />
+                    )}
+                    <div className="admin-danas-reset-label">do resetovanja</div>
+                  </div>
                 </div>
-                <div className="admin-danas-countdown" style={{ contain: "layout" }}>
-                  {frozen ? (
-                    <FrozenBelgradeClock />
-                  ) : (
-                    <>
-                      {displayToday.belgradeTime && (
-                        <div className="admin-danas-time">{displayToday.belgradeTime}</div>
-                      )}
-                      {displayToday.secondsUntilMidnight != null && displayToday.secondsUntilMidnight > 0 && (
-                        <CountdownDisplay
-                          initialSeconds={displayToday.secondsUntilMidnight}
-                          onReset={handleCountdownReset}
-                        />
-                      )}
-                    </>
-                  )}
-                  <div className="admin-danas-reset-label">do resetovanja</div>
+                <div className="admin-danas-sources">
+                  <span>IG: {todayData.bySource?.instagram ?? 0}</span>
+                  <span>FB: {todayData.bySource?.facebook ?? 0}</span>
+                  <span>TikTok: {todayData.tiktokLeads ?? 0}</span>
+                  <span>Direktno: {todayData.direct ?? 0}</span>
                 </div>
               </div>
-              <div className="admin-danas-sources">
-                <span>IG: {displayToday.bySource?.instagram ?? 0}</span>
-                <span>FB: {displayToday.bySource?.facebook ?? 0}</span>
-                <span>TikTok: {displayToday.tiktokLeads ?? 0}</span>
-                <span>Direktno: {displayToday.direct ?? 0}</span>
-              </div>
-            </div>
+            )}
 
             <div className="admin-stats-grid">
               <div className="admin-stat-card" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(0,212,255,0.15)" }}>
@@ -853,7 +586,6 @@ export function AdminAnalyticsDashboard({ frozen = false }: { frozen?: boolean }
                           value={tiktokSpend}
                           onChange={(e) => setTiktokSpend(e.target.value.replace(/[^0-9,.]/g, ""))}
                           placeholder="€ potrošeno"
-                          readOnly={frozen}
                           style={{ flex: 1, minWidth: 100, minHeight: 44, padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: 16 }}
                         />
                         {tiktokCplFromSite !== null && tiktokCplFromSite > 0 && (

@@ -1,6 +1,6 @@
-import { AdminAnalyticsDashboard } from "@/components/admin/AdminAnalyticsDashboard";
+import { redirect } from "next/navigation";
 
-/** Aktivna admin analitika — live podaci, API, realtime. */
-export default function AdminLiveDashPage() {
-  return <AdminAnalyticsDashboard />;
+/** Stari URL — ista konzola kao /admin/x7k9m2q4 */
+export default function AdminLiveRedirectPage() {
+  redirect("/admin/x7k9m2q4");
 }

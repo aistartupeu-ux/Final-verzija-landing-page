@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getLeadsFromSheet } from "@/lib/leads-sheet";
-import { isLiveAdminApiAuthorized } from "@/lib/admin-api-auth";
+import { isAdminApiAuthorized } from "@/lib/admin-api-auth";
 
 export async function GET(req: NextRequest) {
-  if (!(await isLiveAdminApiAuthorized(req))) {
+  if (!(await isAdminApiAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
