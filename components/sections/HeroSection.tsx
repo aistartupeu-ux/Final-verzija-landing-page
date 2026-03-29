@@ -247,12 +247,14 @@ export default function HeroSection({
               border: "1px solid rgba(0,212,255,0.2)",
             }}
           >
+            {/* Pauza: muted pomaže iOS/WebKit da prikaže prvi kadar; u reprodukciji zvuk je uključen (muted={!playing}). */}
             <video
               key={EXPLAINER_MP4}
               ref={explainerRef}
               className="hero-vsl-explainer-video"
               src={EXPLAINER_MP4}
               playsInline
+              muted={!playing}
               preload="auto"
               disableRemotePlayback
               onLoadedMetadata={(e) => {
@@ -292,7 +294,7 @@ export default function HeroSection({
                 backgroundColor: "#0a0d18",
               }}
             />
-            {/* Pre prvog play-a: watermark preko preview kadra; na uskim ekranima video je contain da vertikalni snimak bude ceo vidljiv. */}
+            {/* Pre / posle pauze: isti izgled kao desktop — pun kadar (cover) + providni logo preko. */}
             {!playing && (
               <>
                 {explainerHasPlayed && !explainerFailed ? (
