@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifyAdminSessionToken } from "@/lib/admin-session";
-import { getAdminAnalyticsSecret } from "@/lib/admin-secret";
+import { getAdminAnalyticsSecret, getAdminLiveConsoleSecret } from "@/lib/admin-secret";
 import { getCookieFromHeader } from "@/lib/cookie-header";
 
 const CLICK_ID_PARAMS = ["fbclid", "gclid", "ttclid"];
@@ -13,17 +13,40 @@ function hasAny(searchParams: URLSearchParams, keys: string[]) {
   });
 }
 
+function isLiveConsolePath(pathname: string): boolean {
+  if (pathname === "/admin/live/login") return false;
+  return pathname === "/admin/live" || pathname.startsWith("/admin/live/");
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
 
-  // Admin: /admin/* osim /admin/login zahtevaju validnu sesiju
-  if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
-    const expected = getAdminAnalyticsSecret();
-    if (!expected) return NextResponse.next();
+  if (pathname.startsWith("/admin")) {
+    if (pathname === "/admin/login" || pathname === "/admin/live/login") {
+      return NextResponse.next();
+    }
 
-    const sessionToken = getCookieFromHeader(req.headers.get("cookie"), "admin_session");
+    if (isLiveConsolePath(pathname)) {
+      const liveSecret = getAdminLiveConsoleSecret();
+      if (!liveSecret) {
+        const loginUrl = new URL("/admin/live/login", req.url);
+        loginUrl.searchParams.set("from", pathname);
+        return NextResponse.redirect(loginUrl);
+      }
+      const liveToken = getCookieFromHeader(req.headers.get("cookie"), "admin_live_session");
+      if (!liveToken || !(await verifyAdminSessionToken(liveToken, liveSecret, "live"))) {
+        const loginUrl = new URL("/admin/live/login", req.url);
+        loginUrl.searchParams.set("from", pathname);
+        return NextResponse.redirect(loginUrl);
+      }
+      return NextResponse.next();
+    }
 
-    if (!sessionToken || !(await verifyAdminSessionToken(sessionToken, expected))) {
+    const archiveSecret = getAdminAnalyticsSecret();
+    if (!archiveSecret) return NextResponse.next();
+
+    const archiveToken = getCookieFromHeader(req.headers.get("cookie"), "admin_session");
+    if (!archiveToken || !(await verifyAdminSessionToken(archiveToken, archiveSecret, "archive"))) {
       const loginUrl = new URL("/admin/login", req.url);
       loginUrl.searchParams.set("from", pathname);
       return NextResponse.redirect(loginUrl);
@@ -31,7 +54,6 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // LP: samo guard za paid-ads landing
   if (!pathname.startsWith("/lp")) return NextResponse.next();
 
   if (process.env.NODE_ENV !== "production") return NextResponse.next();
@@ -48,4 +70,3 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: ["/lp/:path*", "/admin/:path*"],
 };
-

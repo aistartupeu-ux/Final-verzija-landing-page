@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminApiAuthorized } from "@/lib/admin-api-auth";
+import { isLiveAdminApiAuthorized } from "@/lib/admin-api-auth";
 
 type MetaPlatformData = {
   spend: number;
@@ -18,7 +18,7 @@ type CampaignCplRow = {
 };
 
 export async function GET(req: NextRequest) {
-  if (!(await isAdminApiAuthorized(req))) {
+  if (!(await isLiveAdminApiAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

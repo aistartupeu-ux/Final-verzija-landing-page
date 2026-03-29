@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminApiAuthorized } from "@/lib/admin-api-auth";
+import { isLiveAdminApiAuthorized } from "@/lib/admin-api-auth";
 
 const TT_API = "https://business-api.tiktok.com/open_api/v1.3";
 
@@ -151,7 +151,7 @@ function parseReportRows(list: unknown[]): TikTokCampaignRow[] {
 }
 
 export async function GET(req: NextRequest) {
-  if (!(await isAdminApiAuthorized(req))) {
+  if (!(await isLiveAdminApiAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

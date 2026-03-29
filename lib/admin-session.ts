@@ -1,9 +1,12 @@
 /**
  * HMAC-SHA256 potpísan admin session token.
  * Token: base64url(payload).base64url(signature)
- * Payload: { exp, iat } - expiry i issued-at (Unix sekunde)
+ * Payload: { exp, iat, k } — k: "archive" | "live"
  */
-const TOKEN_TTL_SEC = 86400; // 24 sati
+const ARCHIVE_TTL_SEC = 86400; // 24 sata
+const LIVE_TTL_SEC = 8 * 3600; // 8 sati — kraće za live konzolu
+
+export type AdminSessionKind = "archive" | "live";
 
 function base64UrlEncode(arr: Uint8Array): string {
   return btoa(String.fromCharCode(...arr))
@@ -48,9 +51,13 @@ function timingSafeEqual(a: string, b: string): boolean {
   return out === 0;
 }
 
-export async function createAdminSessionToken(secret: string): Promise<string> {
+export async function createAdminSessionToken(
+  secret: string,
+  kind: AdminSessionKind = "archive"
+): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  const payload = JSON.stringify({ exp: now + TOKEN_TTL_SEC, iat: now });
+  const ttl = kind === "live" ? LIVE_TTL_SEC : ARCHIVE_TTL_SEC;
+  const payload = JSON.stringify({ exp: now + ttl, iat: now, k: kind });
   const payloadB64 = base64UrlEncode(new TextEncoder().encode(payload));
   const sig = await sign(secret, payload);
   return `${payloadB64}.${sig}`;
@@ -58,7 +65,8 @@ export async function createAdminSessionToken(secret: string): Promise<string> {
 
 export async function verifyAdminSessionToken(
   token: string,
-  secret: string
+  secret: string,
+  expectedKind?: AdminSessionKind
 ): Promise<boolean> {
   if (!token || !secret) return false;
   const parts = token.split(".");
@@ -70,7 +78,7 @@ export async function verifyAdminSessionToken(
   const payloadBytes = base64UrlDecode(payloadB64);
   if (!payloadBytes) return false;
 
-  let payloadObj: { exp?: number; iat?: number };
+  let payloadObj: { exp?: number; iat?: number; k?: string };
   try {
     payloadObj = JSON.parse(new TextDecoder().decode(payloadBytes));
   } catch {
@@ -79,6 +87,10 @@ export async function verifyAdminSessionToken(
 
   const exp = payloadObj?.exp;
   if (typeof exp !== "number" || exp <= Math.floor(Date.now() / 1000)) return false;
+
+  const tokenKind = payloadObj.k === "live" ? "live" : "archive";
+  if (expectedKind === "live" && tokenKind !== "live") return false;
+  if (expectedKind === "archive" && tokenKind === "live") return false;
 
   const payloadStr = new TextDecoder().decode(payloadBytes);
   return verify(secret, payloadStr, sig);

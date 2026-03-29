@@ -1,30 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getLeadsFromSheet } from "@/lib/leads-sheet";
-import { verifyAdminSessionToken } from "@/lib/admin-session";
-import { getAdminAnalyticsSecret } from "@/lib/admin-secret";
-import { getCookieFromHeader } from "@/lib/cookie-header";
-
-async function isAdminAuthorized(req: NextRequest): Promise<boolean> {
-  const expected = getAdminAnalyticsSecret();
-  if (!expected) return false;
-
-  const authHeader = req.headers.get("authorization");
-  const bearerSecret = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  if (bearerSecret === expected) return true;
-
-  const url = req.nextUrl ?? new URL(req.url);
-  const paramSecret = url.searchParams.get("secret");
-  if (paramSecret === expected) return true;
-
-  const sessionToken = getCookieFromHeader(req.headers.get("cookie"), "admin_session");
-  if (sessionToken && (await verifyAdminSessionToken(sessionToken, expected))) return true;
-
-  return false;
-}
+import { isLiveAdminApiAuthorized } from "@/lib/admin-api-auth";
 
 export async function GET(req: NextRequest) {
-  if (!(await isAdminAuthorized(req))) {
+  if (!(await isLiveAdminApiAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

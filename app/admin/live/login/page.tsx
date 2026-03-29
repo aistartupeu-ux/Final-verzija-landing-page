@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 
-export default function AdminLoginPage() {
+/** Poseban ulaz — samo ADMIN_LIVE_CONSOLE_SECRET; ne deli se sa arhivom. */
+export default function AdminLiveLoginPage() {
   const [secret, setSecret] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -13,7 +14,7 @@ export default function AdminLoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/verify", {
+      const res = await fetch("/api/admin/verify-live", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ secret: secret.trim() }),
@@ -22,15 +23,14 @@ export default function AdminLoginPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(
-          data.error === "Not configured"
-            ? "Server nema ADMIN_ANALYTICS_SECRET (.env.local / Vercel)."
-            : data.error || "Pogrešan pristupni kod."
+          res.status === 503
+            ? (data.error as string) || "Postavi ADMIN_LIVE_CONSOLE_SECRET na serveru."
+            : (data.error as string) || "Pogrešan pristupni kod."
         );
         setSecret("");
         return;
       }
-      // Pun document load da browser sigurno pošalje HttpOnly kolačić u middleware
-      window.location.assign("/admin/x7k9m2q4");
+      window.location.assign("/admin/live");
     } catch {
       setError("Greška u konekciji.");
     } finally {
@@ -53,24 +53,24 @@ export default function AdminLoginPage() {
         onSubmit={handleSubmit}
         style={{
           width: "100%",
-          maxWidth: 360,
+          maxWidth: 400,
           padding: 32,
           background: "rgba(255,255,255,0.03)",
           borderRadius: 16,
-          border: "1px solid rgba(255,255,255,0.08)",
+          border: "1px solid rgba(0,212,255,0.2)",
         }}
       >
         <h1 style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 8 }}>
-          Admin pristup
+          Live admin konzola
         </h1>
-        <p style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>
-          Unesi pristupni kod
+        <p style={{ fontSize: 13, color: "#888", marginBottom: 24, lineHeight: 1.5 }}>
+          Drugi kod od arhive — <strong style={{ color: "#aaa" }}>ADMIN_LIVE_CONSOLE_SECRET</strong>. Sesija 8h, stroži kolačić.
         </p>
         <input
           type="password"
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
-          placeholder="Pristupni kod"
+          placeholder="Live pristupni kod"
           autoComplete="off"
           disabled={loading}
           style={{
@@ -86,7 +86,7 @@ export default function AdminLoginPage() {
           }}
         />
         {error && (
-          <p style={{ fontSize: 13, color: "#ef4444", marginBottom: 16 }}>{error}</p>
+          <p style={{ fontSize: 13, color: "#ef4444", marginBottom: 16, lineHeight: 1.45 }}>{error}</p>
         )}
         <button
           type="submit"
@@ -98,13 +98,17 @@ export default function AdminLoginPage() {
             fontWeight: 600,
             border: "none",
             borderRadius: 10,
-            background: "rgba(0,212,255,0.2)",
+            background: "rgba(0,212,255,0.25)",
             color: "#00d4ff",
             cursor: loading ? "not-allowed" : "pointer",
+            marginBottom: 12,
           }}
         >
-          {loading ? "Prijava..." : "Prijavi se"}
+          {loading ? "Prijava..." : "Prijavi se (live)"}
         </button>
+        <p style={{ fontSize: 12, color: "#555", textAlign: "center" }}>
+          Zamrznut prikaz (arhiva) koristi <a href="/admin/login" style={{ color: "#64748b" }}>/admin/login</a>
+        </p>
       </form>
     </div>
   );
