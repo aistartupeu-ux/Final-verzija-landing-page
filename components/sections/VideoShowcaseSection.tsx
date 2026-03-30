@@ -88,7 +88,8 @@ const VideoCard = memo(function VideoCard({
   useEffect(() => {
     // Ne vezuj src (i ne pravimo IO) dok sekcija nije u kadru.
     // Ovo sprečava “mid-scroll” spike kad korisnik tek prilazi sekciji.
-    if (reduced || failed || !sectionInView) return;
+    // Dodatno: dok korisnik aktivno skroluje (marquee pause), ne kačimo src.
+    if (reduced || failed || !sectionInView || !allowAutoPlay) return;
     const el = cardRef.current;
     if (!el) return;
     const io = new IntersectionObserver(
@@ -99,11 +100,11 @@ const VideoCard = memo(function VideoCard({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [reduced, failed, sectionInView]);
+  }, [reduced, failed, sectionInView, allowAutoPlay]);
 
   useEffect(() => {
     // Visibility scoring (autoplay contest) samo kad je sekcija u kadru.
-    if (reduced || failed || !sectionInView || !autoPlayContest || !onVisibilityRatio) return;
+    if (reduced || failed || !sectionInView || !allowAutoPlay || !autoPlayContest || !onVisibilityRatio) return;
     const el = cardRef.current;
     if (!el) return;
     const thresholds = [0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95, 1];
@@ -117,7 +118,7 @@ const VideoCard = memo(function VideoCard({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [reduced, failed, sectionInView, autoPlayContest, onVisibilityRatio, instanceKey]);
+  }, [reduced, failed, sectionInView, allowAutoPlay, autoPlayContest, onVisibilityRatio, instanceKey]);
 
   const shouldPlay =
     (hoverLoop && hoverPlaying && sectionInView) ||
