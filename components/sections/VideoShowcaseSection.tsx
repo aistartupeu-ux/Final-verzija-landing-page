@@ -334,6 +334,7 @@ function VideoRow({
   reduced,
   sectionInView,
   hoverLoop = false,
+  playEveryOtherDesktop = false,
   autoPlayWinnerCount = 0,
   autoPlayWinnerCountDesktop,
 }: {
@@ -343,6 +344,8 @@ function VideoRow({
   reduced: boolean;
   sectionInView: boolean;
   hoverLoop?: boolean;
+  /** Desktop: fiksno puštaj svaki drugi klip u redu (umesto visibility contest-a). */
+  playEveryOtherDesktop?: boolean;
   /** Mobilni / podrazumevano: najviše ovoliko autoplay (najvidljivije). */
   autoPlayWinnerCount?: number;
   /** Desktop: više autoplay; ako je veće od autoPlayWinnerCount, biraju se bez susednih kartica. */
@@ -355,7 +358,7 @@ function VideoRow({
   });
 
   // Desktop: kači src postepeno da se ne desi “load spike”.
-  const [desktopSrcKeys, setDesktopSrcKeys] = useState<Set<string>>(() => makeDesktopInitialKeys(videos.length));
+  const [desktopSrcKeys, setDesktopSrcKeys] = useState<Set<string>>(() => makeDesktopInitialKeys(items.length));
   const desktopSrcTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const mobileSlots = reduced ? 0 : (autoPlayWinnerCount ?? 0);
@@ -423,7 +426,7 @@ function VideoRow({
       // (izbegava “stare” winners dok ne stigne novi IO update).
       visibilityRef.current.clear();
       setWinnerKeys(new Set());
-      setDesktopSrcKeys(makeDesktopInitialKeys(videos.length));
+      setDesktopSrcKeys(makeDesktopInitialKeys(items.length));
       if (desktopSrcTimerRef.current) {
         clearTimeout(desktopSrcTimerRef.current);
         desktopSrcTimerRef.current = null;
@@ -431,17 +434,17 @@ function VideoRow({
     };
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);
-  }, [videos.length]);
+  }, [items.length]);
 
   useEffect(() => {
     if (isMobile || reduced) return;
     if (!sectionInView) return;
-    // Ostatak: 1 po 1 u pozadini (samo prva kopija).
+    // Ostatak: 1 po 1 u pozadini (obe kopije), da ne ostaju logo placeholder-i.
     let idx = 1;
     const tick = () => {
       if (!sectionInView || paused) return;
-      while (idx < videos.length && idx % 2 === 0) idx += 1;
-      if (idx >= videos.length) return;
+      while (idx < items.length && idx % 2 === 0) idx += 1;
+      if (idx >= items.length) return;
       const key = String(idx);
       setDesktopSrcKeys((prev) => {
         if (prev.has(key)) return prev;
@@ -460,7 +463,7 @@ function VideoRow({
         desktopSrcTimerRef.current = null;
       }
     };
-  }, [isMobile, reduced, sectionInView, paused, videos.length]);
+  }, [isMobile, reduced, sectionInView, paused, items.length]);
 
   /** Telefon: bez hover-play u redu (cela prva traka ostaje kao ranije — marquee + autoplay po vidljivosti). Desktop: hover kao i do sada. */
   const hoverLoopEffective = hoverLoop && !isMobile;
@@ -557,12 +560,12 @@ function VideoRow({
         >
           {items.map((videoSrc, i) => {
             const instanceKey = String(i);
+            const desktopEveryOtherActive = playEveryOtherDesktop && !isMobile && i % 2 === 0;
             // "Contest" (visibility scoring + autoplay winners) samo za prvu kopiju trake.
             // Druga kopija služi za seamless marquee i ne treba dodatni IO + raf pick work.
-            const isContestCandidate = contestSlots > 0 && i < videos.length;
-            const isPrimaryCopy = i < videos.length;
+            const isContestCandidate = !desktopEveryOtherActive && contestSlots > 0 && i < videos.length;
             const useManualSrc = !isMobile;
-            const manualSrcAttached = useManualSrc && isPrimaryCopy && desktopSrcKeys.has(instanceKey);
+            const manualSrcAttached = useManualSrc && desktopSrcKeys.has(instanceKey);
             return (
               <VideoCard
                 key={`${videoSrc}-${i}`}
@@ -574,7 +577,7 @@ function VideoRow({
                 manualSrcAttached={manualSrcAttached}
                 hoverLoop={hoverLoopEffective}
                 autoPlayContest={isContestCandidate}
-                autoPlayActive={isContestCandidate && winnerKeys.has(instanceKey)}
+                autoPlayActive={desktopEveryOtherActive || (isContestCandidate && winnerKeys.has(instanceKey))}
                 allowAutoPlay={allowAutoPlay}
                 onVisibilityRatio={isContestCandidate ? reportVisibility : undefined}
               />
@@ -756,7 +759,7 @@ export default function VideoShowcaseSection({
           paused={pauseMarquee}
           reduced={reduced}
           sectionInView={sectionInView}
-          hoverLoop
+          playEveryOtherDesktop
           autoPlayWinnerCount={2}
           autoPlayWinnerCountDesktop={4}
         />
@@ -772,7 +775,6 @@ export default function VideoShowcaseSection({
         <VideoRow
           videos={row2}
           reverse
-          hoverLoop
           paused={pauseMarquee}
           reduced={reduced}
           sectionInView={sectionInView}
