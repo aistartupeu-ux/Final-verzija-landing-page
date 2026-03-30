@@ -71,6 +71,7 @@ export default function GenerationResult({ status, progress, files, error, type 
                 background: "rgba(255,255,255,0.015)", border: "1px solid rgba(255,255,255,0.05)",
               }}>
                 {type === "image" && (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={f.file_url} alt="Generated" style={{ width: "100%", display: "block" }} />
                 )}
                 {type === "audio" && (

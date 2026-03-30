@@ -132,13 +132,6 @@ export default function HeroSection({
   }, [playing]);
 
   useEffect(() => {
-    setExplainerHasPlayed(false);
-    setPlaying(false);
-    primeExplainerFrameRef.current = true;
-    explainerIosPrimeDoneRef.current = false;
-  }, [EXPLAINER_MP4]);
-
-  useEffect(() => {
     if (explainerFailed) return;
     const v = explainerRef.current;
     if (!v) return;
@@ -348,6 +341,9 @@ export default function HeroSection({
               }}
               onPlay={() => {
                 if (suppressExplainerPlayUiRef.current) return;
+                // Na iOS/WebKit, pokušaji “primovanja” prvog kadra mogu okinuti play event.
+                // Preview (watermark) treba da se skloni tek kad je korisnik stvarno pokrenuo reprodukciju.
+                if (!playing) return;
                 primeExplainerFrameRef.current = false;
                 setExplainerHasPlayed(true);
               }}
@@ -391,6 +387,7 @@ export default function HeroSection({
                       padding: "min(14vw, 56px) min(6vw, 20px)",
                     }}
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={HERO_VSL_WATERMARK_SRC}
                       alt=""

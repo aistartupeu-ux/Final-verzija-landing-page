@@ -8,7 +8,7 @@ import { ttqLeadWithPii } from "@/lib/tiktok-datalayer";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { useEmailVerify } from "@/lib/use-email-verify";
 import {
-  ArrowLeft, Mail, ArrowRight, Loader2, CheckCircle, XCircle,
+  ArrowLeft, ArrowRight, Loader2, CheckCircle, XCircle,
   Sparkles, GraduationCap, Users, ShieldCheck, Zap, Award,
 } from "lucide-react";
 const benefits = [

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const CountdownTimerGiveaway = dynamic(() => import("./CountdownTimerGiveaway"), {
   loading: () => <div style={{ minHeight: 100 }} aria-hidden />,
@@ -26,7 +26,7 @@ export default function CountdownTimer({
   const targetMs = resolvedTarget.getTime();
   const safeTargetMs = Number.isFinite(targetMs) ? targetMs : defaultEndMs;
 
-  const calc = () => {
+  const calc = useCallback(() => {
     const diff = Math.max(0, safeTargetMs - Date.now());
     return {
       d: Math.floor(diff / 864e5),
@@ -35,7 +35,7 @@ export default function CountdownTimer({
       s: Math.floor((diff % 6e4) / 1e3),
       isFinished: diff <= 0,
     };
-  };
+  }, [safeTargetMs]);
 
   const [t, setT] = useState<TimerState>(() => calc());
   const [ready, setReady] = useState(false);
@@ -47,7 +47,7 @@ export default function CountdownTimer({
       window.clearTimeout(r);
       clearInterval(i);
     };
-  }, [safeTargetMs]);
+  }, [calc]);
 
   const pad = (n: number) => String(n).padStart(2, "0");
   const items = [

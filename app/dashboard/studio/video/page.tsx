@@ -56,7 +56,6 @@ export default function VideoGenPage() {
     } catch { setError("Network error"); setStatus("failed"); }
   };
 
-  const sel = MODELS.find(m => m.id === model)!;
   const durations = model === "veo3.1-fast" ? ["8"] : ["5", "10"];
 
   return (

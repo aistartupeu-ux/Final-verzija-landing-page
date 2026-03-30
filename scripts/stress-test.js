@@ -22,7 +22,7 @@ export const options = {
   },
 };
 
-export default function () {
+export default function stressTest() {
   const urls = [
     `${BASE_URL}/`,
     `${BASE_URL}/join`,

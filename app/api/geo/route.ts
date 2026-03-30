@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       country_name: data.country_name ?? null,
       country_code: data.country_code ?? null,
     });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

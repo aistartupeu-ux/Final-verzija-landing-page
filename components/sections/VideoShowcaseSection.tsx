@@ -79,16 +79,6 @@ const VideoCard = memo(function VideoCard({
   const didMarkLoaded = useRef(false);
   const errorRetries = useRef(0);
 
-  useEffect(() => {
-    setVideoSrc(src);
-    errorRetries.current = 0;
-    didMarkLoaded.current = false;
-    setLoaded(false);
-    setFailed(false);
-    setSrcAttached(false);
-    setHoverPlaying(false);
-  }, [src]);
-
   const markLoaded = useCallback(() => {
     if (didMarkLoaded.current) return;
     didMarkLoaded.current = true;
@@ -96,7 +86,9 @@ const VideoCard = memo(function VideoCard({
   }, []);
 
   useEffect(() => {
-    if (reduced || failed) return;
+    // Ne vezuj src (i ne pravimo IO) dok sekcija nije u kadru.
+    // Ovo sprečava “mid-scroll” spike kad korisnik tek prilazi sekciji.
+    if (reduced || failed || !sectionInView) return;
     const el = cardRef.current;
     if (!el) return;
     const io = new IntersectionObserver(
@@ -107,10 +99,11 @@ const VideoCard = memo(function VideoCard({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [reduced, failed]);
+  }, [reduced, failed, sectionInView]);
 
   useEffect(() => {
-    if (reduced || failed || !autoPlayContest || !onVisibilityRatio) return;
+    // Visibility scoring (autoplay contest) samo kad je sekcija u kadru.
+    if (reduced || failed || !sectionInView || !autoPlayContest || !onVisibilityRatio) return;
     const el = cardRef.current;
     if (!el) return;
     const thresholds = [0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95, 1];
@@ -124,15 +117,11 @@ const VideoCard = memo(function VideoCard({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [reduced, failed, autoPlayContest, onVisibilityRatio, instanceKey]);
-
-  useEffect(() => {
-    if (!hoverLoop) return;
-    if (!sectionInView) setHoverPlaying(false);
-  }, [sectionInView, hoverLoop]);
+  }, [reduced, failed, sectionInView, autoPlayContest, onVisibilityRatio, instanceKey]);
 
   const shouldPlay =
-    (hoverLoop && hoverPlaying) || (autoPlayContest && autoPlayActive && allowAutoPlay);
+    (hoverLoop && hoverPlaying && sectionInView) ||
+    (autoPlayContest && autoPlayActive && allowAutoPlay);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -197,6 +186,7 @@ const VideoCard = memo(function VideoCard({
       }}
       onPointerEnter={() => {
         if (!hoverLoop) return;
+        if (!sectionInView) return;
         if (typeof window === "undefined") return;
         if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
         setHoverPlaying(true);
@@ -396,10 +386,6 @@ function VideoRow({
     [contestSlots, flushWinnerPick]
   );
 
-  useEffect(() => {
-    flushWinnerPick();
-  }, [isMobile, flushWinnerPick]);
-
   const allowAutoPlay = sectionInView && !paused;
 
   const [dragOffset, setDragOffset] = useState(0);
@@ -410,7 +396,14 @@ function VideoRow({
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
-    const fn = () => setIsMobile(mq.matches);
+    const fn = () => {
+      const nextIsMobile = mq.matches;
+      setIsMobile(nextIsMobile);
+      // Kad se breakpoint promeni, odmah resetuj izbor autoplay pobednika
+      // (izbegava “stare” winners dok ne stigne novi IO update).
+      visibilityRef.current.clear();
+      setWinnerKeys(new Set());
+    };
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);
   }, []);
@@ -510,6 +503,9 @@ function VideoRow({
         >
           {items.map((videoSrc, i) => {
             const instanceKey = String(i);
+            // "Contest" (visibility scoring + autoplay winners) samo za prvu kopiju trake.
+            // Druga kopija služi za seamless marquee i ne treba dodatni IO + raf pick work.
+            const isContestCandidate = contestSlots > 0 && i < videos.length;
             return (
               <VideoCard
                 key={`${videoSrc}-${i}`}
@@ -518,10 +514,10 @@ function VideoRow({
                 reduced={reduced}
                 sectionInView={sectionInView}
                 hoverLoop={hoverLoopEffective}
-                autoPlayContest={contestSlots > 0}
-                autoPlayActive={winnerKeys.has(instanceKey)}
+                autoPlayContest={isContestCandidate}
+                autoPlayActive={isContestCandidate && winnerKeys.has(instanceKey)}
                 allowAutoPlay={allowAutoPlay}
-                onVisibilityRatio={contestSlots > 0 ? reportVisibility : undefined}
+                onVisibilityRatio={isContestCandidate ? reportVisibility : undefined}
               />
             );
           })}
@@ -578,14 +574,7 @@ export default function VideoShowcaseSection({
   const sectionInView = inView ?? false;
   const heroVslHeavy = useDocumentHtmlDataFlag("data-hero-vsl-heavy");
 
-  const [hasBeenVisible, setHasBeenVisible] = useState(false);
-  useEffect(() => {
-    if (reduced) setHasBeenVisible(true);
-  }, [reduced]);
-  useEffect(() => {
-    if (sectionInView) setHasBeenVisible(true);
-  }, [sectionInView]);
-  const reveal = reduced || hasBeenVisible;
+  const reveal = reduced || sectionInView;
   const revealEase = "cubic-bezier(0.22, 1, 0.36, 1)";
 
   const [marqueeScrollHold, setMarqueeScrollHold] = useState(false);

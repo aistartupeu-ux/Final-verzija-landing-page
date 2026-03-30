@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { TrendingUp, ShoppingCart } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
 
 interface AffiliateData { token: string; name: string; commissionRate: number; }
 

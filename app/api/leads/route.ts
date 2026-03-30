@@ -128,7 +128,6 @@ export async function POST(req: NextRequest) {
     // Get location from ipapi using the real visitor IP
     const forwarded = req.headers.get("x-forwarded-for");
     const ip = forwarded ? forwarded.split(",")[0].trim() : req.headers.get("x-real-ip") ?? "";
-    const userAgent = req.headers.get("user-agent");
     const eventSourceUrl = req.headers.get("referer");
 
     if (isRateLimited(ip)) {

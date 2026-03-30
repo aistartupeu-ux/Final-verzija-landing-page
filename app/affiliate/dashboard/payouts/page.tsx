@@ -18,7 +18,6 @@ const statusColors = { pending: "#f59e0b", paid: "#22c55e", rejected: "#ef4444" 
 const statusLabels = { pending: "Na čekanju", paid: "Isplaćeno", rejected: "Odbijeno" };
 
 export default function AffiliatePayoutsPage() {
-  const [affiliate, setAffiliate] = useState<AffiliateData | null>(null);
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [pending, setPending] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -41,8 +40,7 @@ export default function AffiliatePayoutsPage() {
     const stored = localStorage.getItem("ayhype_affiliate");
     if (stored) {
       try {
-        const aff = JSON.parse(stored);
-        setAffiliate(aff);
+        const aff = JSON.parse(stored) as AffiliateData;
         fetchData(aff);
       } catch { setLoading(false); }
     } else { setLoading(false); }

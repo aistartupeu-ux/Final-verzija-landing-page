@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Image, Sparkles, Layers, Zap, Star, Crown, ArrowLeft } from "lucide-react";
+import { Image as ImageIcon, Sparkles, Layers, Zap, Star, Crown, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import PromptInput from "@/components/dashboard/PromptInput";
 import GenerationResult from "@/components/dashboard/GenerationResult";
 
 const MODELS = [
-  { id: "seedream-4.5", name: "Seedream 4.5", provider: "ByteDance", icon: Image, color: "#f97316" },
+  { id: "seedream-4.5", name: "Seedream 4.5", provider: "ByteDance", icon: ImageIcon, color: "#f97316" },
   { id: "seedream-5.0-lite", name: "Seedream 5.0", provider: "ByteDance", icon: Layers, color: "#ef4444" },
   { id: "nano-banana", name: "Nano Banana", provider: "Google", icon: Zap, color: "#facc15" },
   { id: "gemini-3.1-flash-image-preview", name: "Nano Banana 2", provider: "Google", icon: Star, color: "#22c55e" },
@@ -65,7 +65,7 @@ export default function ImageGenPage() {
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
         <div style={{ width: 40, height: 40, borderRadius: 14, background: "rgba(168,85,247,0.08)", border: "1px solid rgba(168,85,247,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Image size={18} color="#a855f7" />
+          <ImageIcon size={18} color="#a855f7" />
         </div>
         <h1 style={{ fontSize: 24, fontWeight: 800 }}>Generisanje Slika</h1>
       </div>

@@ -107,7 +107,7 @@ const useSpotlightEffect = (config: SpotlightConfig) => {
       window.removeEventListener('mouseleave', handleMouseLeave);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [config.radius, config.brightness, config.color]);
+  }, [config.radius, config.brightness, config.color, config.smoothing]);
 
   return canvasRef;
 };

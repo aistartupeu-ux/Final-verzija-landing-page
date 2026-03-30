@@ -250,17 +250,14 @@ export default function ThankYouClient() {
   const ease = [0.16, 1, 0.3, 1] as const;
   const searchParams = useSearchParams();
   const eventIdFromUrl = searchParams.get("eid");
-  const [leadEmail, setLeadEmail] = useState<string | null>(null);
-  const [defaultCountry, setDefaultCountry] = useState("RS");
-  const [localhostPhonePreview, setLocalhostPhonePreview] = useState(false);
-
-  useEffect(() => {
-    setLocalhostPhonePreview(isThankYouLocalhostHost());
-  }, []);
-
-  useEffect(() => {
+  const [leadEmail] = useState<string | null>(() => {
     const stored = readStoredLeadConfirm();
-    if (stored?.email) setLeadEmail(stored.email);
+    return stored?.email ?? null;
+  });
+  const [defaultCountry, setDefaultCountry] = useState("RS");
+  const [localhostPhonePreview] = useState(() => isThankYouLocalhostHost());
+
+  useEffect(() => {
     void pushThankYouPageTracking({ eventIdFromUrl });
   }, [eventIdFromUrl]);
 

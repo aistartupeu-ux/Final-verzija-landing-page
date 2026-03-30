@@ -40,12 +40,12 @@ export default function VideoEditor({ src }: Props) {
     setPlaying(!playing);
   };
 
-  const seek = (t: number) => {
+  const seek = useCallback((t: number) => {
     const v = videoRef.current;
     if (!v) return;
     v.currentTime = Math.max(0, Math.min(t, duration));
     setCurrent(v.currentTime);
-  };
+  }, [duration]);
 
   const fmt = (s: number) => {
     const m = Math.floor(s / 60);
@@ -61,7 +61,7 @@ export default function VideoEditor({ src }: Props) {
     const rect = timelineRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
     seek(x * duration);
-  }, [duration]);
+  }, [duration, seek]);
 
   const handleTrimDrag = useCallback((e: React.MouseEvent, type: "start" | "end") => {
     e.stopPropagation();

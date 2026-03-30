@@ -74,8 +74,9 @@ function CountdownDisplay({
     return () => cancelAnimationFrame(id);
   }, [initialSeconds]);
 
+  const isActive = sec > 0;
   useEffect(() => {
-    if (sec <= 0) return;
+    if (!isActive) return;
     intervalRef.current = setInterval(() => {
       setSec((p) => {
         if (p <= 1) {
@@ -89,7 +90,7 @@ function CountdownDisplay({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [sec <= 0 ? 0 : 1]);
+  }, [isActive]);
 
   if (sec <= 0) return null;
   return (

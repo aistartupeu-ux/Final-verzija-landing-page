@@ -2,26 +2,27 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { User, GraduationCap, Lock, Image, Film, Music, Wand2, ArrowRight, Crown, Sparkles, CheckCircle } from "lucide-react";
+import { GraduationCap, Lock, Image, Film, Music, Wand2, ArrowRight, Crown, CheckCircle } from "lucide-react";
 
 interface UserData { name: string; email: string; hasPaid: boolean; }
 
+const DEFAULT_USER: UserData = { name: "Korisnik", email: "user@example.com", hasPaid: false };
+
 export default function DashboardPage() {
-  const defaultUser: UserData = { name: "Korisnik", email: "user@example.com", hasPaid: false };
   const [user, setUser] = useState<UserData>(() => {
-    if (typeof window === "undefined") return defaultUser;
+    if (typeof window === "undefined") return DEFAULT_USER;
     const stored = localStorage.getItem("ayhype_user");
-    if (!stored) return defaultUser;
+    if (!stored) return DEFAULT_USER;
     try {
       return JSON.parse(stored) as UserData;
     } catch {
-      return defaultUser;
+      return DEFAULT_USER;
     }
   });
 
   useEffect(() => {
     const stored = localStorage.getItem("ayhype_user");
-    if (!stored) localStorage.setItem("ayhype_user", JSON.stringify(defaultUser));
+    if (!stored) localStorage.setItem("ayhype_user", JSON.stringify(DEFAULT_USER));
   }, []);
 
   const handlePay = () => {
