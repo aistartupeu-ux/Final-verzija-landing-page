@@ -195,15 +195,26 @@ export default function HeroSection({
       setPlaying(false);
       return;
     }
-    // User gesture path: force immediate play on first click (Safari/Chrome policies).
-    v.muted = false;
-    void v.play().then(() => {
-      primeExplainerFrameRef.current = false;
-      setExplainerHasPlayed(true);
-      setPlaying(true);
-    }).catch(() => {
-      setPlaying(false);
-    });
+    // One-tap start across devices: mark intent immediately and retry with muted fallback if needed.
+    primeExplainerFrameRef.current = false;
+    setExplainerHasPlayed(true);
+    setPlaying(true);
+    const start = async () => {
+      try {
+        v.muted = false;
+        await v.play();
+      } catch {
+        try {
+          // Some mobile browsers require a muted start first even on user gesture.
+          v.muted = true;
+          await v.play();
+          v.muted = false;
+        } catch {
+          setPlaying(false);
+        }
+      }
+    };
+    void start();
   }, [playing, explainerFailed]);
 
   const enterFullscreen = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
