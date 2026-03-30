@@ -47,6 +47,7 @@ const DESKTOP_ATTACH_STEP_MS = 260;
 const DESKTOP_ATTACH_PAUSED_STEP_MS = 420;
 const DESKTOP_ATTACH_START_DELAY_MS = 260;
 const DESKTOP_TOP_ROW_AUTOPLAY_MAX = 2;
+const DESKTOP_SECOND_AUTOPLAY_DELAY_MS = 850;
 
 function makeDesktopInitialKeys(primaryLen: number): Set<string> {
   const next = new Set<string>();
@@ -159,12 +160,8 @@ const VideoCard = memo(function VideoCard({
       void v.play().catch(() => {});
     } else {
       v.pause();
-      try {
-        v.currentTime = 0.001;
-      } catch {
-        /* ignore */
-      }
-      v.preload = "metadata";
+      // Keep non-active cards light to prevent decode spikes near section boundaries.
+      v.preload = "none";
     }
   }, [shouldPlay, failed, effectiveSrcAttached, videoSrc]);
 
@@ -392,6 +389,9 @@ function VideoRow({
   const evenPrimaryVisibilityRef = useRef<Map<string, number>>(new Map());
   const evenPrimaryRafRef = useRef(0);
   const [evenPrimaryPlayKeys, setEvenPrimaryPlayKeys] = useState<Set<string>>(() => new Set());
+  const [evenPrimaryPlayOrder, setEvenPrimaryPlayOrder] = useState<string[]>([]);
+  const [secondAutoplayReady, setSecondAutoplayReady] = useState(false);
+  const secondAutoplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flushWinnerPick = useCallback(() => {
     if (contestSlots <= 0) {
@@ -447,10 +447,39 @@ function VideoRow({
         }
         return prev;
       });
+      setEvenPrimaryPlayOrder((prev) => {
+        if (prev.length !== picked.length) return picked;
+        for (let i = 0; i < picked.length; i += 1) {
+          if (prev[i] !== picked[i]) return picked;
+        }
+        return prev;
+      });
     });
   }, []);
 
   const allowAutoPlay = sectionInView && !paused;
+
+  useEffect(() => {
+    if (secondAutoplayTimerRef.current != null) {
+      clearTimeout(secondAutoplayTimerRef.current);
+      secondAutoplayTimerRef.current = null;
+    }
+    secondAutoplayTimerRef.current = setTimeout(() => {
+      setSecondAutoplayReady(false);
+      secondAutoplayTimerRef.current = null;
+    }, 0);
+    if (!allowAutoPlay) return;
+    secondAutoplayTimerRef.current = setTimeout(() => {
+      setSecondAutoplayReady(true);
+      secondAutoplayTimerRef.current = null;
+    }, DESKTOP_SECOND_AUTOPLAY_DELAY_MS);
+    return () => {
+      if (secondAutoplayTimerRef.current != null) {
+        clearTimeout(secondAutoplayTimerRef.current);
+        secondAutoplayTimerRef.current = null;
+      }
+    };
+  }, [allowAutoPlay]);
 
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -469,6 +498,8 @@ function VideoRow({
       setWinnerKeys(new Set());
       evenPrimaryVisibilityRef.current.clear();
       setEvenPrimaryPlayKeys(new Set());
+      setEvenPrimaryPlayOrder([]);
+      setSecondAutoplayReady(false);
       setDesktopSrcKeys(makeDesktopInitialKeys(videos.length));
       if (desktopSrcTimerRef.current) {
         clearTimeout(desktopSrcTimerRef.current);
@@ -624,6 +655,9 @@ function VideoRow({
             const useManualSrc = !isMobile;
             const baseKey = String(i % videos.length);
             const manualSrcAttached = useManualSrc && desktopSrcKeys.has(baseKey);
+            const evenOrderIndex = evenPrimaryPlayOrder.indexOf(instanceKey);
+            const evenAutoplayAllowed =
+              evenOrderIndex === 0 || (evenOrderIndex === 1 && secondAutoplayReady);
             return (
               <VideoCard
                 key={`${videoSrc}-${i}`}
@@ -636,7 +670,10 @@ function VideoRow({
                 manualSrcAttached={manualSrcAttached}
                 hoverLoop={hoverLoopEffective}
                 autoPlayActive={
-                  (desktopEveryOtherActive && allowAutoPlay && evenPrimaryPlayKeys.has(instanceKey)) ||
+                  (desktopEveryOtherActive &&
+                    allowAutoPlay &&
+                    evenPrimaryPlayKeys.has(instanceKey) &&
+                    evenAutoplayAllowed) ||
                   (isContestCandidate && winnerKeys.has(instanceKey))
                 }
                 allowAutoPlay={allowAutoPlay}

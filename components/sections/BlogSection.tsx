@@ -114,25 +114,18 @@ function HeroSlideshow({
       onMouseLeave={() => setIsHovered(false)}
       style={{ position: "absolute", inset: 0 }}
     >
-      {images.map((src, i) => (
-        <div
-          key={src}
-          className="blog-slide-layer"
-          style={{
-            opacity: i === index ? 1 : 0,
-            zIndex: i === index ? 1 : 0,
-            pointerEvents: i === index ? "auto" : "none",
-          }}
-        >
-          <Image
-            src={src}
-            alt={alt ?? ""}
-            fill
-            style={imgStyle}
-            sizes="(max-width: 768px) 100vw, 50vw"
-          />
-        </div>
-      ))}
+      <div
+        className="blog-slide-layer"
+        style={{ opacity: 1, zIndex: 1, pointerEvents: "auto" }}
+      >
+        <Image
+          src={images[index]}
+          alt={alt ?? ""}
+          fill
+          style={imgStyle}
+          sizes="(max-width: 768px) 100vw, 50vw"
+        />
+      </div>
       <div style={{
         position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)",
         display: "flex", gap: 6, zIndex: 2,
