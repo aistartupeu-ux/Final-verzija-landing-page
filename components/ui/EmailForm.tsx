@@ -135,8 +135,8 @@ export default function EmailForm({
       <style>{`
         .ef-email-row{display:flex;align-items:stretch;border-radius:50px;overflow:hidden}
         .ef-email-btn{padding:16px 28px;background:linear-gradient(135deg,#00d4ff 0%,#00b0e0 100%);border:none;cursor:pointer;color:#050508;font-weight:700;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;transition:all 0.3s ease;flex-shrink:0}
-        .ef-email-btn--hero{text-transform:none;letter-spacing:0.02em;font-size:15px;font-weight:700;color:#050508;box-shadow:0 4px 22px rgba(0,212,255,0.5),0 0 0 1px rgba(0,0,0,0.08) inset;border:1px solid rgba(0,140,180,0.35)}
-        .ef-email-btn--hero:not(:disabled):hover{box-shadow:0 6px 28px rgba(0,212,255,0.6),0 0 0 1px rgba(0,0,0,0.1) inset}
+        .ef-email-btn--hero{text-transform:none;letter-spacing:0.02em;font-size:15px;font-weight:800;color:#fff;background:linear-gradient(135deg,#00d4ff 0%,#7c3aed 100%);text-shadow:0 1px 10px rgba(0,0,0,0.25);box-shadow:0 0 24px rgba(0,212,255,0.45),0 0 42px rgba(124,58,237,0.3),0 0 0 1px rgba(255,255,255,0.16) inset;border:1px solid rgba(255,255,255,0.22)}
+        .ef-email-btn--hero:not(:disabled):hover{box-shadow:0 0 28px rgba(0,212,255,0.6),0 0 56px rgba(124,58,237,0.42),0 0 0 1px rgba(255,255,255,0.22) inset;transform:translateY(-1px)}
         .ef-email-input-hero::placeholder{color:rgba(255,255,255,0.88);opacity:1;font-weight:400}
         @media(max-width:480px){.ef-email-row{flex-direction:column;border-radius:16px;gap:8px;overflow:visible}        .ef-email-btn{border-radius:12px !important;width:100%;padding:14px 20px}
         .ef-email-btn:disabled{cursor:not-allowed}
@@ -150,11 +150,25 @@ export default function EmailForm({
               verifyState === "invalid"
                 ? "rgba(239,68,68,0.4)"
                 : focused
-                  ? "rgba(0,212,255,0.4)"
-                  : "rgba(0,212,255,0.15)"
+                  ? variant === "hero"
+                    ? "rgba(0,212,255,0.65)"
+                    : "rgba(0,212,255,0.4)"
+                  : variant === "hero"
+                    ? "rgba(0,212,255,0.35)"
+                    : "rgba(0,212,255,0.15)"
             }`,
-            background: "rgba(255,255,255,0.03)",
-            boxShadow: focused ? "0 0 30px rgba(0,212,255,0.08)" : "none",
+            background:
+              variant === "hero"
+                ? "linear-gradient(135deg, rgba(0,212,255,0.09), rgba(124,58,237,0.08))"
+                : "rgba(255,255,255,0.03)",
+            boxShadow:
+              variant === "hero"
+                ? focused
+                  ? "0 0 34px rgba(0,212,255,0.25), 0 0 64px rgba(124,58,237,0.16)"
+                  : "0 0 20px rgba(0,212,255,0.12)"
+                : focused
+                  ? "0 0 30px rgba(0,212,255,0.08)"
+                  : "none",
             transition: "border-color 0.3s ease, box-shadow 0.3s ease",
           }}
         >

@@ -87,11 +87,17 @@ export default function SocialProofSection() {
   const heroVslHeavy = useDocumentHtmlDataFlag("data-hero-vsl-heavy");
   const heavyOk = inView && !reducedHook && !heroVslHeavy;
 
-  const [waitlist, setWaitlist] = useState(() => {
-    if (typeof window === "undefined") return START_VALUE;
-    return getWaitlistCount();
-  });
-  const [barProgress, setBarProgress] = useState(() => getBarProgress());
+  // Keep initial SSR and client render identical to avoid hydration mismatch.
+  const [waitlist, setWaitlist] = useState(START_VALUE);
+  const [barProgress, setBarProgress] = useState(BAR_START_PCT);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setWaitlist(getWaitlistCount());
+      setBarProgress(getBarProgress());
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>;

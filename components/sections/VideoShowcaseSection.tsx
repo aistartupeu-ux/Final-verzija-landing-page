@@ -43,12 +43,11 @@ const LogoFallback = () => (
 const SCROLL_IDLE_RESUME_MS = 420;
 const LOAD_REVEAL_FALLBACK_MS = 12_000;
 const LAZY_SRC_ROOT_MARGIN = "80px 160px 80px 160px";
-const SHOWCASE_HEAVY_ACTIVATION_DELAY_MS = 280;
-const SHOWCASE_HEAVY_DEACTIVATION_DELAY_MS = 120;
-const DESKTOP_INITIAL_ATTACH_COUNT = 2;
-const DESKTOP_ATTACH_STEP_MS = 620;
-const DESKTOP_ATTACH_PAUSED_STEP_MS = 900;
-const DESKTOP_ATTACH_START_DELAY_MS = 900;
+const SHOWCASE_PREWARM_MARGIN = "900px 0px 900px 0px";
+const DESKTOP_INITIAL_ATTACH_COUNT = 4;
+const DESKTOP_ATTACH_STEP_MS = 260;
+const DESKTOP_ATTACH_PAUSED_STEP_MS = 420;
+const DESKTOP_ATTACH_START_DELAY_MS = 260;
 
 function makeDesktopInitialKeys(totalLen: number, primaryLen: number): Set<string> {
   const next = new Set<string>();
@@ -70,10 +69,10 @@ const VideoCard = memo(function VideoCard({
   src,
   reduced,
   sectionInView,
+  canAttach = sectionInView,
   lazySrcMode = "io",
   manualSrcAttached = false,
   hoverLoop = false,
-  autoPlayContest = false,
   autoPlayActive = false,
   allowAutoPlay = true,
   onVisibilityRatio,
@@ -82,14 +81,14 @@ const VideoCard = memo(function VideoCard({
   src: string;
   reduced: boolean;
   sectionInView: boolean;
+  /** Allow metadata/src attach before full in-view to prewarm decode/network. */
+  canAttach?: boolean;
   /** Desktop opt: "manual" = parent controls attach cadence; "io" = per-card IntersectionObserver. */
   lazySrcMode?: "io" | "manual";
   /** Used when lazySrcMode="manual". */
   manualSrcAttached?: boolean;
   /** Donji red: puštanje na hover (desktop). */
   hoverLoop?: boolean;
-  /** Gornji red: kartica učešćuje u izboru koji 2 klipa rade automatski. */
-  autoPlayContest?: boolean;
   autoPlayActive?: boolean;
   /** Za auto red: false kad je marquee zbog skrola ili sekcija van kadra. */
   allowAutoPlay?: boolean;
@@ -102,6 +101,7 @@ const VideoCard = memo(function VideoCard({
   const [videoSrc, setVideoSrc] = useState(src);
   /** Ne vezuj src dok kartica nije blizu viewporta — ne povlači sve mp4 odjednom. */
   const [srcAttached, setSrcAttached] = useState(false);
+  const [hoverAttached, setHoverAttached] = useState(false);
   const [hoverPlaying, setHoverPlaying] = useState(false);
   const didMarkLoaded = useRef(false);
   const errorRetries = useRef(0);
@@ -113,13 +113,15 @@ const VideoCard = memo(function VideoCard({
   }, []);
 
   const effectiveSrcAttached =
-    lazySrcMode === "manual" ? Boolean(sectionInView && manualSrcAttached && !reduced && !failed) : srcAttached;
+    lazySrcMode === "manual"
+      ? Boolean(canAttach && (manualSrcAttached || hoverAttached) && !reduced && !failed)
+      : srcAttached;
 
   useEffect(() => {
     if (lazySrcMode !== "io") return;
     // Ne vezuj src (i ne pravimo IO) dok sekcija nije u kadru.
     // Ovo sprečava “mid-scroll” spike kad korisnik tek prilazi sekciji.
-    if (reduced || failed || !sectionInView) return;
+    if (reduced || failed || !canAttach) return;
     const el = cardRef.current;
     if (!el) return;
     const io = new IntersectionObserver(
@@ -130,11 +132,11 @@ const VideoCard = memo(function VideoCard({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [lazySrcMode, reduced, failed, sectionInView]);
+  }, [lazySrcMode, reduced, failed, canAttach]);
 
   useEffect(() => {
-    // Visibility scoring (autoplay contest) samo kad je sekcija u kadru.
-    if (reduced || failed || !sectionInView || !autoPlayContest || !onVisibilityRatio) return;
+    // Visibility reporting for autoplay decisions.
+    if (reduced || failed || !sectionInView || !onVisibilityRatio) return;
     const el = cardRef.current;
     if (!el) return;
     const thresholds = [0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95, 1];
@@ -148,11 +150,11 @@ const VideoCard = memo(function VideoCard({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [reduced, failed, sectionInView, autoPlayContest, onVisibilityRatio, instanceKey]);
+  }, [reduced, failed, sectionInView, onVisibilityRatio, instanceKey]);
 
   const shouldPlay =
     (hoverLoop && hoverPlaying && sectionInView) ||
-    (autoPlayContest && autoPlayActive && allowAutoPlay);
+    (autoPlayActive && allowAutoPlay);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -216,6 +218,7 @@ const VideoCard = memo(function VideoCard({
         background: VIDEO_CARD_BG,
       }}
       onPointerEnter={() => {
+        if (lazySrcMode === "manual") setHoverAttached(true);
         if (!hoverLoop) return;
         if (!sectionInView) return;
         if (typeof window === "undefined") return;
@@ -348,6 +351,7 @@ function VideoRow({
   paused = false,
   reduced,
   sectionInView,
+  canAttachMedia,
   hoverLoop = false,
   playEveryOtherDesktop = false,
   autoPlayWinnerCount = 0,
@@ -358,6 +362,7 @@ function VideoRow({
   paused?: boolean;
   reduced: boolean;
   sectionInView: boolean;
+  canAttachMedia: boolean;
   hoverLoop?: boolean;
   /** Desktop: fiksno puštaj svaki drugi klip u redu (umesto visibility contest-a). */
   playEveryOtherDesktop?: boolean;
@@ -455,15 +460,11 @@ function VideoRow({
 
   useEffect(() => {
     if (isMobile || reduced) return;
-    if (!sectionInView) return;
+    if (!canAttachMedia) return;
     // Ostatak: 1 po 1 u pozadini (obe kopije), bez naglog burst-a.
     let idx = 0;
     const tick = () => {
-      if (!sectionInView) return;
-      if (paused) {
-        desktopSrcTimerRef.current = setTimeout(tick, DESKTOP_ATTACH_PAUSED_STEP_MS);
-        return;
-      }
+      if (!canAttachMedia) return;
       let nextIndex = -1;
       setDesktopSrcKeys((prev) => {
         while (idx < items.length) {
@@ -480,7 +481,10 @@ function VideoRow({
         return next;
       });
       if (nextIndex === -1) return;
-      desktopSrcTimerRef.current = setTimeout(tick, DESKTOP_ATTACH_STEP_MS);
+      desktopSrcTimerRef.current = setTimeout(
+        tick,
+        paused ? DESKTOP_ATTACH_PAUSED_STEP_MS : DESKTOP_ATTACH_STEP_MS
+      );
     };
     desktopSrcTimerRef.current = setTimeout(tick, DESKTOP_ATTACH_START_DELAY_MS);
 
@@ -490,7 +494,7 @@ function VideoRow({
         desktopSrcTimerRef.current = null;
       }
     };
-  }, [isMobile, reduced, sectionInView, paused, items.length]);
+  }, [isMobile, reduced, canAttachMedia, paused, items.length]);
 
   /** Telefon: bez hover-play u redu (cela prva traka ostaje kao ranije — marquee + autoplay po vidljivosti). Desktop: hover kao i do sada. */
   const hoverLoopEffective = hoverLoop && !isMobile;
@@ -604,13 +608,20 @@ function VideoRow({
                 src={videoSrc}
                 reduced={reduced}
                 sectionInView={sectionInView}
+                canAttach={canAttachMedia}
                 lazySrcMode={useManualSrc ? "manual" : "io"}
                 manualSrcAttached={manualSrcAttached}
                 hoverLoop={hoverLoopEffective}
-                autoPlayContest={isContestCandidate}
-                autoPlayActive={desktopEveryOtherActive || (isContestCandidate && winnerKeys.has(instanceKey))}
+                autoPlayActive={
+                  (desktopEveryOtherActive && allowAutoPlay) ||
+                  (isContestCandidate && winnerKeys.has(instanceKey))
+                }
                 allowAutoPlay={allowAutoPlay}
-                onVisibilityRatio={isContestCandidate ? reportVisibility : undefined}
+                onVisibilityRatio={
+                  isContestCandidate
+                      ? reportVisibility
+                    : undefined
+                }
               />
             );
           })}
@@ -661,10 +672,12 @@ export default function VideoShowcaseSection({
   const row1 = row1Srcs;
   const row2 = row2Srcs;
   const ref = useRef(null);
+  const prewarmInView = useInView(ref, { once: false, amount: 0, margin: SHOWCASE_PREWARM_MARGIN });
   /** Širi „prozor“ da se play/pause ne okida na border skrola (manje treperenja). */
   const inView = useInView(ref, { once: false, amount: 0.16, margin: "40px 0px 60px 0px" });
   const reduced = useReducedMotion();
   const sectionInView = inView ?? false;
+  const canAttachMedia = (prewarmInView ?? false) || sectionInView;
   const heroVslHeavy = useDocumentHtmlDataFlag("data-hero-vsl-heavy");
 
   const reveal = reduced || sectionInView;
@@ -672,8 +685,6 @@ export default function VideoShowcaseSection({
 
   const [marqueeScrollHold, setMarqueeScrollHold] = useState(false);
   const marqueeScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const heavyEnableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showcaseHeavyEnabled, setShowcaseHeavyEnabled] = useState(false);
   const sectionInViewRef = useRef(false);
   useEffect(() => {
     sectionInViewRef.current = sectionInView;
@@ -707,31 +718,6 @@ export default function VideoShowcaseSection({
   }, []);
 
   const pauseMarquee = reduced || !sectionInView || marqueeScrollHold || heroVslHeavy;
-
-  useEffect(() => {
-    if (heavyEnableTimerRef.current != null) {
-      clearTimeout(heavyEnableTimerRef.current);
-      heavyEnableTimerRef.current = null;
-    }
-    const shouldEnable = sectionInView && !marqueeScrollHold && !heroVslHeavy;
-    if (shouldEnable) {
-      heavyEnableTimerRef.current = setTimeout(() => {
-        setShowcaseHeavyEnabled(true);
-        heavyEnableTimerRef.current = null;
-      }, SHOWCASE_HEAVY_ACTIVATION_DELAY_MS);
-      return;
-    }
-    heavyEnableTimerRef.current = setTimeout(() => {
-      setShowcaseHeavyEnabled(false);
-      heavyEnableTimerRef.current = null;
-    }, SHOWCASE_HEAVY_DEACTIVATION_DELAY_MS);
-    return () => {
-      if (heavyEnableTimerRef.current != null) {
-        clearTimeout(heavyEnableTimerRef.current);
-        heavyEnableTimerRef.current = null;
-      }
-    };
-  }, [sectionInView, marqueeScrollHold, heroVslHeavy]);
 
   return (
     <section
@@ -816,7 +802,9 @@ export default function VideoShowcaseSection({
           videos={row1}
           paused={pauseMarquee}
           reduced={reduced}
-          sectionInView={showcaseHeavyEnabled}
+          sectionInView={sectionInView}
+          canAttachMedia={canAttachMedia}
+          hoverLoop
           playEveryOtherDesktop
           autoPlayWinnerCount={2}
           autoPlayWinnerCountDesktop={4}
@@ -835,7 +823,8 @@ export default function VideoShowcaseSection({
           reverse
           paused={pauseMarquee}
           reduced={reduced}
-          sectionInView={showcaseHeavyEnabled}
+          sectionInView={sectionInView}
+          canAttachMedia={canAttachMedia}
         />
       </div>
     </section>
