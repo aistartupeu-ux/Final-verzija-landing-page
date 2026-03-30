@@ -181,10 +181,14 @@ export default function HeroSection({
     if (explainerFailed) return;
     const v = explainerRef.current;
     if (!v) return;
-    if (playing) {
-      void v.play().catch(() => setPlaying(false));
-    } else {
+    if (!playing) {
       v.pause();
+      return;
+    }
+    // Do not force-set playing=false on autoplay-policy rejection.
+    // Playback start is controlled by explicit user gesture in togglePlay.
+    if (v.paused) {
+      void v.play().catch(() => {});
     }
   }, [playing, explainerFailed, EXPLAINER_MP4]);
 
