@@ -40,7 +40,7 @@ const LogoFallback = () => (
 );
 
 const LOAD_REVEAL_FALLBACK_MS = 12_000;
-const LAZY_SRC_ROOT_MARGIN = "80px 160px 80px 160px";
+const VIDEO_NEAR_VIEWPORT_ROOT_MARGIN = "220px 260px 220px 260px";
 const SHOWCASE_PREWARM_MARGIN = "900px 0px 900px 0px";
 const DESKTOP_INITIAL_ATTACH_COUNT = 4;
 const DESKTOP_ATTACH_STEP_MS = 260;
@@ -97,6 +97,7 @@ const VideoCard = memo(function VideoCard({
   const [videoSrc, setVideoSrc] = useState(src);
   /** Ne vezuj src dok kartica nije blizu viewporta — ne povlači sve mp4 odjednom. */
   const [srcAttached, setSrcAttached] = useState(false);
+  const [nearViewport, setNearViewport] = useState(false);
   const [hoverAttached, setHoverAttached] = useState(false);
   const [hoverPlaying, setHoverPlaying] = useState(false);
   const didMarkLoaded = useRef(false);
@@ -110,24 +111,28 @@ const VideoCard = memo(function VideoCard({
 
   const effectiveSrcAttached =
     lazySrcMode === "manual"
-      ? Boolean(canAttach && (manualSrcAttached || hoverAttached) && !reduced && !failed)
+      ? Boolean(canAttach && nearViewport && (manualSrcAttached || hoverAttached) && !reduced && !failed)
       : srcAttached;
 
   useEffect(() => {
-    if (lazySrcMode !== "io") return;
-    // Ne vezuj src (i ne pravimo IO) dok sekcija nije u kadru.
-    // Ovo sprečava “mid-scroll” spike kad korisnik tek prilazi sekciji.
+    // Track whether card is near viewport and attach src only in near zone.
     if (reduced || failed || !canAttach) return;
     const el = cardRef.current;
     if (!el) return;
     const io = new IntersectionObserver(
       ([e]) => {
-        if (e.isIntersecting) setSrcAttached(true);
+        const isNear = Boolean(e?.isIntersecting);
+        setNearViewport(isNear);
+        if (lazySrcMode === "io") setSrcAttached(isNear);
       },
-      { root: null, rootMargin: LAZY_SRC_ROOT_MARGIN, threshold: 0 }
+      { root: null, rootMargin: VIDEO_NEAR_VIEWPORT_ROOT_MARGIN, threshold: 0 }
     );
     io.observe(el);
-    return () => io.disconnect();
+    return () => {
+      io.disconnect();
+      setNearViewport(false);
+      if (lazySrcMode === "io") setSrcAttached(false);
+    };
   }, [lazySrcMode, reduced, failed, canAttach]);
 
   useEffect(() => {
