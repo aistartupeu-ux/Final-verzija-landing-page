@@ -57,7 +57,7 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
       // Meta: Lead šalje se na thank-you (pushThankYouPageTracking). TikTok: isto – Lead samo na thank-you.
 
       await pushLeadToDataLayer(email, null);
-      storeLeadForThankYou(email, null, eventId);
+      storeLeadForThankYou(email.trim().toLowerCase(), null, eventId);
       setPendingEventId(eventId);
       setDone(true);
       setLoading(false);

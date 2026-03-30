@@ -51,7 +51,7 @@ export default function FinalCTASection() {
           className={`sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
           style={{ transitionDelay: reduced ? "0s" : "0.15s" } as CSSProperties}
         >
-          <EmailForm microcopy="10 sekundi. Bez spama." />
+          <EmailForm variant="hero" microcopy="10 sekundi. Bez spama." />
         </div>
       </div>
     </section>

@@ -128,6 +128,40 @@ export async function pushLeadToDataLayer(
 }
 
 const LEAD_CONFIRM_KEY = "lead_confirm";
+const THANK_YOU_TRACKING_DEDUPE_PREFIX = "ty_lc_fired:";
+
+/** Ukloni lead iz sessionStorage (npr. posle uspešnog čuvanja telefona). */
+export function clearStoredLeadConfirm(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(LEAD_CONFIRM_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** Pročitaj lead iz sessionStorage bez brisanja (thank-you: email za formu telefona pre trackinga). */
+export function readStoredLeadConfirm(): {
+  email: string;
+  phone: string | null;
+  event_id?: string | null;
+} | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(LEAD_CONFIRM_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as { email?: string; phone?: string | null; event_id?: string | null };
+    if (!d?.email || typeof d.email !== "string") return null;
+    return { email: d.email, phone: d.phone ?? null, event_id: d.event_id ?? null };
+  } catch {
+    return null;
+  }
+}
+
+/** Nakon što korisnik doda telefon na thank-you: obogaći TikTok identify (bez novog Lead eventa). */
+export async function ttqEnhanceWithPhone(email: string, phone: string): Promise<void> {
+  await ttqIdentify({ email, phone, externalId: email });
+}
 
 /** Sačuvaj email/phone/eventId pre redirecta na thank-you (za Meta Lead na confirmation page). */
 export function storeLeadForThankYou(
@@ -147,8 +181,9 @@ export function storeLeadForThankYou(
 }
 
 /**
- * Na thank-you page: pročita stored lead, push-uje lead_confirmation event, briše storage.
- * Event "lead_confirmation" = korisnik je stigao na confirmation page.
+ * Na thank-you page: pročita stored lead, push-uje lead_confirmation event.
+ * `lead_confirm` ostaje u sessionStorage da bi forma za telefon i refresh stranice radili;
+ * dupli poziv sprečava se ključem `ty_lc_fired:*` (Strict Mode, refresh).
  * eventIdFromUrl = iz ?eid= (Meta preporuka: eksplicitno prosleđivanje za deduplikaciju).
  */
 export async function pushThankYouPageTracking(opts?: { eventIdFromUrl?: string | null }): Promise<void> {
@@ -156,21 +191,29 @@ export async function pushThankYouPageTracking(opts?: { eventIdFromUrl?: string 
   let data: { email: string; phone: string | null; event_id?: string | null } | null = null;
   try {
     const raw = sessionStorage.getItem(LEAD_CONFIRM_KEY);
-    if (raw) {
-      data = JSON.parse(raw) as { email: string; phone: string | null; event_id?: string | null };
-      sessionStorage.removeItem(LEAD_CONFIRM_KEY);
-    }
+    if (!raw) return;
+    data = JSON.parse(raw) as { email: string; phone: string | null; event_id?: string | null };
   } catch {
-    // ignore
+    return;
   }
 
   if (!data?.email) return;
 
   // event_id: prioritet URL param (Meta preporuka), pa sessionStorage
   const eventId = opts?.eventIdFromUrl ?? data.event_id ?? undefined;
+  const emailNorm = data.email.toLowerCase().trim();
+  const dedupeId = eventId ?? emailNorm;
+  const dedupeKey = `${THANK_YOU_TRACKING_DEDUPE_PREFIX}${dedupeId}`;
+  try {
+    if (sessionStorage.getItem(dedupeKey) === "1") {
+      return;
+    }
+    sessionStorage.setItem(dedupeKey, "1");
+  } catch {
+    // ako storage pun, ipak pokušaj tracking jednom
+  }
 
   const w = window as Window & { dataLayer?: unknown[]; gtag?: (...args: unknown[]) => void; ttq?: { page?: () => void; track: (ev: string, opts?: object) => void }; fbq?: (a: string, b: string, c?: object, d?: { eventID?: string }) => void };
-  const emailNorm = data.email.toLowerCase().trim();
   const emailHash = await sha256Hex(emailNorm);
   let phoneHash = "";
   if (data.phone) {

@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { error } = await supabase.from("leads").insert({
-      email,
+      email: emailNorm,
       phone: phone ?? null,
       city,
       country,
@@ -217,7 +217,7 @@ export async function POST(req: NextRequest) {
       try {
         await appendAffiliateLeadToSheet({
           created_at: new Date().toISOString(),
-          email: String(email).trim().toLowerCase(),
+          email: emailNorm,
           phone: phone ?? null,
           affiliate_code: affiliateCode,
           visitor_id: cookieStore.get("af_vid")?.value ?? null,
@@ -236,7 +236,7 @@ export async function POST(req: NextRequest) {
     if (leadsSourceWebhook) {
       const payload = {
         date: new Date().toISOString(),
-        email,
+        email: emailNorm,
         phone: phone ?? "",
         name: "",
         source_tag: sourceTag,
@@ -266,7 +266,7 @@ export async function POST(req: NextRequest) {
     // Leads by Source: direktan upis u Google Sheet (bez Make)
     const row = {
       date: new Date().toISOString(),
-      email,
+      email: emailNorm,
       phone: phone ?? "",
       name: "",
       source_tag: sourceTag,
@@ -294,7 +294,7 @@ export async function POST(req: NextRequest) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              email,
+              email: emailNorm,
               firstName: name?.split(" ")[0] ?? name ?? "",
               lastName: name?.split(" ").slice(1).join(" ") ?? "",
               name: name ?? "",

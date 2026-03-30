@@ -79,7 +79,7 @@ export default function HowToEnterSection() {
           className={`sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
           style={{ marginTop: 56, transitionDelay: reduced ? "0s" : "0.6s" }}
         >
-          <EmailForm />
+          <EmailForm variant="hero" />
         </div>
       </div>
     </section>

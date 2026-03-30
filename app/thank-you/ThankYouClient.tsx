@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { useMemo, type CSSProperties } from "react";
-import { pushThankYouPageTracking } from "@/lib/tiktok-datalayer";
+import ThankYouPhoneForm from "@/components/thank-you/ThankYouPhoneForm";
+import { pushThankYouPageTracking, readStoredLeadConfirm } from "@/lib/tiktok-datalayer";
 
 const SOCIAL_LINKS = [
   { label: "Instagram", href: "https://www.instagram.com/aihype.official/" },
@@ -18,6 +19,15 @@ const STEPS = [
   "Čitaj mailove koje ti šaljemo",
   "Budi spreman/na kad se otvore prijave",
 ] as const;
+
+/** Placeholder email samo za vidljivost forme na localhost-u (dizajn / responsive). */
+const LOCALHOST_PHONE_FORM_PREVIEW_EMAIL = "preview-local@localhost.invalid";
+
+function isThankYouLocalhostHost(): boolean {
+  if (typeof window === "undefined") return false;
+  const h = window.location.hostname;
+  return h === "localhost" || h === "127.0.0.1" || h === "[::1]";
+}
 
 function Icon({ name }: { name: "instagram" | "tiktok" | "youtube" }) {
   if (name === "instagram") {
@@ -240,10 +250,38 @@ export default function ThankYouClient() {
   const ease = [0.16, 1, 0.3, 1] as const;
   const searchParams = useSearchParams();
   const eventIdFromUrl = searchParams.get("eid");
+  const [leadEmail, setLeadEmail] = useState<string | null>(null);
+  const [defaultCountry, setDefaultCountry] = useState("RS");
+  const [localhostPhonePreview, setLocalhostPhonePreview] = useState(false);
 
   useEffect(() => {
+    setLocalhostPhonePreview(isThankYouLocalhostHost());
+  }, []);
+
+  useEffect(() => {
+    const stored = readStoredLeadConfirm();
+    if (stored?.email) setLeadEmail(stored.email);
     void pushThankYouPageTracking({ eventIdFromUrl });
   }, [eventIdFromUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/leads/geo")
+      .then((r) => r.json())
+      .then((d: { defaultCountry?: string }) => {
+        if (!cancelled && typeof d?.defaultCountry === "string" && d.defaultCountry.length === 2) {
+          setDefaultCountry(d.defaultCountry);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const showPhoneFormBlock = Boolean(leadEmail || localhostPhonePreview);
+  const phoneFormEmail = leadEmail ?? LOCALHOST_PHONE_FORM_PREVIEW_EMAIL;
+  const phoneFormIsLocalPreview = !leadEmail && localhostPhonePreview;
 
   return (
     <div
@@ -269,66 +307,67 @@ export default function ThankYouClient() {
 
       <BackgroundEffects />
 
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-5 py-8">
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10 sm:px-6 sm:py-14">
         <div
-          className="w-full max-w-[720px] rounded-[24px] border px-8 pt-7 pb-0 sm:px-10 sm:pt-8 sm:pb-0"
+          className="w-full max-w-[720px] rounded-[24px] border px-6 pt-10 pb-12 sm:px-10 sm:pt-12 sm:pb-14"
           style={{
             background: "#0b0f1a",
             borderColor: "rgba(255,255,255,0.06)",
             boxShadow: "0 0 0 1px rgba(125,211,252,0.08), 0 35px 110px rgba(0,0,0,0.55)",
-            minHeight: 520,
           }}
         >
-          <div className="flex h-full min-h-[480px] flex-col items-center text-center">
+          <div className="flex w-full flex-col items-center gap-y-6 text-center sm:gap-y-8">
             <AnimatedCheckmark />
 
-            <motion.h1
-              initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={reduced ? { duration: 0 } : { duration: 0.6, delay: 0.8, ease }}
-              className="mt-7 text-[32px] font-extrabold leading-[1.15] sm:text-[42px]"
-              style={{ color: "#fff" }}
-            >
-              Uspešno!{" "}
-              <span
-                style={{
-                  background: "linear-gradient(135deg, #c4b5fd, #7dd3fc)",
-                  WebkitBackgroundClip: "text",
-                  backgroundClip: "text",
-                  color: "transparent",
-                }}
+            <div className="flex flex-col items-center gap-y-2 text-center sm:gap-y-2.5">
+              <motion.h1
+                initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={reduced ? { duration: 0 } : { duration: 0.6, delay: 0.8, ease }}
+                className="text-[32px] font-extrabold leading-[1.15] sm:text-[42px]"
+                style={{ color: "#fff" }}
               >
-                Na listi si.
-              </span>{" "}
-              🎉
-            </motion.h1>
+                Uspešno!{" "}
+                <span
+                  style={{
+                    background: "linear-gradient(135deg, #c4b5fd, #7dd3fc)",
+                    WebkitBackgroundClip: "text",
+                    backgroundClip: "text",
+                    color: "transparent",
+                  }}
+                >
+                  Na listi si.
+                </span>{" "}
+                🎉
+              </motion.h1>
 
-            <motion.p
-              initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={reduced ? { duration: 0 } : { duration: 0.6, delay: 1.0, ease }}
-              className="mt-4 max-w-[440px] text-[16px] leading-[1.7] sm:text-[18px]"
-              style={{ color: "rgba(255,255,255,0.75)" }}
-            >
-              Proveri svoj inbox — poslaćemo ti sve detalje u narednim danima.
-            </motion.p>
+              <motion.p
+                initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={reduced ? { duration: 0 } : { duration: 0.6, delay: 1.0, ease }}
+                className="max-w-[440px] text-[16px] leading-[1.7] sm:text-[18px]"
+                style={{ color: "rgba(255,255,255,0.75)" }}
+              >
+                Proveri svoj inbox — poslaćemo ti sve detalje u narednim danima.
+              </motion.p>
+            </div>
 
             <motion.div
               initial={reduced ? { width: 80, opacity: 1 } : { width: 0, opacity: 0 }}
               animate={{ width: 80, opacity: 1 }}
               transition={reduced ? { duration: 0 } : { duration: 0.5, delay: 1.2, ease }}
-              className="my-10 h-px"
+              className="h-px w-20 shrink-0 sm:w-24"
               style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }}
             />
 
-            <div className="w-full max-w-[520px] mt-8 space-y-8">
+            <div className="w-full max-w-[520px] space-y-4 sm:space-y-5">
               {STEPS.map((t, idx) => (
                 <motion.div
                   key={t}
                   initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={reduced ? { duration: 0 } : { duration: 0.5, delay: 1.4 + idx * 0.15, ease }}
-                  className="group flex items-center gap-4 rounded-[14px] border px-4 py-4 text-left"
+                  className="group flex items-center gap-4 rounded-[14px] border px-5 py-4 text-left sm:px-6 sm:py-5"
                   style={{
                     background: "rgba(255,255,255,0.03)",
                     borderColor: "rgba(255,255,255,0.05)",
@@ -352,16 +391,31 @@ export default function ThankYouClient() {
               ))}
             </div>
 
+            {showPhoneFormBlock ? (
+              <motion.div
+                initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={reduced ? { duration: 0 } : { duration: 0.55, delay: 1.82, ease }}
+                className="w-full max-w-[520px]"
+              >
+                <ThankYouPhoneForm
+                  email={phoneFormEmail}
+                  defaultCountryCode={defaultCountry}
+                  isLocalDesignPreview={phoneFormIsLocalPreview}
+                />
+              </motion.div>
+            ) : null}
+
             <motion.div
               initial={reduced ? { opacity: 1 } : { opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={reduced ? { duration: 0 } : { duration: 0.5, delay: 2.0, ease }}
-              className="mt-10 translate-y-8 text-center"
+              transition={reduced ? { duration: 0 } : { duration: 0.5, delay: 2.05, ease }}
+              className="text-center"
             >
               <div className="text-[13px] font-medium tracking-[0.05em]" style={{ color: "rgba(255,255,255,0.45)" }}>
                 Prati nas dok čekaš
               </div>
-              <div className="mt-4 flex items-center justify-center gap-4">
+              <div className="mt-4 flex items-center justify-center gap-4 sm:mt-5">
                 {SOCIAL_LINKS.map((s) => {
                   const name =
                     s.label === "Instagram" ? "instagram" : s.label === "TikTok" ? "tiktok" : "youtube";
@@ -399,7 +453,7 @@ export default function ThankYouClient() {
               </div>
             </motion.div>
 
-              <div className="mt-auto flex w-full flex-col items-center justify-end pt-0 translate-y-16">
+              <div className="flex w-full flex-col items-center pt-6 sm:pt-8">
                 <motion.div
                   initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -439,7 +493,7 @@ export default function ThankYouClient() {
                   initial={reduced ? { opacity: 1 } : { opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={reduced ? { duration: 0 } : { duration: 0.5, delay: 2.2, ease }}
-                  className="mt-8 text-[11px]"
+                  className="mt-5 pb-1 text-[11px] sm:mt-6"
                   style={{ color: "rgba(255,255,255,0.30)" }}
                 >
                   © 2025 AI Hype Academy

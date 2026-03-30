@@ -228,3 +228,62 @@ export async function getLeadsFromSheet(): Promise<LeadsSourceRow[]> {
     return [];
   }
 }
+
+/**
+ * Ažurira kolonu C (telefon) za red čiji je email u koloni B — bez novog reda (Leads by Source).
+ * Traži odozgo; ako ima duplikata emaila, ažurira prvi pogodak.
+ */
+export async function updateLeadsSheetPhoneByEmail(email: string, phone: string): Promise<boolean> {
+  const sheetId = process.env.LEADS_SHEET_ID;
+  const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (!sheetId || !json) return false;
+
+  const emailNorm = String(email).trim().toLowerCase();
+  const phoneVal = String(phone).trim();
+  if (!emailNorm || !phoneVal) return false;
+
+  try {
+    const creds = JSON.parse(json) as { client_email?: string; private_key?: string };
+    if (!creds.client_email || !creds.private_key) return false;
+    const privateKey = String(creds.private_key).replace(/\\n/g, "\n");
+    const credentials = { ...creds, private_key: privateKey };
+
+    const auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    });
+
+    const sheets = google.sheets({ version: "v4", auth });
+    let sheetName = process.env.LEADS_SHEET_NAME;
+    if (!sheetName) {
+      const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+      sheetName = meta.data.sheets?.[0]?.properties?.title || "Sheet1";
+    }
+
+    const rangeRead = `'${sheetName}'!A2:I`;
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: rangeRead });
+    const rows = (res.data.values ?? []) as string[][];
+
+    let sheetRow = -1;
+    for (let i = 0; i < rows.length; i++) {
+      const cell = String(rows[i]?.[1] ?? "").trim().toLowerCase();
+      if (cell === emailNorm) {
+        sheetRow = i + 2;
+        break;
+      }
+    }
+    if (sheetRow < 0) return false;
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `'${sheetName}'!C${sheetRow}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[phoneVal]] },
+    });
+    return true;
+  } catch (e) {
+    const err = e as { message?: string };
+    console.error("Leads Sheet update phone error:", err?.message ?? e);
+    return false;
+  }
+}

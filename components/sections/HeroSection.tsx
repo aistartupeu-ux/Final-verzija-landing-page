@@ -528,7 +528,7 @@ export default function HeroSection({
 
         {/* 2. Email forma — ispod videa */}
         <div id="hero-email-form" style={{ marginBottom: 32, scrollMarginTop: 100 }}>
-          <EmailForm />
+          <EmailForm variant="hero" />
         </div>
 
         {/* 3. Tajmer — na produkciji uključen po defaultu; isključi NEXT_PUBLIC_HERO_COUNTDOWN=false */}
