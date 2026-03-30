@@ -43,10 +43,25 @@ const LogoFallback = () => (
 const SCROLL_IDLE_RESUME_MS = 420;
 const LOAD_REVEAL_FALLBACK_MS = 12_000;
 const LAZY_SRC_ROOT_MARGIN = "80px 160px 80px 160px";
+const SHOWCASE_HEAVY_ACTIVATION_DELAY_MS = 280;
+const SHOWCASE_HEAVY_DEACTIVATION_DELAY_MS = 120;
+const DESKTOP_INITIAL_ATTACH_COUNT = 2;
+const DESKTOP_ATTACH_STEP_MS = 620;
+const DESKTOP_ATTACH_PAUSED_STEP_MS = 900;
+const DESKTOP_ATTACH_START_DELAY_MS = 900;
 
-function makeDesktopInitialKeys(len: number): Set<string> {
+function makeDesktopInitialKeys(totalLen: number, primaryLen: number): Set<string> {
   const next = new Set<string>();
-  for (let i = 0; i < len; i += 2) next.add(String(i));
+  // Keep the initial burst tiny: attach only a couple of top-row "every other" cards.
+  let attached = 0;
+  for (let i = 0; i < primaryLen && attached < DESKTOP_INITIAL_ATTACH_COUNT; i += 2) {
+    next.add(String(i));
+    attached += 1;
+  }
+  // Safety: never include out-of-range keys.
+  for (const k of [...next]) {
+    if (Number(k) >= totalLen) next.delete(k);
+  }
   return next;
 }
 
@@ -358,7 +373,9 @@ function VideoRow({
   });
 
   // Desktop: kači src postepeno da se ne desi “load spike”.
-  const [desktopSrcKeys, setDesktopSrcKeys] = useState<Set<string>>(() => makeDesktopInitialKeys(items.length));
+  const [desktopSrcKeys, setDesktopSrcKeys] = useState<Set<string>>(() =>
+    makeDesktopInitialKeys(items.length, videos.length)
+  );
   const desktopSrcTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const mobileSlots = reduced ? 0 : (autoPlayWinnerCount ?? 0);
@@ -426,7 +443,7 @@ function VideoRow({
       // (izbegava “stare” winners dok ne stigne novi IO update).
       visibilityRef.current.clear();
       setWinnerKeys(new Set());
-      setDesktopSrcKeys(makeDesktopInitialKeys(items.length));
+      setDesktopSrcKeys(makeDesktopInitialKeys(items.length, videos.length));
       if (desktopSrcTimerRef.current) {
         clearTimeout(desktopSrcTimerRef.current);
         desktopSrcTimerRef.current = null;
@@ -434,28 +451,38 @@ function VideoRow({
     };
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);
-  }, [items.length]);
+  }, [items.length, videos.length]);
 
   useEffect(() => {
     if (isMobile || reduced) return;
     if (!sectionInView) return;
-    // Ostatak: 1 po 1 u pozadini (obe kopije), da ne ostaju logo placeholder-i.
-    let idx = 1;
+    // Ostatak: 1 po 1 u pozadini (obe kopije), bez naglog burst-a.
+    let idx = 0;
     const tick = () => {
-      if (!sectionInView || paused) return;
-      while (idx < items.length && idx % 2 === 0) idx += 1;
-      if (idx >= items.length) return;
-      const key = String(idx);
+      if (!sectionInView) return;
+      if (paused) {
+        desktopSrcTimerRef.current = setTimeout(tick, DESKTOP_ATTACH_PAUSED_STEP_MS);
+        return;
+      }
+      let nextIndex = -1;
       setDesktopSrcKeys((prev) => {
-        if (prev.has(key)) return prev;
+        while (idx < items.length) {
+          if (!prev.has(String(idx))) {
+            nextIndex = idx;
+            break;
+          }
+          idx += 1;
+        }
+        if (nextIndex === -1) return prev;
         const next = new Set(prev);
-        next.add(key);
+        next.add(String(nextIndex));
+        idx = nextIndex + 1;
         return next;
       });
-      idx += 2;
-      desktopSrcTimerRef.current = setTimeout(tick, 320);
+      if (nextIndex === -1) return;
+      desktopSrcTimerRef.current = setTimeout(tick, DESKTOP_ATTACH_STEP_MS);
     };
-    desktopSrcTimerRef.current = setTimeout(tick, 480);
+    desktopSrcTimerRef.current = setTimeout(tick, DESKTOP_ATTACH_START_DELAY_MS);
 
     return () => {
       if (desktopSrcTimerRef.current) {
@@ -563,9 +590,11 @@ function VideoRow({
             const isPrimaryCopy = i < videos.length;
             const desktopEveryOtherActive =
               playEveryOtherDesktop && !isMobile && isPrimaryCopy && i % 2 === 0;
+            const forceEveryOtherDesktop = playEveryOtherDesktop && !isMobile;
             // "Contest" (visibility scoring + autoplay winners) samo za prvu kopiju trake.
             // Druga kopija služi za seamless marquee i ne treba dodatni IO + raf pick work.
-            const isContestCandidate = !desktopEveryOtherActive && contestSlots > 0 && i < videos.length;
+            const isContestCandidate =
+              !forceEveryOtherDesktop && !desktopEveryOtherActive && contestSlots > 0 && i < videos.length;
             const useManualSrc = !isMobile;
             const manualSrcAttached = useManualSrc && desktopSrcKeys.has(instanceKey);
             return (
@@ -633,7 +662,7 @@ export default function VideoShowcaseSection({
   const row2 = row2Srcs;
   const ref = useRef(null);
   /** Širi „prozor“ da se play/pause ne okida na border skrola (manje treperenja). */
-  const inView = useInView(ref, { once: false, amount: 0.08, margin: "140px 0px 200px 0px" });
+  const inView = useInView(ref, { once: false, amount: 0.16, margin: "40px 0px 60px 0px" });
   const reduced = useReducedMotion();
   const sectionInView = inView ?? false;
   const heroVslHeavy = useDocumentHtmlDataFlag("data-hero-vsl-heavy");
@@ -643,6 +672,8 @@ export default function VideoShowcaseSection({
 
   const [marqueeScrollHold, setMarqueeScrollHold] = useState(false);
   const marqueeScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heavyEnableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showcaseHeavyEnabled, setShowcaseHeavyEnabled] = useState(false);
   const sectionInViewRef = useRef(false);
   useEffect(() => {
     sectionInViewRef.current = sectionInView;
@@ -676,6 +707,31 @@ export default function VideoShowcaseSection({
   }, []);
 
   const pauseMarquee = reduced || !sectionInView || marqueeScrollHold || heroVslHeavy;
+
+  useEffect(() => {
+    if (heavyEnableTimerRef.current != null) {
+      clearTimeout(heavyEnableTimerRef.current);
+      heavyEnableTimerRef.current = null;
+    }
+    const shouldEnable = sectionInView && !marqueeScrollHold && !heroVslHeavy;
+    if (shouldEnable) {
+      heavyEnableTimerRef.current = setTimeout(() => {
+        setShowcaseHeavyEnabled(true);
+        heavyEnableTimerRef.current = null;
+      }, SHOWCASE_HEAVY_ACTIVATION_DELAY_MS);
+      return;
+    }
+    heavyEnableTimerRef.current = setTimeout(() => {
+      setShowcaseHeavyEnabled(false);
+      heavyEnableTimerRef.current = null;
+    }, SHOWCASE_HEAVY_DEACTIVATION_DELAY_MS);
+    return () => {
+      if (heavyEnableTimerRef.current != null) {
+        clearTimeout(heavyEnableTimerRef.current);
+        heavyEnableTimerRef.current = null;
+      }
+    };
+  }, [sectionInView, marqueeScrollHold, heroVslHeavy]);
 
   return (
     <section
@@ -760,7 +816,7 @@ export default function VideoShowcaseSection({
           videos={row1}
           paused={pauseMarquee}
           reduced={reduced}
-          sectionInView={sectionInView}
+          sectionInView={showcaseHeavyEnabled}
           playEveryOtherDesktop
           autoPlayWinnerCount={2}
           autoPlayWinnerCountDesktop={4}
@@ -779,7 +835,7 @@ export default function VideoShowcaseSection({
           reverse
           paused={pauseMarquee}
           reduced={reduced}
-          sectionInView={sectionInView}
+          sectionInView={showcaseHeavyEnabled}
         />
       </div>
     </section>
