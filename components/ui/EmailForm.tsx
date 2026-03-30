@@ -218,7 +218,7 @@ export default function EmailForm({
             disabled={!canSubmit || loading}
             className={`ef-email-btn${variant === "hero" ? " ef-email-btn--hero" : ""}`}
             style={{
-              opacity: canSubmit && !loading ? 1 : 0.6,
+              opacity: 1,
               cursor: canSubmit && !loading ? "pointer" : "not-allowed",
             }}
           >

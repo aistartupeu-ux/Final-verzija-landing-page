@@ -39,8 +39,6 @@ const LogoFallback = () => (
   </div>
 );
 
-/** Posle ovog mirnog prozora ponovo puštamo CSS marquee (manje GPU pri skrolu). */
-const SCROLL_IDLE_RESUME_MS = 420;
 const LOAD_REVEAL_FALLBACK_MS = 12_000;
 const LAZY_SRC_ROOT_MARGIN = "80px 160px 80px 160px";
 const SHOWCASE_PREWARM_MARGIN = "900px 0px 900px 0px";
@@ -48,18 +46,15 @@ const DESKTOP_INITIAL_ATTACH_COUNT = 4;
 const DESKTOP_ATTACH_STEP_MS = 260;
 const DESKTOP_ATTACH_PAUSED_STEP_MS = 420;
 const DESKTOP_ATTACH_START_DELAY_MS = 260;
+const DESKTOP_TOP_ROW_AUTOPLAY_MAX = 2;
 
-function makeDesktopInitialKeys(totalLen: number, primaryLen: number): Set<string> {
+function makeDesktopInitialKeys(primaryLen: number): Set<string> {
   const next = new Set<string>();
   // Keep the initial burst tiny: attach only a couple of top-row "every other" cards.
   let attached = 0;
   for (let i = 0; i < primaryLen && attached < DESKTOP_INITIAL_ATTACH_COUNT; i += 2) {
     next.add(String(i));
     attached += 1;
-  }
-  // Safety: never include out-of-range keys.
-  for (const k of [...next]) {
-    if (Number(k) >= totalLen) next.delete(k);
   }
   return next;
 }
@@ -379,7 +374,7 @@ function VideoRow({
 
   // Desktop: kači src postepeno da se ne desi “load spike”.
   const [desktopSrcKeys, setDesktopSrcKeys] = useState<Set<string>>(() =>
-    makeDesktopInitialKeys(items.length, videos.length)
+    makeDesktopInitialKeys(videos.length)
   );
   const desktopSrcTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -394,6 +389,9 @@ function VideoRow({
   const visibilityRef = useRef<Map<string, number>>(new Map());
   const rafPickRef = useRef(0);
   const [winnerKeys, setWinnerKeys] = useState<Set<string>>(() => new Set());
+  const evenPrimaryVisibilityRef = useRef<Map<string, number>>(new Map());
+  const evenPrimaryRafRef = useRef(0);
+  const [evenPrimaryPlayKeys, setEvenPrimaryPlayKeys] = useState<Set<string>>(() => new Set());
 
   const flushWinnerPick = useCallback(() => {
     if (contestSlots <= 0) {
@@ -431,6 +429,27 @@ function VideoRow({
     [contestSlots, flushWinnerPick]
   );
 
+  const reportEvenPrimaryVisibility = useCallback((key: string, ratio: number) => {
+    if (ratio < 0.08) evenPrimaryVisibilityRef.current.delete(key);
+    else evenPrimaryVisibilityRef.current.set(key, ratio);
+    if (evenPrimaryRafRef.current) return;
+    evenPrimaryRafRef.current = requestAnimationFrame(() => {
+      evenPrimaryRafRef.current = 0;
+      const picked = [...evenPrimaryVisibilityRef.current.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, DESKTOP_TOP_ROW_AUTOPLAY_MAX)
+        .map(([k]) => k);
+      const next = new Set(picked);
+      setEvenPrimaryPlayKeys((prev) => {
+        if (prev.size !== next.size) return next;
+        for (const k of next) {
+          if (!prev.has(k)) return next;
+        }
+        return prev;
+      });
+    });
+  }, []);
+
   const allowAutoPlay = sectionInView && !paused;
 
   const [dragOffset, setDragOffset] = useState(0);
@@ -448,7 +467,9 @@ function VideoRow({
       // (izbegava “stare” winners dok ne stigne novi IO update).
       visibilityRef.current.clear();
       setWinnerKeys(new Set());
-      setDesktopSrcKeys(makeDesktopInitialKeys(items.length, videos.length));
+      evenPrimaryVisibilityRef.current.clear();
+      setEvenPrimaryPlayKeys(new Set());
+      setDesktopSrcKeys(makeDesktopInitialKeys(videos.length));
       if (desktopSrcTimerRef.current) {
         clearTimeout(desktopSrcTimerRef.current);
         desktopSrcTimerRef.current = null;
@@ -456,18 +477,18 @@ function VideoRow({
     };
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);
-  }, [items.length, videos.length]);
+  }, [videos.length]);
 
   useEffect(() => {
     if (isMobile || reduced) return;
     if (!canAttachMedia) return;
-    // Ostatak: 1 po 1 u pozadini (obe kopije), bez naglog burst-a.
+    // Ostatak: 1 po 1 u pozadini po BASE listi (duplikat trake ne pokreće novi attach ciklus).
     let idx = 0;
     const tick = () => {
       if (!canAttachMedia) return;
       let nextIndex = -1;
       setDesktopSrcKeys((prev) => {
-        while (idx < items.length) {
+        while (idx < videos.length) {
           if (!prev.has(String(idx))) {
             nextIndex = idx;
             break;
@@ -494,7 +515,7 @@ function VideoRow({
         desktopSrcTimerRef.current = null;
       }
     };
-  }, [isMobile, reduced, canAttachMedia, paused, items.length]);
+  }, [isMobile, reduced, canAttachMedia, paused, videos.length]);
 
   /** Telefon: bez hover-play u redu (cela prva traka ostaje kao ranije — marquee + autoplay po vidljivosti). Desktop: hover kao i do sada. */
   const hoverLoopEffective = hoverLoop && !isMobile;
@@ -599,8 +620,10 @@ function VideoRow({
             // Druga kopija služi za seamless marquee i ne treba dodatni IO + raf pick work.
             const isContestCandidate =
               !forceEveryOtherDesktop && !desktopEveryOtherActive && contestSlots > 0 && i < videos.length;
+            const isEvenPrimaryCandidate = forceEveryOtherDesktop && isPrimaryCopy && i % 2 === 0;
             const useManualSrc = !isMobile;
-            const manualSrcAttached = useManualSrc && desktopSrcKeys.has(instanceKey);
+            const baseKey = String(i % videos.length);
+            const manualSrcAttached = useManualSrc && desktopSrcKeys.has(baseKey);
             return (
               <VideoCard
                 key={`${videoSrc}-${i}`}
@@ -613,14 +636,16 @@ function VideoRow({
                 manualSrcAttached={manualSrcAttached}
                 hoverLoop={hoverLoopEffective}
                 autoPlayActive={
-                  (desktopEveryOtherActive && allowAutoPlay) ||
+                  (desktopEveryOtherActive && allowAutoPlay && evenPrimaryPlayKeys.has(instanceKey)) ||
                   (isContestCandidate && winnerKeys.has(instanceKey))
                 }
                 allowAutoPlay={allowAutoPlay}
                 onVisibilityRatio={
-                  isContestCandidate
+                  isEvenPrimaryCandidate
+                    ? reportEvenPrimaryVisibility
+                    : isContestCandidate
                       ? reportVisibility
-                    : undefined
+                      : undefined
                 }
               />
             );
@@ -683,41 +708,8 @@ export default function VideoShowcaseSection({
   const reveal = reduced || sectionInView;
   const revealEase = "cubic-bezier(0.22, 1, 0.36, 1)";
 
-  const [marqueeScrollHold, setMarqueeScrollHold] = useState(false);
-  const marqueeScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sectionInViewRef = useRef(false);
-  useEffect(() => {
-    sectionInViewRef.current = sectionInView;
-  }, [sectionInView]);
-
-  /** Dok korisnik skroluje dok je showcase u kadru, pauziraj CSS marquee (najjeftinije za skrol). */
-  useEffect(() => {
-    const bump = () => {
-      if (!sectionInViewRef.current) return;
-      setMarqueeScrollHold(true);
-      if (marqueeScrollTimerRef.current != null) {
-        clearTimeout(marqueeScrollTimerRef.current);
-      }
-      marqueeScrollTimerRef.current = setTimeout(() => {
-        marqueeScrollTimerRef.current = null;
-        setMarqueeScrollHold(false);
-      }, SCROLL_IDLE_RESUME_MS);
-    };
-    window.addEventListener("scroll", bump, { passive: true });
-    window.addEventListener("wheel", bump, { passive: true });
-    window.addEventListener("touchmove", bump, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", bump);
-      window.removeEventListener("wheel", bump);
-      window.removeEventListener("touchmove", bump);
-      if (marqueeScrollTimerRef.current != null) {
-        clearTimeout(marqueeScrollTimerRef.current);
-        marqueeScrollTimerRef.current = null;
-      }
-    };
-  }, []);
-
-  const pauseMarquee = reduced || !sectionInView || marqueeScrollHold || heroVslHeavy;
+  // Keep handoff smooth around boundaries: don't stop marquee until we're fully outside prewarm zone.
+  const pauseMarquee = reduced || !canAttachMedia || heroVslHeavy;
 
   return (
     <section

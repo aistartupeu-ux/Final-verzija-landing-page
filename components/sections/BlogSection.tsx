@@ -73,7 +73,19 @@ const articles: Article[] = [
   },
 ];
 
-function HeroSlideshow({ images, alt, objectPosition, objectPositions }: { images: string[]; alt?: string; objectPosition?: string; objectPositions?: string[] }) {
+function HeroSlideshow({
+  images,
+  alt,
+  objectPosition,
+  objectPositions,
+  active,
+}: {
+  images: string[];
+  alt?: string;
+  objectPosition?: string;
+  objectPositions?: string[];
+  active: boolean;
+}) {
   const [index, setIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [prefersReducedMotion] = useState(() => {
@@ -84,10 +96,10 @@ function HeroSlideshow({ images, alt, objectPosition, objectPositions }: { image
   const imgStyle = { objectFit: "cover" as const, objectPosition: currentObjectPosition };
 
   useEffect(() => {
-    if (images.length <= 1 || prefersReducedMotion || isHovered) return;
+    if (images.length <= 1 || prefersReducedMotion || isHovered || !active) return;
     const id = setInterval(() => setIndex(i => (i + 1) % images.length), 3200);
     return () => clearInterval(id);
-  }, [images.length, prefersReducedMotion, isHovered]);
+  }, [images.length, prefersReducedMotion, isHovered, active]);
 
   if (images.length === 1) {
     const oneObjectPosition = objectPositions?.[0] ?? objectPosition ?? "center";
@@ -143,7 +155,7 @@ function HeroSlideshow({ images, alt, objectPosition, objectPositions }: { image
   );
 }
 
-function ArticleCard({ article }: { article: Article }) {
+function ArticleCard({ article, active }: { article: Article; active: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const images = article.heroImages?.length ? article.heroImages : [article.heroImage];
 
@@ -153,7 +165,12 @@ function ArticleCard({ article }: { article: Article }) {
       style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}
     >
       <div style={{ position: "relative", height: 240, overflow: "hidden", flexShrink: 0 }}>
-        <HeroSlideshow images={images} objectPosition={article.heroImagePosition} objectPositions={article.heroImagePositions} />
+        <HeroSlideshow
+          images={images}
+          objectPosition={article.heroImagePosition}
+          objectPositions={article.heroImagePositions}
+          active={active}
+        />
         <div style={{
           position: "absolute", inset: 0,
           background: "linear-gradient(to top, rgba(5,5,12,0.95) 0%, rgba(5,5,12,0.3) 50%, transparent 100%)",
@@ -231,7 +248,7 @@ function ArticleCard({ article }: { article: Article }) {
 
 export default function BlogSection() {
   const ref = useRef<HTMLElement>(null);
-  const inView = useInView(ref, { once: true, amount: 0.1 });
+  const inView = useInView(ref, { once: false, amount: 0.08, margin: "180px 0px 220px 0px" });
   const reduced = useReducedMotion();
   const iv = inView || reduced;
 
@@ -254,13 +271,11 @@ export default function BlogSection() {
         </div>
 
         <style>{`.blog-grid{display:grid;grid-template-columns:1fr;gap:24px;max-width:400px;margin:0 auto;width:100%}`}</style>
-        {(inView || reduced) && (
-          <div className={`blog-grid sr-blog-cards ${iv ? "sr-inview" : ""}`}>
-            {articles.map((article) => (
-              <ArticleCard key={article.id} article={article} />
-            ))}
-          </div>
-        )}
+        <div className={`blog-grid sr-blog-cards ${iv ? "sr-inview" : ""}`}>
+          {articles.map((article) => (
+            <ArticleCard key={article.id} article={article} active={Boolean(inView)} />
+          ))}
+        </div>
       </div>
     </section>
   );
