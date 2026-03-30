@@ -44,11 +44,19 @@ const SCROLL_IDLE_RESUME_MS = 420;
 const LOAD_REVEAL_FALLBACK_MS = 12_000;
 const LAZY_SRC_ROOT_MARGIN = "80px 160px 80px 160px";
 
+function makeDesktopInitialKeys(len: number): Set<string> {
+  const next = new Set<string>();
+  for (let i = 0; i < len; i += 2) next.add(String(i));
+  return next;
+}
+
 const VideoCard = memo(function VideoCard({
   instanceKey,
   src,
   reduced,
   sectionInView,
+  lazySrcMode = "io",
+  manualSrcAttached = false,
   hoverLoop = false,
   autoPlayContest = false,
   autoPlayActive = false,
@@ -59,6 +67,10 @@ const VideoCard = memo(function VideoCard({
   src: string;
   reduced: boolean;
   sectionInView: boolean;
+  /** Desktop opt: "manual" = parent controls attach cadence; "io" = per-card IntersectionObserver. */
+  lazySrcMode?: "io" | "manual";
+  /** Used when lazySrcMode="manual". */
+  manualSrcAttached?: boolean;
   /** Donji red: puštanje na hover (desktop). */
   hoverLoop?: boolean;
   /** Gornji red: kartica učešćuje u izboru koji 2 klipa rade automatski. */
@@ -85,11 +97,14 @@ const VideoCard = memo(function VideoCard({
     setLoaded(true);
   }, []);
 
+  const effectiveSrcAttached =
+    lazySrcMode === "manual" ? Boolean(sectionInView && manualSrcAttached && !reduced && !failed) : srcAttached;
+
   useEffect(() => {
+    if (lazySrcMode !== "io") return;
     // Ne vezuj src (i ne pravimo IO) dok sekcija nije u kadru.
     // Ovo sprečava “mid-scroll” spike kad korisnik tek prilazi sekciji.
-    // Dodatno: dok korisnik aktivno skroluje (marquee pause), ne kačimo src.
-    if (reduced || failed || !sectionInView || !allowAutoPlay) return;
+    if (reduced || failed || !sectionInView) return;
     const el = cardRef.current;
     if (!el) return;
     const io = new IntersectionObserver(
@@ -100,11 +115,11 @@ const VideoCard = memo(function VideoCard({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [reduced, failed, sectionInView, allowAutoPlay]);
+  }, [lazySrcMode, reduced, failed, sectionInView]);
 
   useEffect(() => {
     // Visibility scoring (autoplay contest) samo kad je sekcija u kadru.
-    if (reduced || failed || !sectionInView || !allowAutoPlay || !autoPlayContest || !onVisibilityRatio) return;
+    if (reduced || failed || !sectionInView || !autoPlayContest || !onVisibilityRatio) return;
     const el = cardRef.current;
     if (!el) return;
     const thresholds = [0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95, 1];
@@ -118,7 +133,7 @@ const VideoCard = memo(function VideoCard({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [reduced, failed, sectionInView, allowAutoPlay, autoPlayContest, onVisibilityRatio, instanceKey]);
+  }, [reduced, failed, sectionInView, autoPlayContest, onVisibilityRatio, instanceKey]);
 
   const shouldPlay =
     (hoverLoop && hoverPlaying && sectionInView) ||
@@ -126,7 +141,7 @@ const VideoCard = memo(function VideoCard({
 
   useEffect(() => {
     const v = videoRef.current;
-    if (!v || failed || !srcAttached) return;
+    if (!v || failed || !effectiveSrcAttached) return;
     if (shouldPlay) {
       v.preload = "auto";
       void v.play().catch(() => {});
@@ -139,15 +154,15 @@ const VideoCard = memo(function VideoCard({
       }
       v.preload = "metadata";
     }
-  }, [shouldPlay, failed, srcAttached, videoSrc]);
+  }, [shouldPlay, failed, effectiveSrcAttached, videoSrc]);
 
   useEffect(() => {
-    if (reduced || failed || !sectionInView || loaded || !srcAttached) return;
+    if (reduced || failed || !sectionInView || loaded || !effectiveSrcAttached) return;
     const t = window.setTimeout(() => {
       if (!didMarkLoaded.current) markLoaded();
     }, LOAD_REVEAL_FALLBACK_MS);
     return () => clearTimeout(t);
-  }, [sectionInView, reduced, failed, loaded, markLoaded, srcAttached]);
+  }, [sectionInView, reduced, failed, loaded, markLoaded, effectiveSrcAttached]);
 
   if (reduced) {
     return (
@@ -197,7 +212,7 @@ const VideoCard = memo(function VideoCard({
         setHoverPlaying(false);
       }}
     >
-      {!failed && srcAttached && (
+      {!failed && (lazySrcMode === "manual" ? effectiveSrcAttached : srcAttached) && (
         <video
           ref={videoRef}
           src={videoSrc}
@@ -282,7 +297,7 @@ const VideoCard = memo(function VideoCard({
           }}
         />
       )}
-      {!failed && (!srcAttached || !loaded) && (
+      {!failed && (!(lazySrcMode === "manual" ? effectiveSrcAttached : srcAttached) || !loaded) && (
         <div
           style={{
             position: "absolute",
@@ -338,6 +353,10 @@ function VideoRow({
     if (typeof window === "undefined") return false;
     return window.matchMedia("(max-width: 768px)").matches;
   });
+
+  // Desktop: kači src postepeno da se ne desi “load spike”.
+  const [desktopSrcKeys, setDesktopSrcKeys] = useState<Set<string>>(() => makeDesktopInitialKeys(videos.length));
+  const desktopSrcTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const mobileSlots = reduced ? 0 : (autoPlayWinnerCount ?? 0);
   const desktopSlots = reduced ? 0 : (autoPlayWinnerCountDesktop ?? autoPlayWinnerCount ?? 0);
@@ -404,10 +423,44 @@ function VideoRow({
       // (izbegava “stare” winners dok ne stigne novi IO update).
       visibilityRef.current.clear();
       setWinnerKeys(new Set());
+      setDesktopSrcKeys(makeDesktopInitialKeys(videos.length));
+      if (desktopSrcTimerRef.current) {
+        clearTimeout(desktopSrcTimerRef.current);
+        desktopSrcTimerRef.current = null;
+      }
     };
     mq.addEventListener("change", fn);
     return () => mq.removeEventListener("change", fn);
-  }, []);
+  }, [videos.length]);
+
+  useEffect(() => {
+    if (isMobile || reduced) return;
+    if (!sectionInView) return;
+    // Ostatak: 1 po 1 u pozadini (samo prva kopija).
+    let idx = 1;
+    const tick = () => {
+      if (!sectionInView || paused) return;
+      while (idx < videos.length && idx % 2 === 0) idx += 1;
+      if (idx >= videos.length) return;
+      const key = String(idx);
+      setDesktopSrcKeys((prev) => {
+        if (prev.has(key)) return prev;
+        const next = new Set(prev);
+        next.add(key);
+        return next;
+      });
+      idx += 2;
+      desktopSrcTimerRef.current = setTimeout(tick, 320);
+    };
+    desktopSrcTimerRef.current = setTimeout(tick, 480);
+
+    return () => {
+      if (desktopSrcTimerRef.current) {
+        clearTimeout(desktopSrcTimerRef.current);
+        desktopSrcTimerRef.current = null;
+      }
+    };
+  }, [isMobile, reduced, sectionInView, paused, videos.length]);
 
   /** Telefon: bez hover-play u redu (cela prva traka ostaje kao ranije — marquee + autoplay po vidljivosti). Desktop: hover kao i do sada. */
   const hoverLoopEffective = hoverLoop && !isMobile;
@@ -507,6 +560,9 @@ function VideoRow({
             // "Contest" (visibility scoring + autoplay winners) samo za prvu kopiju trake.
             // Druga kopija služi za seamless marquee i ne treba dodatni IO + raf pick work.
             const isContestCandidate = contestSlots > 0 && i < videos.length;
+            const isPrimaryCopy = i < videos.length;
+            const useManualSrc = !isMobile;
+            const manualSrcAttached = useManualSrc && isPrimaryCopy && desktopSrcKeys.has(instanceKey);
             return (
               <VideoCard
                 key={`${videoSrc}-${i}`}
@@ -514,6 +570,8 @@ function VideoRow({
                 src={videoSrc}
                 reduced={reduced}
                 sectionInView={sectionInView}
+                lazySrcMode={useManualSrc ? "manual" : "io"}
+                manualSrcAttached={manualSrcAttached}
                 hoverLoop={hoverLoopEffective}
                 autoPlayContest={isContestCandidate}
                 autoPlayActive={isContestCandidate && winnerKeys.has(instanceKey)}

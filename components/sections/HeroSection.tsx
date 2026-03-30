@@ -59,6 +59,70 @@ export default function HeroSection({
   const explainerIosPrimeDoneRef = useRef(false);
   const suppressExplainerPlayUiRef = useRef(false);
 
+  const tryPrimeExplainerStaticFrame = useCallback(
+    (v: HTMLVideoElement) => {
+      if (explainerFailed || !primeExplainerFrameRef.current) return;
+      // Ako je korisnik već krenuo da pušta, ne diraj.
+      if (playing) return;
+      // Ne primuj ponovo ako smo već uradili iOS prime.
+      if (explainerIosPrimeDoneRef.current) return;
+
+      suppressExplainerPlayUiRef.current = true;
+      v.muted = true;
+
+      const done = () => {
+        suppressExplainerPlayUiRef.current = false;
+      };
+
+      const pauseAndSeek = () => {
+        try {
+          v.pause();
+          v.currentTime = 0.001;
+        } catch {
+          /* ignore */
+        }
+        done();
+      };
+
+      try {
+        // 1) Pokušaj “cheap” seek bez play.
+        try {
+          v.currentTime = 0.001;
+          v.pause();
+        } catch {
+          /* ignore */
+        }
+
+        // 2) Sačekaj render jedne frame (ako može), inače kratko play→pause (muted) da se iscrta prvi kadar.
+        const rvfc = (v as HTMLVideoElement & {
+          requestVideoFrameCallback?: (cb: () => void) => number;
+        }).requestVideoFrameCallback;
+        if (rvfc) {
+          try {
+            rvfc(() => pauseAndSeek());
+            return;
+          } catch {
+            /* ignore */
+          }
+        }
+
+        const p = v.play();
+        if (p !== undefined) {
+          void p
+            .then(() => {
+              window.setTimeout(() => pauseAndSeek(), 140);
+            })
+            .catch(() => done());
+        } else {
+          done();
+        }
+      } catch {
+        done();
+      }
+    },
+    [explainerFailed, playing]
+  );
+
   /** BG video + VSL: pauza kad hero nije dovoljno u kadru; skrol dole gasi explainer i sve „heavy“ efekte na stranici. */
   useEffect(() => {
     const section = sectionRef.current;
@@ -188,13 +252,30 @@ export default function HeroSection({
         if (p !== undefined) {
           void p
             .then(() => {
-              v.pause();
-              try {
-                v.currentTime = 0.001;
-              } catch {
-                /* ignore */
+              // iOS/Safari često neće “iscrtati” prvi kadar bez makar jedne renderovane frame.
+              // Sačekaj 1 frame (ako je moguće), pa tek onda pauziraj.
+              const pauseAndSeek = () => {
+                try {
+                  v.pause();
+                  v.currentTime = 0.001;
+                } catch {
+                  /* ignore */
+                }
+                done();
+              };
+              // requestVideoFrameCallback nije svuda dostupan.
+              const rvfc = (v as HTMLVideoElement & {
+                requestVideoFrameCallback?: (cb: () => void) => number;
+              }).requestVideoFrameCallback;
+              if (rvfc) {
+                try {
+                  rvfc(() => pauseAndSeek());
+                  return;
+                } catch {
+                  /* ignore */
+                }
               }
-              done();
+              window.setTimeout(pauseAndSeek, 140);
             })
             .catch(fail);
         } else {
@@ -326,18 +407,16 @@ export default function HeroSection({
                   requestAnimationFrame(() => tryPrimeExplainerFirstFrame(v));
                   return;
                 }
-                try {
-                  v.currentTime = 0.001;
-                  v.pause();
-                } catch {
-                  /* ignore */
-                }
+                requestAnimationFrame(() => tryPrimeExplainerStaticFrame(v));
               }}
               onCanPlay={(e) => {
                 if (!primeExplainerFrameRef.current || explainerIosPrimeDoneRef.current) return;
                 const v = e.currentTarget;
-                if (!isAppleTouchSafariFamily()) return;
-                requestAnimationFrame(() => tryPrimeExplainerFirstFrame(v));
+                if (isAppleTouchSafariFamily()) {
+                  requestAnimationFrame(() => tryPrimeExplainerFirstFrame(v));
+                } else {
+                  requestAnimationFrame(() => tryPrimeExplainerStaticFrame(v));
+                }
               }}
               onPlay={() => {
                 if (suppressExplainerPlayUiRef.current) return;
