@@ -46,10 +46,6 @@ export default function HeroSection({
   const sectionRef = useRef<HTMLElement>(null);
   const [playing, setPlaying] = useState(false);
   const [startedMuted, setStartedMuted] = useState(false);
-  const [isTouchLike] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia("(hover: none), (pointer: coarse)").matches;
-  });
   const [hovering, setHovering] = useState(false);
   const [explainerFailed, setExplainerFailed] = useState(false);
   /** Kad je jednom krenuo repro — sklanja preview (logo + providni sloj), pun video. */
@@ -196,6 +192,12 @@ export default function HeroSection({
     const v = explainerRef.current;
     if (!v || explainerFailed) return;
     if (playing) {
+      if (startedMuted) {
+        // If playback already started muted, next tap should unmute (not pause).
+        setStartedMuted(false);
+        v.muted = false;
+        return;
+      }
       v.pause();
       setPlaying(false);
       setStartedMuted(false);
@@ -206,26 +208,13 @@ export default function HeroSection({
     setExplainerHasPlayed(true);
     setPlaying(true);
     const start = async () => {
-      if (isTouchLike) {
-        try {
-          // Most reliable mobile path: start muted on first tap.
-          setStartedMuted(true);
-          v.muted = true;
-          await v.play();
-          return;
-        } catch {
-          setPlaying(false);
-          setStartedMuted(false);
-          return;
-        }
-      }
       try {
         setStartedMuted(false);
         v.muted = false;
         await v.play();
       } catch {
         try {
-          // Some mobile browsers require a muted start first even on user gesture.
+          // Fallback: start muted, then let the next tap unmute instantly.
           setStartedMuted(true);
           v.muted = true;
           await v.play();
@@ -236,7 +225,7 @@ export default function HeroSection({
       }
     };
     void start();
-  }, [playing, explainerFailed, isTouchLike]);
+  }, [playing, startedMuted, explainerFailed]);
 
   const enterFullscreen = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
