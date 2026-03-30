@@ -93,7 +93,7 @@ export default function ThankYouPhoneForm({
       : "rgba(0,212,255,0.15)";
 
   return (
-    <div className="mx-auto flex w-full max-w-[480px] flex-col gap-4 sm:max-w-[520px] sm:gap-5">
+    <div className="mx-auto flex w-full max-w-[min(480px,100%)] flex-col gap-3 md:max-lg:max-w-[500px] md:max-lg:gap-4 lg:max-w-[520px] lg:gap-5">
       <style>{`
         @keyframes ty-spin{to{transform:rotate(360deg)}}
         .ty-ef-row{display:flex;align-items:stretch;border-radius:50px;overflow:hidden}
@@ -107,16 +107,16 @@ export default function ThankYouPhoneForm({
         .ty-pi-wrap .PhoneInputCountrySelectArrow{color:rgba(255,255,255,0.55);margin-left:2px;opacity:0.85;width:6px;height:6px}
         .ty-pi-wrap .PhoneInputInput{flex:1;min-width:0;padding:16px 12px 16px 4px;background:transparent;border:none;outline:none;color:#fff;font-size:15px;font-weight:400}
         .ty-pi-wrap .PhoneInputInput::placeholder{color:rgba(255,255,255,0.88);opacity:1;font-weight:400}
-        @media(max-width:480px){
+        @media (max-width: 767px){
           .ty-ef-row{flex-direction:column;border-radius:16px;gap:8px;overflow:visible}
           .ty-ef-btn{border-radius:12px !important;width:100%;padding:14px 20px}
         }
       `}</style>
-      <div className="space-y-2 text-center sm:space-y-3">
-        <p className="text-[20px] font-extrabold leading-tight tracking-tight text-white sm:text-[24px]">
+      <div className="space-y-1.5 text-center md:max-lg:space-y-2 lg:space-y-3">
+        <p className="text-[18px] font-extrabold leading-tight tracking-tight text-white md:max-lg:text-[22px] lg:text-[24px]">
           Krećemo 15. aprila <span aria-hidden>👇</span>
         </p>
-        <p className="text-[15px] leading-relaxed sm:text-[17px]" style={{ color: "rgba(255,255,255,0.78)" }}>
+        <p className="text-[14px] leading-relaxed md:max-lg:text-[16px] lg:text-[17px]" style={{ color: "rgba(255,255,255,0.78)" }}>
           Ako nećeš da propustiš, ostavi broj
         </p>
         {isLocalDesignPreview ? (
@@ -126,7 +126,7 @@ export default function ThankYouPhoneForm({
           </p>
         ) : null}
       </div>
-      <div className="flex w-full flex-col gap-2 sm:gap-3">
+      <div className="flex w-full flex-col gap-2 md:max-lg:gap-2.5 lg:gap-3">
         <form onSubmit={submit} style={{ width: "100%" }}>
           <div
             className="ty-ef-row"

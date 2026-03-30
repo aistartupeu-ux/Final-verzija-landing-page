@@ -284,10 +284,7 @@ export default function ThankYouClient() {
   const phoneFormIsLocalPreview = !leadEmail && localhostPhonePreview;
 
   return (
-    <div
-      className="relative min-h-screen overflow-hidden"
-      style={{ background: "#050508" }}
-    >
+    <div className="relative min-h-dvh overflow-x-hidden bg-[#050508]">
       <style>{`
         @keyframes tyGlow1 { 0%,100%{opacity:.08} 50%{opacity:.14} }
         @keyframes tyGlow2 { 0%,100%{opacity:.06} 50%{opacity:.12} }
@@ -307,24 +304,24 @@ export default function ThankYouClient() {
 
       <BackgroundEffects />
 
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10 sm:px-6 sm:py-14">
+      <div className="relative z-10 flex min-h-dvh w-full max-w-[100vw] flex-col items-center justify-center px-4 py-5 max-md:py-6 md:max-lg:px-6 md:max-lg:py-9 lg:px-6 lg:py-11">
         <div
-          className="w-full max-w-[720px] rounded-[24px] border px-6 pt-10 pb-12 sm:px-10 sm:pt-12 sm:pb-14"
+          className="w-full max-w-[min(720px,100%)] rounded-[20px] border px-4 pt-6 pb-8 md:max-lg:max-w-[640px] md:max-lg:rounded-[22px] md:max-lg:px-8 md:max-lg:pt-9 md:max-lg:pb-10 lg:max-w-[720px] lg:rounded-[24px] lg:px-10 lg:pt-12 lg:pb-14"
           style={{
             background: "#0b0f1a",
             borderColor: "rgba(255,255,255,0.06)",
             boxShadow: "0 0 0 1px rgba(125,211,252,0.08), 0 35px 110px rgba(0,0,0,0.55)",
           }}
         >
-          <div className="flex w-full flex-col items-center gap-y-6 text-center sm:gap-y-8">
+          <div className="flex w-full flex-col items-center gap-y-4 text-center md:max-lg:gap-y-6 lg:gap-y-8">
             <AnimatedCheckmark />
 
-            <div className="flex flex-col items-center gap-y-2 text-center sm:gap-y-2.5">
+            <div className="flex flex-col items-center gap-y-1.5 text-center md:gap-y-2 lg:gap-y-2.5">
               <motion.h1
                 initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={reduced ? { duration: 0 } : { duration: 0.6, delay: 0.8, ease }}
-                className="text-[32px] font-extrabold leading-[1.15] sm:text-[42px]"
+                className="text-[26px] font-extrabold leading-[1.12] md:max-lg:text-[34px] md:max-lg:leading-[1.14] lg:text-[42px] lg:leading-[1.15]"
                 style={{ color: "#fff" }}
               >
                 Uspešno!{" "}
@@ -345,7 +342,7 @@ export default function ThankYouClient() {
                 initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={reduced ? { duration: 0 } : { duration: 0.6, delay: 1.0, ease }}
-                className="max-w-[440px] text-[16px] leading-[1.7] sm:text-[18px]"
+                className="max-w-[min(440px,100%)] text-[15px] leading-[1.65] md:max-lg:text-[16px] md:max-lg:leading-[1.7] lg:text-[18px]"
                 style={{ color: "rgba(255,255,255,0.75)" }}
               >
                 Proveri svoj inbox — poslaćemo ti sve detalje u narednim danima.
@@ -356,18 +353,18 @@ export default function ThankYouClient() {
               initial={reduced ? { width: 80, opacity: 1 } : { width: 0, opacity: 0 }}
               animate={{ width: 80, opacity: 1 }}
               transition={reduced ? { duration: 0 } : { duration: 0.5, delay: 1.2, ease }}
-              className="h-px w-20 shrink-0 sm:w-24"
+              className="h-px w-16 shrink-0 md:max-lg:w-20 lg:w-24"
               style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }}
             />
 
-            <div className="w-full max-w-[520px] space-y-4 sm:space-y-5">
+            <div className="w-full max-w-[min(520px,100%)] space-y-3 md:max-lg:space-y-4 lg:space-y-5">
               {STEPS.map((t, idx) => (
                 <motion.div
                   key={t}
                   initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={reduced ? { duration: 0 } : { duration: 0.5, delay: 1.4 + idx * 0.15, ease }}
-                  className="group flex items-center gap-4 rounded-[14px] border px-5 py-4 text-left sm:px-6 sm:py-5"
+                  className="group flex items-center gap-3 rounded-[14px] border px-4 py-3.5 text-left md:max-lg:gap-4 md:max-lg:px-5 md:max-lg:py-4 lg:gap-4 lg:px-6 lg:py-5"
                   style={{
                     background: "rgba(255,255,255,0.03)",
                     borderColor: "rgba(255,255,255,0.05)",
@@ -384,7 +381,7 @@ export default function ThankYouClient() {
                   >
                     {idx + 1}
                   </div>
-                  <div className="text-[15px] font-medium leading-[1.5]" style={{ color: "#fff" }}>
+                  <div className="text-[14px] font-medium leading-[1.45] md:max-lg:text-[15px] lg:text-[15px] lg:leading-[1.5]" style={{ color: "#fff" }}>
                     {t}
                   </div>
                 </motion.div>
@@ -396,7 +393,7 @@ export default function ThankYouClient() {
                 initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={reduced ? { duration: 0 } : { duration: 0.55, delay: 1.82, ease }}
-                className="w-full max-w-[520px]"
+                className="w-full max-w-[min(520px,100%)]"
               >
                 <ThankYouPhoneForm
                   email={phoneFormEmail}
@@ -415,7 +412,7 @@ export default function ThankYouClient() {
               <div className="text-[13px] font-medium tracking-[0.05em]" style={{ color: "rgba(255,255,255,0.45)" }}>
                 Prati nas dok čekaš
               </div>
-              <div className="mt-4 flex items-center justify-center gap-4 sm:mt-5">
+              <div className="mt-3 flex items-center justify-center gap-4 md:max-lg:mt-4 lg:mt-5">
                 {SOCIAL_LINKS.map((s) => {
                   const name =
                     s.label === "Instagram" ? "instagram" : s.label === "TikTok" ? "tiktok" : "youtube";
@@ -453,7 +450,7 @@ export default function ThankYouClient() {
               </div>
             </motion.div>
 
-              <div className="flex w-full flex-col items-center pt-6 sm:pt-8">
+              <div className="flex w-full flex-col items-center pt-4 md:max-lg:pt-6 lg:pt-8">
                 <motion.div
                   initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -493,7 +490,7 @@ export default function ThankYouClient() {
                   initial={reduced ? { opacity: 1 } : { opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={reduced ? { duration: 0 } : { duration: 0.5, delay: 2.2, ease }}
-                  className="mt-5 pb-1 text-[11px] sm:mt-6"
+                  className="mt-4 pb-1 text-[11px] md:max-lg:mt-5 lg:mt-6"
                   style={{ color: "rgba(255,255,255,0.30)" }}
                 >
                   © 2025 AI Hype Academy

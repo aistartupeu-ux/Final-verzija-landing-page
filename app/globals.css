@@ -59,20 +59,40 @@ body {
 ::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.2); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(0,212,255,0.35); }
 
+/* Širina sadržaja: telefon / tablet / desktop (odvojeni opsezi) */
 .section-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 16px;
   width: 100%;
   box-sizing: border-box;
 }
-@media (min-width: 768px) {
+@media (min-width: 768px) and (max-width: 1023px) {
+  .section-container { padding: 0 32px; }
+}
+@media (min-width: 1024px) {
   .section-container { padding: 0 40px; }
 }
 
-/* Mobile: reduce section vertical padding */
-@media (max-width: 640px) {
-  section { padding-top: 72px !important; padding-bottom: 72px !important; padding-left: 20px !important; padding-right: 20px !important; }
+/*
+ * Vertikalni ritam sekcija po uređaju (ne koristiti sm: za ovo — eksplicitni opsezi).
+ * Desktop (1024+): komponente zadržavaju sopstveni inline padding.
+ */
+@media (max-width: 767px) {
+  section {
+    padding-top: 56px !important;
+    padding-bottom: 56px !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  section {
+    padding-top: 88px !important;
+    padding-bottom: 88px !important;
+    padding-left: 32px !important;
+    padding-right: 32px !important;
+  }
 }
 
 .card {
