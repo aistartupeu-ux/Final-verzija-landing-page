@@ -46,6 +46,10 @@ export default function HeroSection({
   const sectionRef = useRef<HTMLElement>(null);
   const [playing, setPlaying] = useState(false);
   const [startedMuted, setStartedMuted] = useState(false);
+  const [isTouchLike] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(hover: none), (pointer: coarse)").matches;
+  });
   const [hovering, setHovering] = useState(false);
   const [explainerFailed, setExplainerFailed] = useState(false);
   /** Kad je jednom krenuo repro — sklanja preview (logo + providni sloj), pun video. */
@@ -202,6 +206,19 @@ export default function HeroSection({
     setExplainerHasPlayed(true);
     setPlaying(true);
     const start = async () => {
+      if (isTouchLike) {
+        try {
+          // Most reliable mobile path: start muted on first tap.
+          setStartedMuted(true);
+          v.muted = true;
+          await v.play();
+          return;
+        } catch {
+          setPlaying(false);
+          setStartedMuted(false);
+          return;
+        }
+      }
       try {
         setStartedMuted(false);
         v.muted = false;
@@ -219,7 +236,7 @@ export default function HeroSection({
       }
     };
     void start();
-  }, [playing, explainerFailed]);
+  }, [playing, explainerFailed, isTouchLike]);
 
   const enterFullscreen = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
