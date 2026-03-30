@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Play, Pause, Maximize } from "lucide-react";
-import Image from "next/image";
 import CountdownTimer from "@/components/ui/CountdownTimer";
 import EmailForm from "@/components/ui/EmailForm";
 import { getCdnMediaUrl } from "@/lib/cdn-media";
 import { isHeroCountdownEnabled } from "@/lib/promo-landing-pages";
-import { CDN_PATH_HERO_BG, CDN_PATH_EXPLAINER_MP4 } from "@/lib/video-cdn-paths";
+import { CDN_PATH_EXPLAINER_MP4 } from "@/lib/video-cdn-paths";
 
 /** Watermark preko VSL preview-a — isti fajl kao header (`public/logo.png`), vizuelno beli + providan kao na mobilnom referenci. */
 const HERO_VSL_WATERMARK_SRC = "/logo.png";
@@ -30,12 +29,10 @@ function isAppleTouchSafariFamily(): boolean {
 }
 
 const DEFAULT_HERO_MEDIA = {
-  bgMp4: getCdnMediaUrl(CDN_PATH_HERO_BG),
   explainerMp4: getCdnMediaUrl(CDN_PATH_EXPLAINER_MP4),
 };
 
 export type HeroSectionMediaUrls = {
-  bgMp4: string;
   explainerMp4: string;
 };
 
@@ -44,13 +41,11 @@ export default function HeroSection({
 }: {
   mediaUrls?: HeroSectionMediaUrls;
 }) {
-  const { bgMp4: HERO_BG_MP4, explainerMp4: EXPLAINER_MP4 } = mediaUrls;
-  const bgVideoRef = useRef<HTMLVideoElement>(null);
+  const { explainerMp4: EXPLAINER_MP4 } = mediaUrls;
   const explainerRef = useRef<HTMLVideoElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const [playing, setPlaying] = useState(false);
   const [hovering, setHovering] = useState(false);
-  const [bgFailed, setBgFailed] = useState(false);
   const [explainerFailed, setExplainerFailed] = useState(false);
   /** Kad je jednom krenuo repro — sklanja preview (logo + providni sloj), pun video. */
   const [explainerHasPlayed, setExplainerHasPlayed] = useState(false);
@@ -123,29 +118,16 @@ export default function HeroSection({
     [explainerFailed, playing]
   );
 
-  /** BG video + VSL: pauza kad hero nije dovoljno u kadru; skrol dole gasi explainer i sve „heavy“ efekte na stranici. */
+  /** VSL: pauza kad hero nije dovoljno u kadru; skrol dole gasi explainer i sve „heavy“ efekte na stranici. */
   useEffect(() => {
     const section = sectionRef.current;
     if (!section) return;
-    const video = bgVideoRef.current;
-
-    const onCanPlay = () => video?.play().catch(() => {});
-    if (video && !bgFailed) {
-      video.addEventListener("canplay", onCanPlay, { once: true });
-      if (video.readyState >= 3) void video.play().catch(() => {});
-    }
 
     const io = new IntersectionObserver(
       ([e]) => {
         if (!e) return;
-        const bg = bgVideoRef.current;
         const visibleEnough =
           e.isIntersecting && e.intersectionRatio >= HERO_VISIBLE_MIN_RATIO;
-
-        if (bg && !bgFailed) {
-          if (visibleEnough) void bg.play().catch(() => {});
-          else bg.pause();
-        }
 
         if (!visibleEnough) {
           setPlaying(false);
@@ -170,10 +152,9 @@ export default function HeroSection({
     );
     io.observe(section);
     return () => {
-      video?.removeEventListener("canplay", onCanPlay);
       io.disconnect();
     };
-  }, [HERO_BG_MP4, bgFailed]);
+  }, []);
 
   /** Dok je VSL u repro ili u fullscreenu — smanji opterećenje ostatka stranice (CSS + ostale sekcije slušaju isti flag). */
   useEffect(() => {
@@ -206,26 +187,59 @@ export default function HeroSection({
     }
   }, [playing, explainerFailed, EXPLAINER_MP4]);
 
-  /** Jedan dekoder manje dok gledaju VSL. */
-  useEffect(() => {
-    const bg = bgVideoRef.current;
-    if (!bg || bgFailed) return;
-    if (playing) {
-      bg.pause();
-    } else {
-      void bg.play().catch(() => {});
-    }
-  }, [playing, bgFailed]);
-
   const togglePlay = useCallback(() => {
-    if (!explainerRef.current || explainerFailed) return;
+    const v = explainerRef.current;
+    if (!v || explainerFailed) return;
     if (playing) {
-      explainerRef.current.pause();
+      v.pause();
       setPlaying(false);
-    } else {
-      setPlaying(true);
+      return;
     }
+    // User gesture path: force immediate play on first click (Safari/Chrome policies).
+    v.muted = false;
+    void v.play().then(() => {
+      primeExplainerFrameRef.current = false;
+      setExplainerHasPlayed(true);
+      setPlaying(true);
+    }).catch(() => {
+      setPlaying(false);
+    });
   }, [playing, explainerFailed]);
+
+  const enterFullscreen = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    const v = explainerRef.current as (HTMLVideoElement & {
+      webkitEnterFullscreen?: () => void;
+      webkitRequestFullscreen?: () => void;
+    }) | null;
+    if (!v) return;
+    if (v.requestFullscreen) {
+      void v.requestFullscreen();
+    } else if (v.webkitEnterFullscreen) {
+      v.webkitEnterFullscreen();
+    } else if (v.webkitRequestFullscreen) {
+      v.webkitRequestFullscreen();
+    }
+  }, []);
+
+  const fullscreenButtonStyle = {
+    position: "absolute" as const,
+    bottom: 12,
+    right: 12,
+    zIndex: 10,
+    background: "rgba(0,0,0,0.65)",
+    border: "1px solid rgba(255,255,255,0.15)",
+    borderRadius: 8,
+    padding: "7px 9px",
+    cursor: "pointer",
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backdropFilter: "blur(6px)",
+    transition: "background 0.2s, border-color 0.2s",
+    lineHeight: 1,
+  };
 
   const tryPrimeExplainerFirstFrame = useCallback(
     (v: HTMLVideoElement) => {
@@ -252,8 +266,6 @@ export default function HeroSection({
         if (p !== undefined) {
           void p
             .then(() => {
-              // iOS/Safari često neće “iscrtati” prvi kadar bez makar jedne renderovane frame.
-              // Sačekaj 1 frame (ako je moguće), pa tek onda pauziraj.
               const pauseAndSeek = () => {
                 try {
                   v.pause();
@@ -263,7 +275,6 @@ export default function HeroSection({
                 }
                 done();
               };
-              // requestVideoFrameCallback nije svuda dostupan.
               const rvfc = (v as HTMLVideoElement & {
                 requestVideoFrameCallback?: (cb: () => void) => number;
               }).requestVideoFrameCallback;
@@ -297,41 +308,9 @@ export default function HeroSection({
         padding: "120px 24px 80px", overflow: "hidden",
       }}
     >
-      {/* Video wallpaper with parallax */}
+      {/* Static background like other sections (no video wallpaper). */}
       <div style={{ position: "absolute", inset: 0, zIndex: 0, overflow: "hidden" }}>
-        {bgFailed ? (
-          <Image
-            src="/pozadina-plexus.png"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            style={{ objectFit: "cover" }}
-          />
-        ) : (
-          <video
-            key={HERO_BG_MP4}
-            ref={bgVideoRef}
-            src={HERO_BG_MP4}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="auto"
-            poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%2305080c' width='1' height='1'/%3E%3C/svg%3E"
-            onError={() => setBgFailed(true)}
-            style={{
-              position: "absolute",
-              top: "50%", left: "50%",
-              minWidth: "100%", minHeight: "100%",
-              width: "auto", height: "auto",
-              transform: "translate(-50%, -50%) scale(1.12) translateZ(0)",
-              objectFit: "cover",
-              backfaceVisibility: "hidden",
-            }}
-          />
-        )}
-        <div style={{ position: "absolute", inset: 0, background: "rgba(5,5,8,0.82)" }} />
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 20% 10%, rgba(0,212,255,0.08) 0%, transparent 42%), radial-gradient(ellipse at 80% 20%, rgba(168,85,247,0.10) 0%, transparent 45%), #050508" }} />
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "45%", background: "linear-gradient(to top, #050508 0%, rgba(5,5,8,0.7) 50%, transparent 100%)" }} />
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "25%", background: "linear-gradient(to bottom, rgba(5,5,8,0.4), transparent)" }} />
         <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at center, transparent 50%, rgba(5,5,8,0.5) 100%)" }} />
@@ -420,9 +399,6 @@ export default function HeroSection({
               }}
               onPlay={() => {
                 if (suppressExplainerPlayUiRef.current) return;
-                // Na iOS/WebKit, pokušaji “primovanja” prvog kadra mogu okinuti play event.
-                // Preview (watermark) treba da se skloni tek kad je korisnik stvarno pokrenuo reprodukciju.
-                if (!playing) return;
                 primeExplainerFrameRef.current = false;
                 setExplainerHasPlayed(true);
               }}
@@ -575,23 +551,8 @@ export default function HeroSection({
             {/* Fullscreen button — always visible on touch, hover on desktop */}
             {(hovering || playing) && (
               <button
-                onClick={e => {
-                  e.stopPropagation();
-                  const v = explainerRef.current as HTMLVideoElement & { webkitEnterFullscreen?: () => void; webkitRequestFullscreen?: () => void } | null;
-                  if (!v) return;
-                  if (v.requestFullscreen) v.requestFullscreen();
-                  else if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
-                  else if (v.webkitRequestFullscreen) v.webkitRequestFullscreen();
-                }}
-                style={{
-                  position: "absolute", bottom: 12, right: 12, zIndex: 10,
-                  background: "rgba(0,0,0,0.65)", border: "1px solid rgba(255,255,255,0.15)",
-                  borderRadius: 8, padding: "7px 9px", cursor: "pointer",
-                  color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
-                  backdropFilter: "blur(6px)",
-                  transition: "background 0.2s, border-color 0.2s",
-                  lineHeight: 1,
-                }}
+                onClick={enterFullscreen}
+                style={fullscreenButtonStyle}
                 onMouseEnter={e => { e.currentTarget.style.background = "rgba(0,212,255,0.2)"; e.currentTarget.style.borderColor = "rgba(0,212,255,0.4)"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "rgba(0,0,0,0.65)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
                 title="Fullscreen"
@@ -613,7 +574,6 @@ export default function HeroSection({
             <CountdownTimer targetDate={TARGET_DATE} />
           </div>
         ) : null}
-
       </div>
     </section>
   );

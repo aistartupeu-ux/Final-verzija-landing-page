@@ -5,7 +5,6 @@ import SectionChunkFallback from "@/components/layout/SectionChunkFallback";
 import HeroSection from "@/components/sections/HeroSection";
 import { getServerCdnUrl } from "@/lib/bunny-cdn-sign";
 import {
-  CDN_PATH_HERO_BG,
   CDN_PATH_EXPLAINER_MP4,
   CDN_EXPLAINER_CACHE_TAG,
   CDN_PATH_SHOWCASE_ROW1,
@@ -64,11 +63,9 @@ export default function Home() {
   const heroFromPublic = useLocalHeroMedia();
   const heroMedia = heroFromPublic
     ? {
-        bgMp4: publicAsset(CDN_PATH_HERO_BG),
         explainerMp4: publicAsset(CDN_PATH_EXPLAINER_MP4),
       }
     : {
-        bgMp4: getServerCdnUrl(CDN_PATH_HERO_BG),
         explainerMp4: getServerCdnUrl(CDN_PATH_EXPLAINER_MP4, undefined, CDN_EXPLAINER_CACHE_TAG),
       };
   const showcaseRow1Urls = CDN_PATH_SHOWCASE_ROW1.map((p) => getServerCdnUrl(p));
