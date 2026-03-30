@@ -45,6 +45,7 @@ export default function HeroSection({
   const explainerRef = useRef<HTMLVideoElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const [playing, setPlaying] = useState(false);
+  const [startedMuted, setStartedMuted] = useState(false);
   const [hovering, setHovering] = useState(false);
   const [explainerFailed, setExplainerFailed] = useState(false);
   /** Kad je jednom krenuo repro — sklanja preview (logo + providni sloj), pun video. */
@@ -193,6 +194,7 @@ export default function HeroSection({
     if (playing) {
       v.pause();
       setPlaying(false);
+      setStartedMuted(false);
       return;
     }
     // One-tap start across devices: mark intent immediately and retry with muted fallback if needed.
@@ -201,16 +203,18 @@ export default function HeroSection({
     setPlaying(true);
     const start = async () => {
       try {
+        setStartedMuted(false);
         v.muted = false;
         await v.play();
       } catch {
         try {
           // Some mobile browsers require a muted start first even on user gesture.
+          setStartedMuted(true);
           v.muted = true;
           await v.play();
-          v.muted = false;
         } catch {
           setPlaying(false);
+          setStartedMuted(false);
         }
       }
     };
@@ -376,7 +380,7 @@ export default function HeroSection({
               className="hero-vsl-explainer-video"
               src={EXPLAINER_MP4}
               playsInline
-              muted={!playing}
+              muted={!playing || startedMuted}
               preload="auto"
               disableRemotePlayback
               onLoadedMetadata={(e) => {
