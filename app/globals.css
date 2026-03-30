@@ -40,6 +40,20 @@ body {
 
 ::selection { background: rgba(0, 212, 255, 0.25); color: #fff; }
 
+/* react-phone-number-input: native country <select> — tamna stranica inače daje belu listu sa belim tekstom */
+.PhoneInputCountry {
+  color-scheme: light;
+}
+.PhoneInputCountrySelect {
+  color: #111827;
+  background-color: #fff;
+  color-scheme: light;
+}
+.PhoneInputCountrySelect option {
+  color: #111827;
+  background-color: #fff;
+}
+
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: #08080f; }
 ::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.2); border-radius: 10px; }
