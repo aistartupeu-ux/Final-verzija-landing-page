@@ -560,7 +560,9 @@ function VideoRow({
         >
           {items.map((videoSrc, i) => {
             const instanceKey = String(i);
-            const desktopEveryOtherActive = playEveryOtherDesktop && !isMobile && i % 2 === 0;
+            const isPrimaryCopy = i < videos.length;
+            const desktopEveryOtherActive =
+              playEveryOtherDesktop && !isMobile && isPrimaryCopy && i % 2 === 0;
             // "Contest" (visibility scoring + autoplay winners) samo za prvu kopiju trake.
             // Druga kopija služi za seamless marquee i ne treba dodatni IO + raf pick work.
             const isContestCandidate = !desktopEveryOtherActive && contestSlots > 0 && i < videos.length;
