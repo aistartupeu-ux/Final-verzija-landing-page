@@ -21,9 +21,19 @@ export async function POST(req: NextRequest) {
 
     const cookieStore = await cookies();
     const fbp = cookieStore.get("_fbp")?.value ?? null;
-    const fbc = cookieStore.get("_fbc")?.value ?? null;
+    const fbcCookie = cookieStore.get("_fbc")?.value ?? null;
+    const fbclidFromEventUrl = (() => {
+      if (!eventSourceUrl || typeof eventSourceUrl !== "string") return null;
+      try {
+        return new URL(eventSourceUrl).searchParams.get("fbclid");
+      } catch {
+        return null;
+      }
+    })();
+    // Meta preporuka: ako _fbc cookie ne postoji, konstruisi ga iz fbclid kad je dostupan.
+    const fbc = fbcCookie ?? (fbclidFromEventUrl ? `fb.1.${Date.now()}.${fbclidFromEventUrl}` : null);
 
-    await sendMetaCapiLeadEvent({
+    const result = await sendMetaCapiLeadEvent({
       email,
       phone: phone ?? null,
       ip: ip || null,
@@ -33,6 +43,14 @@ export async function POST(req: NextRequest) {
       fbc,
       event_id: typeof eventId === "string" && eventId.trim() ? eventId.trim() : null,
     });
+
+    if (!result.ok) {
+      console.error("Meta CAPI rejected event:", result);
+      return NextResponse.json(
+        { error: "Meta CAPI request failed", details: result.errorMessage ?? "Unknown error" },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {
