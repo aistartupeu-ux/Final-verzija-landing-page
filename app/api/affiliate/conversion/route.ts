@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { appendAffiliateConversionToSheet, isAffiliateSheetConfigured } from "@/lib/affiliate-sheet";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
 
 // Call this endpoint when a sale is completed.
 // This supports:
@@ -13,6 +15,11 @@ const supabase = createClient(
 // - GHL workflows (Webhook action) that can send email + affiliate_code + amount
 export async function POST(req: NextRequest) {
   try {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return NextResponse.json({ error: "Database not configured" }, { status: 503 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const orderAmount = Number(body.orderAmount ?? body.order_amount ?? 0);
     const orderId = (body.orderId ?? body.order_id ?? null) as string | null;
