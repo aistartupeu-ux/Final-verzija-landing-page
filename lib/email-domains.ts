@@ -1,30 +1,25 @@
 /**
- * Dozvoljeni email domeni za form submit.
- * Samo oví provajderi su prihvaćeni: Gmail, Outlook, Yahoo, iCloud, AOL, itd.
+ * Provera osnovnog formata email adrese (uključujući poslovne domene).
+ * Nema whitelist provajdera — bilo koji domen sa tačkom u delu posle @ je dozvoljen.
  */
-const ALLOWED_DOMAINS = [
-  "@gmail.com",
-  "@hotmail.com",
-  "@yahoo.com",
-  "@icloud.com",
-  "@outlook.com",
-  "@msn.com",
-  "@live.com",
-  "@me.com",
-  "@mac.com",
-  "@aol.com",
-  "@mail.com",
-] as const;
 
-/** Proveri da li email završava jednim od dozvoljenih domena (case-insensitive). */
+/** Jednostavna provera: local@domain.tld (domen mora imati bar jednu tačku). */
 export function isAllowedEmailDomain(email: string): boolean {
-  const normalized = String(email).trim().toLowerCase();
+  const normalized = String(email).trim();
   if (!normalized.includes("@")) return false;
-  return ALLOWED_DOMAINS.some((d) => normalized.endsWith(d));
+  const parts = normalized.split("@");
+  if (parts.length !== 2) return false;
+  const [local, domain] = parts;
+  if (!local || !domain) return false;
+  if (domain.includes(" ") || local.startsWith(".") || local.endsWith(".")) return false;
+  // FQDN: bar jedna tačka u domenu (npr. firma.rs, mail.company.co.uk)
+  if (!domain.includes(".")) return false;
+  const labels = domain.split(".");
+  if (labels.some((l) => !l || l.length > 63)) return false;
+  return true;
 }
 
-export const EMAIL_DOMAIN_ERROR =
-  "Koristite email sa dozvoljenog provajdera (npr. Gmail, Outlook, Yahoo, iCloud, AOL).";
+export const EMAIL_DOMAIN_ERROR = "Unesite ispravnu email adresu (npr. ime@firma.com).";
 
 export const EMAIL_MX_ERROR =
   "Email adresa nije validna ili domen nema podešene mail servere.";
