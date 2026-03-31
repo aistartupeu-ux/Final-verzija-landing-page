@@ -36,9 +36,13 @@ export function initAffiliateTracking(): void {
   const utmSource = getParam("utm_source");
   const utmMedium = getParam("utm_medium");
   const utmCampaign = getParam("utm_campaign");
+  const fbclid = getParam("fbclid");
+  const ttclid = getParam("ttclid");
   if (utmSource) setCookie("af_utm_source", utmSource, 7);
   if (utmMedium) setCookie("af_utm_medium", utmMedium, 7);
   if (utmCampaign) setCookie("af_utm_campaign", utmCampaign, 7);
+  if (fbclid) setCookie("af_fbclid", fbclid, 7);
+  if (ttclid) setCookie("af_ttclid", ttclid, 7);
 }
 
 /** Podaci o izvoru za lead (UTM + affiliate) — za Sheet "Leads by Source" i Supabase */
@@ -53,9 +57,13 @@ export function getLeadSourceData(): {
   const utmSource = getCookie("af_utm_source") || getParam("utm_source");
   const utmMedium = getCookie("af_utm_medium") || getParam("utm_medium");
   const utmCampaign = getCookie("af_utm_campaign") || getParam("utm_campaign");
+  const ttclid = getCookie("af_ttclid") || getParam("ttclid");
+  const fbclid = getCookie("af_fbclid") || getParam("fbclid");
 
   let sourceTag = "direct";
   if (affiliateCode) sourceTag = "affiliate";
+  else if (ttclid) sourceTag = "tiktok";
+  else if (fbclid) sourceTag = "facebook";
   else {
     const s = (utmSource + "").toLowerCase();
     const m = (utmMedium + "").toLowerCase();

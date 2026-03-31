@@ -64,7 +64,21 @@ export async function GET(req: NextRequest) {
   const toYmd = queryParamToYmd(to);
 
   const supabase = createClient(supabaseUrl, supabaseKey);
-  const leadByKey = new Map<string, string>(); // key -> normalized source_tag
+  const leadByEmail = new Map<string, { tag: string; ts: number; order: number }>();
+  let orderCounter = 0;
+
+  function upsertLeadByEmail(emailKey: string, tag: string, ts: number) {
+    const current = leadByEmail.get(emailKey);
+    const nextOrder = orderCounter++;
+    if (!current) {
+      leadByEmail.set(emailKey, { tag, ts, order: nextOrder });
+      return;
+    }
+    // Ako isti email dođe više puta, čuvamo noviji ulaz (prepis kampanje po novijem dolasku).
+    if (ts > current.ts || (ts === current.ts && nextOrder > current.order)) {
+      leadByEmail.set(emailKey, { tag, ts, order: nextOrder });
+    }
+  }
 
   function normalizeSourceTag(
     tag: string | null | undefined,
@@ -106,10 +120,11 @@ export async function GET(req: NextRequest) {
     if (!sheetRowYmdInPeriod(rowYmd, fromYmd, toYmd)) continue;
     if (legacyCutoffDate && !sheetRowYmdAllowedForLegacy(rowYmd, legacyCutoffDate)) continue;
     sheetRowsUsed += 1;
-    const day = rowYmd;
-    const key = `${(row.email ?? "").toLowerCase()}_${day}`;
+    const emailKey = (row.email ?? "").trim().toLowerCase();
+    if (!emailKey) continue;
     const tag = normalizeSourceTag(row.source_tag, row.utm_source, row.utm_medium, row.utm_campaign);
-    leadByKey.set(key, tag);
+    const ts = Date.parse(`${rowYmd}T12:00:00.000Z`);
+    upsertLeadByEmail(emailKey, tag, Number.isNaN(ts) ? 0 : ts);
   }
 
   // 2) Supabase — dopuna (leadovi koji nisu u Sheet-u)
@@ -146,7 +161,7 @@ export async function GET(req: NextRequest) {
     if (upperBound) {
       q = q.lte("created_at", upperBound.toISOString());
     }
-    const { data: batch, error } = await q.order("created_at", { ascending: false }).range(offset, offset + PAGE - 1);
+    const { data: batch, error } = await q.order("created_at", { ascending: true }).range(offset, offset + PAGE - 1);
     if (error) {
       console.error("admin analytics leads:", error.message);
       break;
@@ -156,21 +171,19 @@ export async function GET(req: NextRequest) {
     if (rows.length < PAGE) break;
   }
   for (const lead of listSupabase) {
-    const day = lead.created_at?.slice(0, 10) ?? "";
-    const key = `${(lead.email ?? lead.id).toString().toLowerCase()}_${day}`;
-    if (leadByKey.has(key)) continue; // Sheet već ima — prioritet
-    leadByKey.set(
-      key,
-      normalizeSourceTag(lead.source_tag, lead.utm_source ?? null, lead.utm_medium ?? null, lead.utm_campaign ?? null)
-    );
+    const emailKey = (lead.email ?? "").trim().toLowerCase();
+    if (!emailKey) continue;
+    const tag = normalizeSourceTag(lead.source_tag, lead.utm_source ?? null, lead.utm_medium ?? null, lead.utm_campaign ?? null);
+    const ts = Date.parse(lead.created_at ?? "");
+    upsertLeadByEmail(emailKey, tag, Number.isNaN(ts) ? 0 : ts);
   }
 
   const bySource: Record<string, number> = {};
-  for (const tag of leadByKey.values()) {
-    bySource[tag] = (bySource[tag] ?? 0) + 1;
+  for (const entry of leadByEmail.values()) {
+    bySource[entry.tag] = (bySource[entry.tag] ?? 0) + 1;
   }
   const sumBySource = Object.values(bySource).reduce((a, b) => a + b, 0);
-  const total = leadByKey.size;
+  const total = leadByEmail.size;
   if (sumBySource !== total) {
     console.warn(`Analytics: sum(bySource)=${sumBySource} !== total=${total}`);
   }
@@ -220,7 +233,7 @@ export async function GET(req: NextRequest) {
       sheetRowsTotal: sheetRows.length,
       sheetRowsAfterFilter: sheetRowsUsed,
       supabaseLeadsFetched: listSupabase.length,
-      mergedUniqueKeys: leadByKey.size,
+      mergedUniqueEmails: leadByEmail.size,
       legacyMode,
       legacyLastInclusiveSheetYmd: legacyCutoffDate
         ? lastInclusiveBelgradeYmdForLegacyCutoff(legacyCutoffDate)

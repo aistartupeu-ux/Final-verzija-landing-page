@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle, Loader2, XCircle } from "lucide-react";
 import { getLeadSourceData } from "@/lib/affiliate-tracking";
 import { useEmailVerify } from "@/lib/use-email-verify";
-import { pushLeadToDataLayer, storeLeadForThankYou } from "@/lib/tiktok-datalayer";
+import { storeLeadForThankYou } from "@/lib/tiktok-datalayer";
 import { useRouter } from "next/navigation";
 
 export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
@@ -54,9 +54,7 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
         return;
       }
 
-      // Meta: Lead šalje se na thank-you (pushThankYouPageTracking). TikTok: isto – Lead samo na thank-you.
-
-      await pushLeadToDataLayer(email, null);
+      // Meta i TikTok lead okidamo na thank-you (jednom), da ne dupliramo evente.
       storeLeadForThankYou(email.trim().toLowerCase(), null, eventId);
       setPendingEventId(eventId);
       setDone(true);

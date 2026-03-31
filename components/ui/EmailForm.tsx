@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, CheckCircle, Loader2, XCircle } from "lucide-rea
 import { trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { useEmailVerify } from "@/lib/use-email-verify";
-import { pushLeadToDataLayer, storeLeadForThankYou } from "@/lib/tiktok-datalayer";
+import { storeLeadForThankYou } from "@/lib/tiktok-datalayer";
 import { useRouter } from "next/navigation";
 
 const montserratHeroInput = Montserrat({
@@ -81,7 +81,6 @@ export default function EmailForm({
         setLoading(false);
         return;
       }
-      await pushLeadToDataLayer(email, null);
       storeLeadForThankYou(email.trim().toLowerCase(), null, eventId);
       trackAffiliateLeadOnSubmit({ email, phone: null });
       setPendingEventId(eventId);

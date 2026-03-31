@@ -245,8 +245,8 @@ export async function pushThankYouPageTracking(opts?: { eventIdFromUrl?: string 
         phone: data.phone,
         externalId: eventId ?? data.email,
       });
-      w.ttq.track("SubmitForm", { ...TIKTOK_LEAD_CONTENT }); // form submit
-      w.ttq.track("CompleteRegistration", { ...TIKTOK_LEAD_CONTENT }); // signup complete
+      // Jedan TikTok lead event po potvrdi, da se ne naduvavaju brojevi.
+      w.ttq.track("CompleteRegistration", { ...TIKTOK_LEAD_CONTENT });
     }
   }
 
