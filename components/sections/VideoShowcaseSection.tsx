@@ -51,7 +51,6 @@ const DESKTOP_SECOND_AUTOPLAY_DELAY_MS = 850;
 
 function makeDesktopInitialKeys(primaryLen: number): Set<string> {
   const next = new Set<string>();
-  // Keep the initial burst tiny: attach only a couple of top-row "every other" cards.
   let attached = 0;
   for (let i = 0; i < primaryLen && attached < DESKTOP_INITIAL_ATTACH_COUNT; i += 2) {
     next.add(String(i));
@@ -350,6 +349,7 @@ function VideoRow({
   sectionInView,
   canAttachMedia,
   hoverLoop = false,
+  /** Desktop: gornji red — svaki drugi + odloženi drugi autoplay (kao ranije). */
   playEveryOtherDesktop = false,
   autoPlayWinnerCount = 0,
   autoPlayWinnerCountDesktop,
@@ -361,7 +361,6 @@ function VideoRow({
   sectionInView: boolean;
   canAttachMedia: boolean;
   hoverLoop?: boolean;
-  /** Desktop: fiksno puštaj svaki drugi klip u redu (umesto visibility contest-a). */
   playEveryOtherDesktop?: boolean;
   /** Mobilni / podrazumevano: najviše ovoliko autoplay (najvidljivije). */
   autoPlayWinnerCount?: number;
@@ -374,7 +373,6 @@ function VideoRow({
     return window.matchMedia("(max-width: 768px)").matches;
   });
 
-  // Desktop: kači src postepeno da se ne desi “load spike”.
   const [desktopSrcKeys, setDesktopSrcKeys] = useState<Set<string>>(() =>
     makeDesktopInitialKeys(videos.length)
   );
@@ -652,10 +650,13 @@ function VideoRow({
             const desktopEveryOtherActive =
               playEveryOtherDesktop && !isMobile && isPrimaryCopy && i % 2 === 0;
             const forceEveryOtherDesktop = playEveryOtherDesktop && !isMobile;
-            // "Contest" (visibility scoring + autoplay winners) samo za prvu kopiju trake.
-            // Druga kopija služi za seamless marquee i ne treba dodatni IO + raf pick work.
+            // Telefon: oba reda — autoplay samo na svakom drugom klipu (0,2,4…); učitavanje src i dalje IO za sve kartice.
             const isContestCandidate =
-              !forceEveryOtherDesktop && !desktopEveryOtherActive && contestSlots > 0 && i < videos.length;
+              !forceEveryOtherDesktop &&
+              !desktopEveryOtherActive &&
+              contestSlots > 0 &&
+              i < videos.length &&
+              (!isMobile || i % 2 === 0);
             const isEvenPrimaryCandidate = forceEveryOtherDesktop && isPrimaryCopy && i % 2 === 0;
             const useManualSrc = !isMobile;
             const baseKey = String(i % videos.length);
