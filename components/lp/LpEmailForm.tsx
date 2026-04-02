@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle, Loader2, XCircle } from "lucide-react";
 import { getLeadSourceData } from "@/lib/affiliate-tracking";
 import { useEmailVerify } from "@/lib/use-email-verify";
-import { storeLeadForThankYou } from "@/lib/tiktok-datalayer";
-import { useRouter } from "next/navigation";
+import { pushLeadToDataLayer, storeLeadForThankYou } from "@/lib/tiktok-datalayer";
+import { landingChannelFromPathname } from "@/lib/landing-attribution";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
   const router = useRouter();
+  const pathname = usePathname() ?? "";
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -54,8 +56,9 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
         return;
       }
 
-      // Meta i TikTok lead okidamo na thank-you (jednom), da ne dupliramo evente.
-      storeLeadForThankYou(email.trim().toLowerCase(), null, eventId);
+      // Meta/TikTok konverzije na thank-you (jednom). dataLayer na submit za GTM na Meta putu.
+      await pushLeadToDataLayer(email, null);
+      storeLeadForThankYou(email.trim().toLowerCase(), null, eventId, landingChannelFromPathname(pathname));
       setPendingEventId(eventId);
       setDone(true);
       setLoading(false);

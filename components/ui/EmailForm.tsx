@@ -6,8 +6,9 @@ import { ArrowLeft, ArrowRight, CheckCircle, Loader2, XCircle } from "lucide-rea
 import { trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { useEmailVerify } from "@/lib/use-email-verify";
-import { storeLeadForThankYou } from "@/lib/tiktok-datalayer";
-import { useRouter } from "next/navigation";
+import { pushLeadToDataLayer, storeLeadForThankYou } from "@/lib/tiktok-datalayer";
+import { landingChannelFromPathname } from "@/lib/landing-attribution";
+import { useRouter, usePathname } from "next/navigation";
 
 const montserratHeroInput = Montserrat({
   weight: "400",
@@ -26,6 +27,7 @@ export default function EmailForm({
   variant?: "default" | "hero";
 }) {
   const router = useRouter();
+  const pathname = usePathname() ?? "";
   const [step, setStep] = useState<"email" | "done">("email");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -81,7 +83,8 @@ export default function EmailForm({
         setLoading(false);
         return;
       }
-      storeLeadForThankYou(email.trim().toLowerCase(), null, eventId);
+      await pushLeadToDataLayer(email, null);
+      storeLeadForThankYou(email.trim().toLowerCase(), null, eventId, landingChannelFromPathname(pathname));
       trackAffiliateLeadOnSubmit({ email, phone: null });
       setPendingEventId(eventId);
       setLoading(false);

@@ -1,19 +1,66 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import Script from "next/script";
+import { LANDING_CHANNEL_STORAGE_KEY } from "@/lib/landing-attribution";
+import { peekStoredLeadLandingChannel } from "@/lib/tiktok-datalayer";
 
 /**
- * Učitava tracking skripte za kampanju kada su env varijable postavljene.
- * Dodaj u Vercel: NEXT_PUBLIC_META_PIXEL_ID, NEXT_PUBLIC_GTM_ID, NEXT_PUBLIC_TIKTOK_PIXEL_ID
+ * `/` — Meta + GTM (bez TikTok na glavnoj).
+ * `/tiktok` i thank-you posle TikTok funnela — samo TikTok pixel.
  */
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "2347723352398323";
 const TIKTOK_PIXEL_ID = process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID || "D6TSA9RC77UB4ENA7F70";
 const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID || "GTM-NCH883PC";
 
+function resolvePixelChannel(pathname: string): "meta" | "tiktok" {
+  if (pathname.startsWith("/tiktok")) return "tiktok";
+  if (pathname === "/" || pathname === "") return "meta";
+  if (pathname.startsWith("/thank-you")) {
+    const fromLead = typeof window !== "undefined" ? peekStoredLeadLandingChannel() : null;
+    if (fromLead) return fromLead;
+  }
+  try {
+    if (typeof window !== "undefined" && sessionStorage.getItem(LANDING_CHANNEL_STORAGE_KEY) === "tiktok") {
+      return "tiktok";
+    }
+  } catch {
+    // ignore
+  }
+  return "meta";
+}
+
 export default function TrackingScripts() {
+  const pathname = usePathname() ?? "";
+  const [channel, setChannel] = useState<"meta" | "tiktok" | null>(null);
+
+  useEffect(() => {
+    setChannel(resolvePixelChannel(pathname));
+  }, [pathname]);
+
   const metaPixelId = META_PIXEL_ID;
   const gtmId = GTM_ID;
   const tiktokPixelId = TIKTOK_PIXEL_ID;
 
-  if (!metaPixelId && !gtmId && !tiktokPixelId) return null;
+  if (channel === null) return null;
+
+  if (channel === "tiktok") {
+    if (!tiktokPixelId) return null;
+    return (
+      <Script id="tiktok-pixel" strategy="lazyOnload">
+        {`
+            !function (w, d, t) {
+              w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
+              ttq.load('${tiktokPixelId}');
+              ttq.page();
+            }(window, document, 'ttq');
+          `}
+      </Script>
+    );
+  }
+
+  if (!metaPixelId && !gtmId) return null;
 
   return (
     <>
@@ -60,19 +107,9 @@ export default function TrackingScripts() {
           height="0"
           width="0"
           style={{ display: "none", visibility: "hidden" }}
+          title=""
         />
       </noscript>
-      {tiktokPixelId && (
-        <Script id="tiktok-pixel" strategy="lazyOnload">
-          {`
-            !function (w, d, t) {
-              w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
-              ttq.load('${tiktokPixelId}');
-              ttq.page();
-            }(window, document, 'ttq');
-          `}
-        </Script>
-      )}
     </>
   );
 }

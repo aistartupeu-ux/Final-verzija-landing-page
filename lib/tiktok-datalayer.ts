@@ -15,6 +15,8 @@
  *   + dataLayer.push({ ecommerce: null }); dataLayer.push({ event: 'purchase', ... });
  */
 
+import { getLandingChannel, type LandingChannel } from "@/lib/landing-attribution";
+
 async function sha256Hex(str: string): Promise<string> {
   if (typeof window === "undefined" || !window.crypto?.subtle) return "";
   const buf = await crypto.subtle.digest(
@@ -130,6 +132,21 @@ export async function pushLeadToDataLayer(
 const LEAD_CONFIRM_KEY = "lead_confirm";
 const THANK_YOU_TRACKING_DEDUPE_PREFIX = "ty_lc_fired:";
 
+/** Za učitavanje pravog pixela na /thank-you pre nego što se session „meta” prepisuje. */
+export function peekStoredLeadLandingChannel(): LandingChannel | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(LEAD_CONFIRM_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as { landing_channel?: string };
+    if (d.landing_channel === "tiktok") return "tiktok";
+    if (d.landing_channel === "meta") return "meta";
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Ukloni lead iz sessionStorage (npr. posle uspešnog čuvanja telefona). */
 export function clearStoredLeadConfirm(): void {
   if (typeof window === "undefined") return;
@@ -145,14 +162,22 @@ export function readStoredLeadConfirm(): {
   email: string;
   phone: string | null;
   event_id?: string | null;
+  landing_channel?: LandingChannel;
 } | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = sessionStorage.getItem(LEAD_CONFIRM_KEY);
     if (!raw) return null;
-    const d = JSON.parse(raw) as { email?: string; phone?: string | null; event_id?: string | null };
+    const d = JSON.parse(raw) as {
+      email?: string;
+      phone?: string | null;
+      event_id?: string | null;
+      landing_channel?: string;
+    };
     if (!d?.email || typeof d.email !== "string") return null;
-    return { email: d.email, phone: d.phone ?? null, event_id: d.event_id ?? null };
+    const landing_channel: LandingChannel | undefined =
+      d.landing_channel === "tiktok" ? "tiktok" : d.landing_channel === "meta" ? "meta" : undefined;
+    return { email: d.email, phone: d.phone ?? null, event_id: d.event_id ?? null, landing_channel };
   } catch {
     return null;
   }
@@ -167,13 +192,20 @@ export async function ttqEnhanceWithPhone(email: string, phone: string): Promise
 export function storeLeadForThankYou(
   email: string,
   phone: string | null | undefined,
-  eventId?: string | null
+  eventId?: string | null,
+  landingChannel?: LandingChannel
 ): void {
   if (typeof window === "undefined") return;
   try {
+    const ch = landingChannel ?? getLandingChannel();
     sessionStorage.setItem(
       LEAD_CONFIRM_KEY,
-      JSON.stringify({ email, phone: phone ?? null, event_id: eventId ?? null })
+      JSON.stringify({
+        email,
+        phone: phone ?? null,
+        event_id: eventId ?? null,
+        landing_channel: ch,
+      })
     );
   } catch {
     // ignore
@@ -188,16 +220,33 @@ export function storeLeadForThankYou(
  */
 export async function pushThankYouPageTracking(opts?: { eventIdFromUrl?: string | null }): Promise<void> {
   if (typeof window === "undefined") return;
-  let data: { email: string; phone: string | null; event_id?: string | null } | null = null;
+  let data: {
+    email: string;
+    phone: string | null;
+    event_id?: string | null;
+    landing_channel?: LandingChannel;
+  } | null = null;
   try {
     const raw = sessionStorage.getItem(LEAD_CONFIRM_KEY);
     if (!raw) return;
-    data = JSON.parse(raw) as { email: string; phone: string | null; event_id?: string | null };
+    data = JSON.parse(raw) as {
+      email: string;
+      phone: string | null;
+      event_id?: string | null;
+      landing_channel?: LandingChannel;
+    };
   } catch {
     return;
   }
 
   if (!data?.email) return;
+
+  const channel: LandingChannel =
+    data.landing_channel === "tiktok"
+      ? "tiktok"
+      : data.landing_channel === "meta"
+        ? "meta"
+        : getLandingChannel();
 
   // event_id: prioritet URL param (Meta preporuka), pa sessionStorage
   const eventId = opts?.eventIdFromUrl ?? data.event_id ?? undefined;
@@ -232,42 +281,44 @@ export async function pushThankYouPageTracking(opts?: { eventIdFromUrl?: string 
     tt_content_type: "product",
   });
 
-  if (typeof w.gtag === "function") {
-    w.gtag("event", "lead_confirmation", { user_data, tt_content_type: "product" });
-    w.gtag("event", "generate_lead", { event_category: "lead", event_label: "thank_you_page", user_data });
+  if (channel === "meta") {
+    if (typeof w.gtag === "function") {
+      w.gtag("event", "lead_confirmation", { user_data, tt_content_type: "product" });
+      w.gtag("event", "generate_lead", { event_category: "lead", event_label: "thank_you_page", user_data });
+    }
   }
-  if (w.ttq) {
-    if (typeof w.ttq.page === "function") w.ttq.page(); // PageView kao Meta
+
+  if (channel === "tiktok" && w.ttq) {
+    if (typeof w.ttq.page === "function") w.ttq.page();
     if (typeof w.ttq.track === "function") {
-      // TikTok: identify sa hashed PII pre eventa (za bolju atribuciju)
       await ttqIdentify({
         email: data.email,
         phone: data.phone,
         externalId: eventId ?? data.email,
       });
-      // Jedan TikTok lead event po potvrdi, da se ne naduvavaju brojevi.
+      // Jedan TikTok event po potvrdi (bez duplog SubmitForm).
       w.ttq.track("CompleteRegistration", { ...TIKTOK_LEAD_CONTENT });
     }
   }
 
-  // Meta: PageView + Lead na thank-you stranici (client-side navigacija ne šalje auto PageView).
-  if (w.fbq) {
-    w.fbq("track", "PageView"); // Meta mora da vidi posetu thank-you stranici
-    w.fbq("track", "Lead", {}, { eventID: eventId });
-  }
+  if (channel === "meta") {
+    if (w.fbq) {
+      w.fbq("track", "PageView");
+      w.fbq("track", "Lead", {}, { eventID: eventId });
+    }
 
-  // Meta CAPI — server-side Lead; eksplicitan thank-you URL da Meta uvek vidi /thank-you
-  const thankYouUrl = typeof window !== "undefined" ? `${window.location.origin}/thank-you` : null;
-  fetch("/api/leads/meta-capi", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      email: data.email,
-      phone: data.phone,
-      event_id: eventId,
-      event_source_url: thankYouUrl,
-    }),
-  }).catch(() => {});
+    const thankYouUrl = typeof window !== "undefined" ? `${window.location.origin}/thank-you` : null;
+    fetch("/api/leads/meta-capi", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: data.email,
+        phone: data.phone,
+        event_id: eventId,
+        event_source_url: thankYouUrl,
+      }),
+    }).catch(() => {});
+  }
 }
 
 export type PurchaseItem = {
