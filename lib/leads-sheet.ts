@@ -230,10 +230,14 @@ export async function getLeadsFromSheet(): Promise<LeadsSourceRow[]> {
 }
 
 /**
- * Ažurira kolonu C (telefon) za red čiji je email u koloni B — bez novog reda (Leads by Source).
+ * Ažurira kolonu C (telefon), opciono D (ime) za red čiji je email u koloni B — bez novog reda (Leads by Source).
  * Traži odozgo; ako ima duplikata emaila, ažurira prvi pogodak.
  */
-export async function updateLeadsSheetPhoneByEmail(email: string, phone: string): Promise<boolean> {
+export async function updateLeadsSheetPhoneByEmail(
+  email: string,
+  phone: string,
+  name?: string
+): Promise<boolean> {
   const sheetId = process.env.LEADS_SHEET_ID;
   const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!sheetId || !json) return false;
@@ -274,11 +278,19 @@ export async function updateLeadsSheetPhoneByEmail(email: string, phone: string)
     }
     if (sheetRow < 0) return false;
 
-    await sheets.spreadsheets.values.update({
+    const nameTrim = typeof name === "string" ? name.trim() : "";
+    const data: { range: string; values: string[][] }[] = [
+      { range: `'${sheetName}'!C${sheetRow}`, values: [[phoneVal]] },
+    ];
+    if (nameTrim) {
+      data.push({ range: `'${sheetName}'!D${sheetRow}`, values: [[nameTrim]] });
+    }
+    await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: sheetId,
-      range: `'${sheetName}'!C${sheetRow}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[phoneVal]] },
+      requestBody: {
+        valueInputOption: "USER_ENTERED",
+        data,
+      },
     });
     return true;
   } catch (e) {

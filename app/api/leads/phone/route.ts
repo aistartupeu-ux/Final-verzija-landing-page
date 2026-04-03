@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { updateLeadsSheetPhoneByEmail } from "@/lib/leads-sheet";
+import { THANK_YOU_AI_EXPERIENCE_OPTIONS } from "@/lib/thank-you-ai-experience";
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 15;
@@ -25,6 +26,13 @@ function isPlausibleE164(phone: string): boolean {
   return /^\+[1-9]\d{7,14}$/.test(t);
 }
 
+function normalizePersonName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const t = value.trim().replace(/\s+/g, " ");
+  if (t.length < 2 || t.length > 80) return null;
+  return t;
+}
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase =
@@ -45,12 +53,26 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const email = typeof body?.email === "string" ? body.email.trim() : "";
     const phone = typeof body?.phone === "string" ? body.phone.trim() : "";
+    const firstName = normalizePersonName(body?.first_name);
+    const lastName = normalizePersonName(body?.last_name);
+    const aiRaw = typeof body?.ai_experience === "string" ? body.ai_experience.trim() : "";
+    const aiExperience = THANK_YOU_AI_EXPERIENCE_OPTIONS.includes(
+      aiRaw as (typeof THANK_YOU_AI_EXPERIENCE_OPTIONS)[number]
+    )
+      ? aiRaw
+      : "";
 
     if (!email || !email.includes("@")) {
       return NextResponse.json({ error: "Invalid email" }, { status: 400 });
     }
     if (!isPlausibleE164(phone)) {
       return NextResponse.json({ error: "Invalid phone" }, { status: 400 });
+    }
+    if (!firstName || !lastName) {
+      return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+    }
+    if (!aiExperience) {
+      return NextResponse.json({ error: "Invalid ai_experience" }, { status: 400 });
     }
 
     if (!supabase) {
@@ -75,7 +97,15 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
 
-    const { error } = await supabase.from("leads").update({ phone }).eq("id", leadRow.id);
+    const fullName = `${firstName} ${lastName}`.trim();
+    const { error } = await supabase
+      .from("leads")
+      .update({
+        phone,
+        name: fullName,
+        ai_experience: aiExperience,
+      })
+      .eq("id", leadRow.id);
 
     if (error) {
       console.error("Supabase phone update error:", error.message);
@@ -83,7 +113,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     try {
-      await updateLeadsSheetPhoneByEmail(emailNorm, phone);
+      await updateLeadsSheetPhoneByEmail(emailNorm, phone, fullName);
     } catch (e) {
       console.error("Sheet phone update:", e);
     }
@@ -100,10 +130,11 @@ export async function PATCH(req: NextRequest) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               email: emailNorm,
-              firstName: "",
-              lastName: "",
-              name: "",
+              firstName,
+              lastName,
+              name: fullName,
               phone,
+              ai_experience: aiExperience,
               source: affiliateCode ? "affiliate" : "AI Hype Academy",
               affiliate_code: affiliateCode,
               city: leadRow.city ?? "",
