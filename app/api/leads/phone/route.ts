@@ -98,17 +98,26 @@ export async function PATCH(req: NextRequest) {
     }
 
     const fullName = `${firstName} ${lastName}`.trim();
-    const { error } = await supabase
-      .from("leads")
-      .update({
-        phone,
-        name: fullName,
-        ai_experience: aiExperience,
-      })
-      .eq("id", leadRow.id);
+    const baseUpdate = { phone, name: fullName };
+    let updateErr = (
+      await supabase
+        .from("leads")
+        .update({ ...baseUpdate, ai_experience: aiExperience })
+        .eq("id", leadRow.id)
+    ).error;
 
-    if (error) {
-      console.error("Supabase phone update error:", error.message);
+    if (updateErr) {
+      const hint = updateErr.message.toLowerCase();
+      if (hint.includes("ai_experience") || hint.includes("column") || hint.includes("schema")) {
+        updateErr = (await supabase.from("leads").update(baseUpdate).eq("id", leadRow.id)).error;
+        if (!updateErr) {
+          console.warn("leads.ai_experience kolona nedostaje — upisano phone+name; pokreni supabase-leads-ai-experience-migration.sql");
+        }
+      }
+    }
+
+    if (updateErr) {
+      console.error("Supabase phone update error:", updateErr.message);
       return NextResponse.json({ error: "Update failed" }, { status: 500 });
     }
 
