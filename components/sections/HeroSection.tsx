@@ -506,7 +506,7 @@ export default function HeroSection({
                     }}
                   >
                     Video se trenutno ne učitava (404). Proveri da postoji{" "}
-                    <code style={{ fontSize: 11 }}>public/examples/explainer-vsl.mp4</code> (localhost) ili Bunny env na produkciji.
+                    <code style={{ fontSize: 11 }}>public/hero-vsl.webm</code> (localhost) ili Bunny env na produkciji.
                   </div>
                 ) : null}
                 {!explainerFailed ? (
