@@ -44,6 +44,8 @@ export default function HeroSection({
   const { explainerMp4: EXPLAINER_MP4 } = mediaUrls;
   const explainerRef = useRef<HTMLVideoElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [shouldAttachExplainerSrc, setShouldAttachExplainerSrc] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [startedMuted, setStartedMuted] = useState(false);
   const [hovering, setHovering] = useState(false);
@@ -54,6 +56,29 @@ export default function HeroSection({
   /** Jednokratni iOS/WebKit „prime“ (play→pause); ne sme da okine UI kao pravo puštanje. */
   const explainerIosPrimeDoneRef = useRef(false);
   const suppressExplainerPlayUiRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px)");
+    const sync = () => {
+      const mobile = mq.matches;
+      setIsMobile(mobile);
+      // Desktop: attach odmah; mobilni: staged attach da se smanji burst na first paint-u.
+      setShouldAttachExplainerSrc(!mobile);
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    if (playing) return;
+    if (shouldAttachExplainerSrc) return;
+    // Mobilni: odloži attach da hero headline/forma dobiju prioritet.
+    const t = window.setTimeout(() => setShouldAttachExplainerSrc(true), 1200);
+    return () => window.clearTimeout(t);
+  }, [isMobile, playing, shouldAttachExplainerSrc]);
 
   const tryPrimeExplainerStaticFrame = useCallback(
     (v: HTMLVideoElement) => {
@@ -181,6 +206,7 @@ export default function HeroSection({
     if (explainerFailed) return;
     const v = explainerRef.current;
     if (!v) return;
+    if (!shouldAttachExplainerSrc) return;
     if (!playing) {
       v.pause();
       return;
@@ -190,7 +216,7 @@ export default function HeroSection({
     if (v.paused) {
       void v.play().catch(() => {});
     }
-  }, [playing, explainerFailed, EXPLAINER_MP4]);
+  }, [playing, explainerFailed, EXPLAINER_MP4, shouldAttachExplainerSrc]);
 
   const togglePlay = useCallback(() => {
     const v = explainerRef.current;
@@ -210,6 +236,9 @@ export default function HeroSection({
     // One-tap start across devices: mark intent immediately and retry with muted fallback if needed.
     primeExplainerFrameRef.current = false;
     setExplainerHasPlayed(true);
+    if (!shouldAttachExplainerSrc) {
+      setShouldAttachExplainerSrc(true);
+    }
     setPlaying(true);
     const start = async () => {
       try {
@@ -229,7 +258,7 @@ export default function HeroSection({
       }
     };
     void start();
-  }, [playing, startedMuted, explainerFailed]);
+  }, [playing, startedMuted, explainerFailed, shouldAttachExplainerSrc]);
 
   const enterFullscreen = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -388,10 +417,10 @@ export default function HeroSection({
               key={EXPLAINER_MP4}
               ref={explainerRef}
               className="hero-vsl-explainer-video"
-              src={EXPLAINER_MP4}
+              src={shouldAttachExplainerSrc ? EXPLAINER_MP4 : undefined}
               playsInline
               muted={!playing || startedMuted}
-              preload="auto"
+              preload={shouldAttachExplainerSrc ? (isMobile ? "metadata" : "auto") : "none"}
               disableRemotePlayback
               onLoadedMetadata={(e) => {
                 if (!primeExplainerFrameRef.current) return;
