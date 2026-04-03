@@ -534,6 +534,7 @@ function VideoRow({
 
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const touchDragEnabledRef = useRef(false);
   const lastX = useRef(0);
   const pendingOffset = useRef(0);
   const rafRef = useRef<number | 0>(0);
@@ -604,12 +605,20 @@ function VideoRow({
 
   const onTouchStart = (e: React.TouchEvent) => {
     if (!isMobile) return;
+    const target = e.target as HTMLElement | null;
+    // Tap na karticu treba samo da pusti video — bez ulaska u drag režim koji vizuelno "pauzira" traku.
+    if (target?.closest(".video-card")) {
+      touchDragEnabledRef.current = false;
+      return;
+    }
+    touchDragEnabledRef.current = true;
     lastX.current = e.touches[0].clientX;
     setIsDragging(true);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
     if (!isMobile) return;
+    if (!touchDragEnabledRef.current) return;
     const dx = e.touches[0].clientX - lastX.current;
     lastX.current = e.touches[0].clientX;
     pendingOffset.current += dx;
@@ -622,6 +631,8 @@ function VideoRow({
 
   const onTouchEnd = () => {
     if (!isMobile) return;
+    if (!touchDragEnabledRef.current) return;
+    touchDragEnabledRef.current = false;
     setIsDragging(false);
     pendingOffset.current = 0;
     setDragOffset(0);
