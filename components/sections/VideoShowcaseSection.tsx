@@ -68,6 +68,8 @@ const VideoCard = memo(function VideoCard({
   lazySrcMode = "io",
   manualSrcAttached = false,
   hoverLoop = false,
+  tapToPlay = false,
+  tapGroup,
   autoPlayActive = false,
   allowAutoPlay = true,
   onVisibilityRatio,
@@ -84,6 +86,10 @@ const VideoCard = memo(function VideoCard({
   manualSrcAttached?: boolean;
   /** Donji red: puštanje na hover (desktop). */
   hoverLoop?: boolean;
+  /** Telefon: puštanje na tap (bez autoplay-a ili kao override za klipove koji nisu u autoplay setu). */
+  tapToPlay?: boolean;
+  /** Grupisanje da tap pauzira ostale u istoj grupi. */
+  tapGroup?: string;
   autoPlayActive?: boolean;
   /** Za auto red: false kad je marquee zbog skrola ili sekcija van kadra. */
   allowAutoPlay?: boolean;
@@ -99,6 +105,7 @@ const VideoCard = memo(function VideoCard({
   const [nearViewport, setNearViewport] = useState(false);
   const [hoverAttached, setHoverAttached] = useState(false);
   const [hoverPlaying, setHoverPlaying] = useState(false);
+  const [tapPlaying, setTapPlaying] = useState(false);
   const didMarkLoaded = useRef(false);
   const errorRetries = useRef(0);
 
@@ -122,7 +129,8 @@ const VideoCard = memo(function VideoCard({
       ([e]) => {
         const isNear = Boolean(e?.isIntersecting);
         setNearViewport(isNear);
-        if (lazySrcMode === "io") setSrcAttached(isNear);
+        // Mobilni stability: jednom kad je src attachovan, ne skidaj ga ponovo (sprečava stalne reload/decode spike).
+        if (lazySrcMode === "io") setSrcAttached((prev) => prev || isNear);
       },
       { root: null, rootMargin: VIDEO_NEAR_VIEWPORT_ROOT_MARGIN, threshold: 0 }
     );
@@ -130,7 +138,7 @@ const VideoCard = memo(function VideoCard({
     return () => {
       io.disconnect();
       setNearViewport(false);
-      if (lazySrcMode === "io") setSrcAttached(false);
+      // Namerno: ne resetuj srcAttached u IO režimu (sticky attach).
     };
   }, [lazySrcMode, reduced, failed, canAttach]);
 
@@ -153,8 +161,22 @@ const VideoCard = memo(function VideoCard({
   }, [reduced, failed, sectionInView, onVisibilityRatio, instanceKey]);
 
   const shouldPlay =
+    (tapToPlay && tapPlaying && sectionInView) ||
     (hoverLoop && hoverPlaying && sectionInView) ||
     (autoPlayActive && allowAutoPlay);
+
+  useEffect(() => {
+    if (!tapToPlay || !tapGroup) return;
+    const onTap = (e: Event) => {
+      const ev = e as CustomEvent<{ group?: string; key?: string }>;
+      if (!ev.detail) return;
+      if (ev.detail.group !== tapGroup) return;
+      if (ev.detail.key === instanceKey) return;
+      setTapPlaying(false);
+    };
+    window.addEventListener("aha:tap-play", onTap);
+    return () => window.removeEventListener("aha:tap-play", onTap);
+  }, [tapToPlay, tapGroup, instanceKey]);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -212,6 +234,23 @@ const VideoCard = memo(function VideoCard({
         transition: "border-color 0.2s ease, box-shadow 0.2s ease",
         cursor: hoverLoop ? "pointer" : "default",
         background: VIDEO_CARD_BG,
+      }}
+      onClick={() => {
+        if (!tapToPlay) return;
+        if (!sectionInView) return;
+        // On tap, ensure src is attached in both modes.
+        if (lazySrcMode === "manual") setHoverAttached(true);
+        if (lazySrcMode === "io") setSrcAttached(true);
+
+        const next = !tapPlaying;
+        setTapPlaying(next);
+        if (next && tapGroup) {
+          try {
+            window.dispatchEvent(new CustomEvent("aha:tap-play", { detail: { group: tapGroup, key: instanceKey } }));
+          } catch {
+            // ignore
+          }
+        }
       }}
       onPointerEnter={() => {
         if (lazySrcMode === "manual") setHoverAttached(true);
@@ -351,6 +390,12 @@ function VideoRow({
   hoverLoop = false,
   /** Desktop: gornji red — svaki drugi + odloženi drugi autoplay (kao ranije). */
   playEveryOtherDesktop = false,
+  /** Telefon: isključi autoplay (donji red), ali ostavi tap-to-play. */
+  disableAutoPlayOnMobile = false,
+  /** Telefon: tap-to-play za sve kartice u ovom redu. */
+  tapToPlayOnMobile = false,
+  /** Grupa za tap-to-play (pauzira ostale u istoj grupi). */
+  tapGroup,
   autoPlayWinnerCount = 0,
   autoPlayWinnerCountDesktop,
 }: {
@@ -362,6 +407,9 @@ function VideoRow({
   canAttachMedia: boolean;
   hoverLoop?: boolean;
   playEveryOtherDesktop?: boolean;
+  disableAutoPlayOnMobile?: boolean;
+  tapToPlayOnMobile?: boolean;
+  tapGroup?: string;
   /** Mobilni / podrazumevano: najviše ovoliko autoplay (najvidljivije). */
   autoPlayWinnerCount?: number;
   /** Desktop: više autoplay; ako je veće od autoPlayWinnerCount, biraju se bez susednih kartica. */
@@ -378,7 +426,7 @@ function VideoRow({
   );
   const desktopSrcTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const mobileSlots = reduced ? 0 : (autoPlayWinnerCount ?? 0);
+  const mobileSlots = reduced ? 0 : (disableAutoPlayOnMobile ? 0 : (autoPlayWinnerCount ?? 0));
   const desktopSlots = reduced ? 0 : (autoPlayWinnerCountDesktop ?? autoPlayWinnerCount ?? 0);
   const contestSlots = isMobile ? mobileSlots : desktopSlots;
   const useSpacedDesktopPick =
@@ -675,6 +723,8 @@ function VideoRow({
                 lazySrcMode={useManualSrc ? "manual" : "io"}
                 manualSrcAttached={manualSrcAttached}
                 hoverLoop={hoverLoopEffective}
+                tapToPlay={Boolean(isMobile && tapToPlayOnMobile)}
+                tapGroup={isMobile ? tapGroup : undefined}
                 autoPlayActive={
                   (desktopEveryOtherActive &&
                     allowAutoPlay &&
@@ -841,6 +891,8 @@ export default function VideoShowcaseSection({
           canAttachMedia={canAttachMedia}
           hoverLoop
           playEveryOtherDesktop
+          tapToPlayOnMobile
+          tapGroup="showcase-row1"
           autoPlayWinnerCount={2}
           autoPlayWinnerCountDesktop={4}
         />
@@ -860,6 +912,9 @@ export default function VideoShowcaseSection({
           reduced={reduced}
           sectionInView={sectionInView}
           canAttachMedia={canAttachMedia}
+          disableAutoPlayOnMobile
+          tapToPlayOnMobile
+          tapGroup="showcase-row2"
         />
       </div>
     </section>
