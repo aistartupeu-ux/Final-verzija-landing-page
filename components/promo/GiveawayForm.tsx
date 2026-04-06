@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight, CheckCircle, Gift, Loader2, XCircle } from "lucide-react";
-import { getLeadSourceData, trackAffiliateLeadOnSubmit } from "@/lib/affiliate-tracking";
+import { getLeadSourceData } from "@/lib/affiliate-tracking";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { useEmailVerify } from "@/lib/use-email-verify";
 import PhoneInput, { type Value } from "react-phone-number-input";
@@ -22,12 +22,20 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
   const [phone, setPhone] = useState<Value | undefined>();
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { state: verifyState, error: verifyError, check: verifyCheck } = useEmailVerify();
+  const typingTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     verifyCheck(email);
   }, [email, verifyCheck]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current);
+    };
+  }, []);
 
   const submitEmail = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,8 +67,8 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
           phone: skipPhone || !phone ? null : phone,
           utm_source: sourceData.utm_source,
           utm_medium: sourceData.utm_medium,
-          utm_campaign: sourceData.utm_campaign ?? "giveaway_10_mesta",
-          affiliate_code: sourceData.affiliate_code,
+          utm_campaign: sourceData.utm_campaign ?? "giveaway_5_mesta",
+          affiliate_code: null,
           source_tag: "giveaway",
           name: null,
         }),
@@ -72,7 +80,6 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
         setLoading(false);
         return;
       }
-      trackAffiliateLeadOnSubmit({ email, phone: skipPhone || !phone ? null : phone });
       setStep("done");
     } catch {
       setError("Greška u konekciji. Pokušajte ponovo.");
@@ -115,7 +122,7 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
           .gf-row{display:flex;align-items:stretch;border-radius:50px;overflow:hidden}
           .gf-btn{padding:16px 22px;background:linear-gradient(135deg,#00d4ff 0%,#00b0e0 100%);border:none;cursor:pointer;color:#050508;font-weight:750;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;transition:all 0.3s ease;flex-shrink:0}
           .gf-btn--gold{padding:16px 22px;background:linear-gradient(135deg,#fbbf24 0%,#f59e0b 55%,#d97706 100%);font-weight:700;font-size:15px;letter-spacing:0.06em}
-          @media(max-width:480px){.gf-row{flex-direction:column;border-radius:16px;gap:8px;overflow:visible}.gf-btn,.gf-btn--gold{border-radius:12px !important;width:100%;padding:14px 20px}}
+          @media(max-width:640px){.gf-row{flex-direction:column;border-radius:16px;gap:10px;overflow:visible}.gf-btn,.gf-btn--gold{border-radius:12px !important;width:100%;min-height:48px;padding:14px 20px}}
           .gf-btn:disabled,.gf-btn--gold:disabled{cursor:not-allowed;opacity:0.65}
           .phone-wrap .PhoneInput{display:flex;align-items:center;padding:0 4px 0 16px;gap:6px}
           .phone-wrap .PhoneInputCountry{display:flex;align-items:center;gap:4px}
@@ -125,7 +132,7 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
           .phone-wrap .PhoneInputCountrySelect{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer}
           .phone-wrap .PhoneInputInput{flex:1;padding:16px 8px;background:transparent;border:none;outline:none;color:#fff;font-size:15px;font-family:inherit}
           .phone-wrap .PhoneInputInput::placeholder{color:#555}
-          @media(max-width:480px){.phone-wrap .PhoneInputInput{padding:14px 8px}}
+          @media(max-width:640px){.phone-wrap .PhoneInputInput{padding:14px 8px;min-height:48px;font-size:16px}}
         `}</style>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 14 }}>
           <div
@@ -216,72 +223,98 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
     <div>
       <style>{`
         @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-        .gf-email-row{display:flex;align-items:stretch;border-radius:50px;overflow:hidden}
-        .gf-email-btn{padding:16px 22px;background:linear-gradient(135deg,#00d4ff 0%,#00b0e0 100%);border:none;cursor:pointer;color:#050508;font-weight:750;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;transition:all 0.3s ease;flex-shrink:0}
+        @keyframes gfArrowRun{0%{transform:translateX(0)}50%{transform:translateX(8px)}100%{transform:translateX(0)}}
+        .gf-email-shell{position:relative;overflow:hidden;border-radius:50px}
+        .gf-email-row{position:relative;display:flex;align-items:stretch;border-radius:50px;overflow:hidden;z-index:1}
+        .gf-email-row::before,.gf-email-row::after{
+          content:"";position:absolute;top:50%;transform:translateY(-50%);width:108px;height:46px;pointer-events:none;filter:blur(16px);
+          opacity:.38;transition:opacity .25s ease;z-index:2;
+        }
+        .gf-email-row::before{left:8px;background:linear-gradient(90deg, rgba(0,212,255,0.64), rgba(102,45,145,0.14), rgba(0,0,0,0))}
+        .gf-email-row::after{right:8px;background:linear-gradient(270deg, rgba(124,58,237,0.62), rgba(102,45,145,0.14), rgba(0,0,0,0))}
+        .gf-email-shell:focus-within .gf-email-row::before,.gf-email-shell:focus-within .gf-email-row::after{opacity:.8}
+        .gf-email-btn{padding:16px 22px;border:none;cursor:pointer;font-weight:900;font-size:13px;letter-spacing:0.10em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;transition:all 0.3s ease;flex-shrink:0}
+        .gf-email-btn--brand{opacity:1;background:linear-gradient(135deg,#00e0ff 0%,#662d91 55%,#7c3aed 100%);color:#fff;border:1px solid rgba(255,255,255,0.28);text-shadow:0 1px 12px rgba(0,0,0,0.38);box-shadow:0 0 30px rgba(0,212,255,0.62),0 0 64px rgba(102,45,145,0.42),0 0 86px rgba(124,58,237,0.34),0 6px 22px rgba(0,0,0,0.5)}
+        .gf-email-btn--brand:not(:disabled):hover{opacity:1;background:linear-gradient(135deg,#00f0ff 0%,#7c3aed 100%);box-shadow:0 0 40px rgba(0,212,255,0.78),0 0 86px rgba(102,45,145,0.5),0 0 110px rgba(124,58,237,0.38),0 8px 26px rgba(0,0,0,0.55);transform:translate3d(0,-1px,0)}
         .gf-email-btn--gold{background:linear-gradient(135deg,#fbbf24 0%,#f59e0b 55%,#d97706 100%);font-weight:700;font-size:15px;letter-spacing:0.06em}
-        .gf-email-btn:disabled,.gf-email-btn--gold:disabled{opacity:0.6;cursor:not-allowed}
-        @media(max-width:480px){.gf-email-row{flex-direction:column;border-radius:16px;gap:8px;overflow:visible}.gf-email-btn,.gf-email-btn--gold{border-radius:12px !important;width:100%;padding:14px 20px}}
+        .gf-email-btn:disabled,.gf-email-btn--gold:disabled{opacity:1;cursor:not-allowed;filter:saturate(1.05) brightness(0.92)}
+        .gf-arrow-run{display:inline-grid;animation:gfArrowRun .8s ease-in-out infinite}
+        @media(max-width:640px){.gf-email-row::before,.gf-email-row::after{display:none}.gf-email-row{flex-direction:column;border-radius:16px;gap:10px;overflow:visible}.gf-email-btn,.gf-email-btn--gold{border-radius:12px !important;width:100%;min-height:48px;padding:14px 20px;font-size:12px;letter-spacing:0.08em}}
+        .gf-email-input{font-family:Montserrat, var(--font-inter), Inter, system-ui, -apple-system, sans-serif;font-weight:600}
+        .gf-email-input::placeholder{color:rgba(255,255,255,0.88);font-weight:600}
+        @media(max-width:640px){
+          .gf-email-shell{border-radius:16px}
+          .gf-email-input{font-size:16px!important;min-height:48px;padding:14px 40px 14px 16px!important}
+        }
       `}</style>
       <form onSubmit={submitEmail} style={{ maxWidth: 520, margin: "0 auto" }}>
-        <div
-          className="gf-email-row"
-          style={{
-            border: `1px solid ${
-              verifyState === "invalid"
-                ? "rgba(239,68,68,0.4)"
-                : focused
-                  ? borderFocus
-                  : borderDefault
-            }`,
-            background: "rgba(255,255,255,0.03)",
-            boxShadow: focused ? shadowFocus : "none",
-            transition: "border-color 0.3s ease, box-shadow 0.3s ease",
-          }}
-        >
-          <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", position: "relative" }}>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setError(null);
-              }}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              placeholder="Unesi svoj email"
-              autoComplete="email"
-              inputMode="email"
-              required
-              style={{
-                flex: 1,
-                minWidth: 0,
-                padding: "16px 44px 16px 20px",
-                background: "transparent",
-                border: "none",
-                outline: "none",
-                color: "#fff",
-                fontSize: 15,
-                fontFamily: "inherit",
-                width: "100%",
-              }}
-            />
-            {verifyState === "checking" && (
-              <Loader2
-                size={18}
-                color={gold ? "#fbbf24" : "#00d4ff"}
-                style={{ position: "absolute", right: 16, animation: "spin 1s linear infinite", willChange: "transform" }}
-              />
-            )}
-            {verifyState === "valid" && <CheckCircle size={18} color="#4ade80" style={{ position: "absolute", right: 16 }} />}
-            {verifyState === "invalid" && <XCircle size={18} color="#ef4444" style={{ position: "absolute", right: 16 }} />}
-          </div>
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className={gold ? "gf-email-btn gf-email-btn--gold" : "gf-email-btn"}
+        <div className="gf-email-shell">
+          <div
+            className="gf-email-row"
+            style={{
+              border: `1px solid ${
+                verifyState === "invalid"
+                  ? "rgba(239,68,68,0.4)"
+                  : focused
+                    ? borderFocus
+                    : borderDefault
+              }`,
+              background: "linear-gradient(120deg, rgba(8,14,28,0.92), rgba(12,16,32,0.9))",
+              boxShadow: focused ? `${shadowFocus}, 0 0 26px rgba(102,45,145,0.22)` : "0 0 16px rgba(0,212,255,0.08)",
+              transition: "border-color 0.3s ease, box-shadow 0.3s ease",
+            }}
           >
-            Nastavi <ArrowRight size={15} />
-          </button>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", position: "relative" }}>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError(null);
+                  setIsTyping(true);
+                  if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current);
+                  typingTimerRef.current = window.setTimeout(() => setIsTyping(false), 700);
+                }}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                placeholder="Unesi svoj email"
+                autoComplete="email"
+                inputMode="email"
+                required
+                className="gf-email-input"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  padding: "16px 44px 16px 20px",
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
+                  color: "#fff",
+                  fontSize: 15,
+                  width: "100%",
+                }}
+              />
+              {verifyState === "checking" && (
+                <Loader2
+                  size={18}
+                  color={gold ? "#fbbf24" : "#00d4ff"}
+                  style={{ position: "absolute", right: 16, animation: "spin 1s linear infinite", willChange: "transform" }}
+                />
+              )}
+              {verifyState === "valid" && <CheckCircle size={18} color="#4ade80" style={{ position: "absolute", right: 16 }} />}
+              {verifyState === "invalid" && <XCircle size={18} color="#ef4444" style={{ position: "absolute", right: 16 }} />}
+            </div>
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              className={gold ? "gf-email-btn gf-email-btn--gold" : "gf-email-btn gf-email-btn--brand"}
+            >
+              OSIGURAJ MESTO{" "}
+              <span className={isTyping ? "gf-arrow-run" : ""}>
+                <ArrowRight size={15} />
+              </span>
+            </button>
+          </div>
         </div>
       </form>
 

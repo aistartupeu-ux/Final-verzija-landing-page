@@ -354,7 +354,7 @@ export default function ThankYouClient() {
               style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }}
             />
 
-            <div className="w-full max-w-[min(520px,100%)] space-y-3 md:max-lg:space-y-4 lg:space-y-5">
+            <div className="w-full max-w-[min(580px,100%)] space-y-3 md:max-lg:space-y-4 lg:space-y-5">
               {STEPS.map((t, idx) => (
                 <motion.div
                   key={t}
@@ -390,7 +390,7 @@ export default function ThankYouClient() {
                 initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={reduced ? { duration: 0 } : { duration: 0.55, delay: 1.82, ease }}
-                className="w-full max-w-[min(520px,100%)]"
+                className="w-full"
               >
                 <ThankYouPhoneForm
                   email={phoneFormEmail}

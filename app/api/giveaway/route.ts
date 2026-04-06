@@ -14,9 +14,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
+  const incoming = body as Record<string, unknown>;
+  const hasText = (v: unknown): v is string => typeof v === "string" && v.trim().length > 0;
+
   const payload = {
-    ...(body as Record<string, unknown>),
+    ...incoming,
+    // Giveaway uvek obeležavamo kao poseban izvor.
+    // Ne prosleđujemo affiliate_code da se source_tag ne prepiše u "affiliate".
+    affiliate_code: null,
     source_tag: "giveaway",
+    utm_source: hasText(incoming.utm_source) ? incoming.utm_source : "giveaway",
+    utm_medium: hasText(incoming.utm_medium) ? incoming.utm_medium : "organic",
+    utm_campaign: hasText(incoming.utm_campaign) ? incoming.utm_campaign : "giveaway_ref",
   };
 
   const res = await fetch(target, {
