@@ -3,9 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, CheckCircle, Gift, Loader2, XCircle } from "lucide-react";
 import { getLeadSourceData } from "@/lib/affiliate-tracking";
+import { storeLeadForThankYou } from "@/lib/tiktok-datalayer";
+import { landingChannelFromPathname } from "@/lib/landing-attribution";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { useEmailVerify } from "@/lib/use-email-verify";
 import PhoneInput, { type Value } from "react-phone-number-input";
+import { usePathname, useRouter } from "next/navigation";
 import "react-phone-number-input/style.css";
 
 type Step = "email" | "phone" | "done";
@@ -13,6 +16,8 @@ type Step = "email" | "phone" | "done";
 type GiveawayAccent = "cyan" | "gold";
 
 export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAccent }) {
+  const router = useRouter();
+  const pathname = usePathname() ?? "";
   const gold = accent === "gold";
   const borderDefault = gold ? "rgba(251,191,36,0.2)" : "rgba(0,212,255,0.15)";
   const borderFocus = gold ? "rgba(251,191,36,0.45)" : "rgba(0,212,255,0.4)";
@@ -24,6 +29,8 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
   const [focused, setFocused] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [didRedirect, setDidRedirect] = useState(false);
+  const [pendingEventId, setPendingEventId] = useState<string | null>(null);
   const { state: verifyState, error: verifyError, check: verifyCheck } = useEmailVerify();
   const typingTimerRef = useRef<number | null>(null);
 
@@ -36,6 +43,15 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
       if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (step !== "done" || didRedirect || !pendingEventId) return;
+    const t = window.setTimeout(() => {
+      setDidRedirect(true);
+      router.push(`/thank-you?eid=${encodeURIComponent(pendingEventId)}`);
+    }, 1000);
+    return () => window.clearTimeout(t);
+  }, [didRedirect, pendingEventId, router, step]);
 
   const submitEmail = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +73,10 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
     if (loading) return;
     setLoading(true);
     setError(null);
+    const eventId =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     try {
       const sourceData = getLeadSourceData();
       const res = await fetch("/api/giveaway", {
@@ -70,6 +90,7 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
           utm_campaign: sourceData.utm_campaign ?? "giveaway_5_mesta",
           affiliate_code: null,
           source_tag: "giveaway",
+          event_id: eventId,
           name: null,
         }),
       });
@@ -80,6 +101,8 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
         setLoading(false);
         return;
       }
+      storeLeadForThankYou(email.trim().toLowerCase(), skipPhone || !phone ? null : phone, eventId, landingChannelFromPathname(pathname));
+      setPendingEventId(eventId);
       setStep("done");
     } catch {
       setError("Greška u konekciji. Pokušajte ponovo.");

@@ -169,12 +169,31 @@ export async function POST(req: NextRequest) {
     const emailNorm = String(email).trim().toLowerCase();
     const { data: existing } = await supabase
       .from("leads")
-      .select("id")
+      .select("id, utm_campaign")
       .ilike("email", emailNorm)
       .limit(1)
       .maybeSingle();
 
     if (existing) {
+      if (sourceTag === "giveaway") {
+        const repeatTag = "giveaway_repeat";
+        const campaignRaw = typeof existing.utm_campaign === "string" ? existing.utm_campaign.trim() : "";
+        const hasRepeatTag = campaignRaw.toLowerCase().includes(repeatTag);
+        const updatedCampaign = hasRepeatTag
+          ? campaignRaw
+          : campaignRaw
+            ? `${campaignRaw}|${repeatTag}`
+            : repeatTag;
+        try {
+          await supabase
+            .from("leads")
+            .update({ utm_campaign: updatedCampaign })
+            .eq("id", existing.id);
+        } catch {
+          // duplicirani giveaway upis je opciona oznaka; ne blokiramo response
+        }
+      }
+
       cookieStore.set("special_access", "1", {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -182,7 +201,11 @@ export async function POST(req: NextRequest) {
         maxAge: 60 * 60 * 24,
         path: "/",
       });
-      return NextResponse.json({ success: true });
+      return NextResponse.json({
+        success: true,
+        duplicate: true,
+        giveaway_repeat_tagged: sourceTag === "giveaway",
+      });
     }
 
     const { error } = await supabase.from("leads").insert({
