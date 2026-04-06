@@ -105,6 +105,7 @@ export async function POST(req: NextRequest) {
       affiliate_code: bodyAffiliate,
       source_tag,
       skip_leads_source_sheet,
+      skip_ghl_webhook,
     } = body;
     const name = typeof body?.name === "string" ? body.name.trim() : null;
 
@@ -309,8 +310,9 @@ export async function POST(req: NextRequest) {
     }
 
     // HighLevel: pošalji lead u jedan workflow (welcome + affiliate logika)
+    const shouldSendGhlWebhook = !Boolean(skip_ghl_webhook);
     const ghlWebhook = process.env.GHL_WEBHOOK_URL;
-    if (ghlWebhook) {
+    if (shouldSendGhlWebhook && ghlWebhook) {
       // Ne blokiramo lead na sporom GHL webhook-u.
       (async () => {
         try {

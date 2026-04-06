@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     utm_medium: hasText(incoming.utm_medium) ? incoming.utm_medium : "organic",
     utm_campaign: hasText(incoming.utm_campaign) ? incoming.utm_campaign : "giveaway_ref",
     skip_leads_source_sheet: true,
+    skip_ghl_webhook: true,
   };
 
   const res = await fetch(target, {
@@ -107,6 +108,33 @@ export async function POST(req: NextRequest) {
       });
     } catch (e) {
       console.error("Giveaway sheet write error:", e);
+    }
+
+    const giveawayGhlWebhook = process.env.GIVEAWAY_GHL_WEBHOOK_URL;
+    if (giveawayGhlWebhook) {
+      try {
+        const ctrl = new AbortController();
+        const timeoutId = setTimeout(() => ctrl.abort(), 5_000);
+        await fetch(giveawayGhlWebhook, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            phone: phone || "",
+            firstName: name?.split(" ")[0] ?? name ?? "",
+            lastName: name?.split(" ").slice(1).join(" ") ?? "",
+            name: name || "",
+            source: "giveaway",
+            campaign_type: "giveaway",
+            entry_point: "giveaway_page",
+            tags: ["GW_LEAD"],
+          }),
+          signal: ctrl.signal,
+        });
+        clearTimeout(timeoutId);
+      } catch (e) {
+        console.error("Giveaway GHL webhook error:", e);
+      }
     }
   }
 
