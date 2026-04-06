@@ -6,7 +6,7 @@ import { Menu, X } from "lucide-react";
 import Image from "next/image";
 
 const NAV_SECTIONS = ["blog", "kako-funkcionise"];
-const GIVEAWAY_PREFIXES = ["/giveaway", "/promo/giveaway-10-mesta"];
+const GIVEAWAY_PREFIXES = ["/giveaway"];
 const LEAD_MAGNET_PREFIXES = ["/free-guide", "/promo/lead-magnet"];
 
 function pathMatchesPrefixes(pathname: string, prefixes: string[]): boolean {
@@ -78,12 +78,17 @@ export default function Header() {
 
   return (
     <header
+      className={isGiveawayPage ? "site-header site-header--giveaway" : "site-header"}
       style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
         width: "100%",
         /* Čista pozadina umesto blur — blur opterećuje pri skrolu */
-        background: scrolled ? "rgba(5,5,8,0.98)" : "transparent",
-        borderBottom: scrolled ? "1px solid rgba(0,212,255,0.08)" : "1px solid transparent",
+        background: isGiveawayPage ? "rgba(5,5,8,0.98)" : scrolled ? "rgba(5,5,8,0.98)" : "transparent",
+        borderBottom: isGiveawayPage
+          ? "1px solid rgba(0,212,255,0.08)"
+          : scrolled
+            ? "1px solid transparent"
+            : "1px solid rgba(0,212,255,0.16)",
         transition: "background 0.2s ease, border-color 0.2s ease",
         transform: "translateZ(0)",
       }}
@@ -131,8 +136,19 @@ export default function Header() {
             ))}
           <button
             onClick={jump}
-            className={isGiveawayPage ? "glow-btn glow-btn--gold" : "glow-btn"}
-            style={{ padding: "10px 24px", fontSize: 12, borderRadius: 10 }}
+            className={isGiveawayPage ? "glow-btn glow-btn--giveaway" : "glow-btn"}
+            style={
+              isGiveawayPage
+                ? {
+                    padding: "10px 24px",
+                    fontSize: 12,
+                    borderRadius: 10,
+                    background: "linear-gradient(135deg,#00d4ff 0%,#7c3aed 100%)",
+                    color: "#fff",
+                    border: "1px solid rgba(255,255,255,0.22)",
+                  }
+                : { padding: "10px 24px", fontSize: 12, borderRadius: 10 }
+            }
           >
             Join The Hype
           </button>
@@ -153,8 +169,20 @@ export default function Header() {
           )}
           <button
             onClick={jump}
-            className={isGiveawayPage ? "glow-btn glow-btn--gold" : "glow-btn"}
-            style={{ width: "100%", marginTop: 12, borderRadius: 10, fontFamily: "inherit" }}
+            className={isGiveawayPage ? "glow-btn glow-btn--giveaway" : "glow-btn"}
+            style={
+              isGiveawayPage
+                ? {
+                    width: "100%",
+                    marginTop: 12,
+                    borderRadius: 10,
+                    fontFamily: "inherit",
+                    background: "linear-gradient(135deg,#00d4ff 0%,#7c3aed 100%)",
+                    color: "#fff",
+                    border: "1px solid rgba(255,255,255,0.22)",
+                  }
+                : { width: "100%", marginTop: 12, borderRadius: 10, fontFamily: "inherit" }
+            }
           >
             Join The Hype
           </button>
@@ -162,6 +190,23 @@ export default function Header() {
       )}
 
       <style>{`
+        .site-header{position:fixed;}
+        .site-header--giveaway::after{
+          content:"";
+          position:absolute;
+          left:0;
+          right:0;
+          bottom:-1px;
+          height:1px;
+          background:linear-gradient(90deg, rgba(79,227,240,0.18) 0%, rgba(79,227,240,0.78) 28%, rgba(123,97,255,0.72) 55%, rgba(79,227,240,0.78) 78%, rgba(79,227,240,0.18) 100%);
+          box-shadow:0 0 10px rgba(79,227,240,0.42), 0 0 18px rgba(123,97,255,0.22);
+          pointer-events:none;
+          animation: giveawayHeaderLine 3.8s ease-in-out infinite;
+        }
+        @keyframes giveawayHeaderLine{
+          0%,100%{opacity:.65;filter:saturate(1);}
+          50%{opacity:1;filter:saturate(1.12);}
+        }
         .hide-mobile { display: none !important; }
         .show-mobile { display: flex !important; }
         @media (min-width: 768px) {
