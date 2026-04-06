@@ -9,9 +9,9 @@ export const metadata: Metadata = {
 };
 
 /**
- * Tajmer do 14.04.2026. 00:00:00, Europe/Belgrade (CEST = UTC+2 u aprilu).
+ * Tajmer do 15.04.2026. 00:00:00, Europe/Belgrade (CEST = UTC+2 u aprilu).
  */
-const TARGET_DATE = new Date("2026-04-14T00:00:00+02:00");
+const TARGET_DATE = new Date("2026-04-15T00:00:00+02:00");
 
 const SPARKLE_INDICES = [0, 1, 2, 3, 4, 5, 6, 7] as const;
 
@@ -319,6 +319,11 @@ export default function GiveawayPage() {
                 <GiveawayForm accent="cyan" />
               </div>
             </div>
+            <p className="gv-footer-copy" style={{ marginTop: 22, marginBottom: 4 }}>
+              Misliš da nećeš biti izvučen? Nema veze! Svi prijavljeni dobijaju{" "}
+              <span className="giveaway-page__accent-word">POKLON</span> na dan lansiranja! Prijavi se i preuzmi svoj poklon
+              15. aprila za sigurniji <span className="gv-accent-violet">rast</span>!
+            </p>
 
             <div className="gv-value">
               <p className="gv-value-title">
@@ -338,11 +343,6 @@ export default function GiveawayPage() {
                   <span className="gv-accent-cyan">rezultat</span>
                 </li>
               </ul>
-              <p className="gv-footer-copy">
-                Misliš da nećeš biti izvučen? Nema veze! Svi prijavljeni dobijaju{" "}
-                <span className="giveaway-page__accent-word">POKLON</span> na dan lansiranja! Prijavi se i preuzmi svoj poklon
-                15. aprila za sigurniji <span className="gv-accent-violet">rast</span>!
-              </p>
             </div>
           </div>
         </section>
