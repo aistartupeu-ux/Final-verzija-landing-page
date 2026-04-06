@@ -121,7 +121,7 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
           @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
           .gf-row{display:flex;align-items:stretch;border-radius:50px;overflow:hidden}
           .gf-btn{padding:16px 22px;background:linear-gradient(135deg,#00d4ff 0%,#00b0e0 100%);border:none;cursor:pointer;color:#050508;font-weight:750;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;transition:all 0.3s ease;flex-shrink:0}
-          .gf-btn--gold{padding:16px 22px;background:linear-gradient(135deg,#fbbf24 0%,#f59e0b 55%,#d97706 100%);font-weight:700;font-size:15px;letter-spacing:0.06em}
+          .gf-btn--gold{padding:16px 22px;background:linear-gradient(135deg,#00e0ff 0%,#662d91 55%,#7c3aed 100%);color:#fff;border:1px solid rgba(255,255,255,0.28);text-shadow:0 1px 12px rgba(0,0,0,0.38);font-weight:700;font-size:15px;letter-spacing:0.06em}
           @media(max-width:640px){.gf-row{flex-direction:column;border-radius:16px;gap:10px;overflow:visible}.gf-btn,.gf-btn--gold{border-radius:12px !important;width:100%;min-height:48px;padding:14px 20px}}
           .gf-btn:disabled,.gf-btn--gold:disabled{cursor:not-allowed;opacity:0.65}
           .phone-wrap .PhoneInput{display:flex;align-items:center;padding:0 4px 0 16px;gap:6px}
@@ -236,7 +236,7 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
         .gf-email-btn{padding:16px 22px;border:none;cursor:pointer;font-weight:900;font-size:13px;letter-spacing:0.10em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;transition:all 0.3s ease;flex-shrink:0}
         .gf-email-btn--brand{opacity:1;background:linear-gradient(135deg,#00e0ff 0%,#662d91 55%,#7c3aed 100%);color:#fff;border:1px solid rgba(255,255,255,0.28);text-shadow:0 1px 12px rgba(0,0,0,0.38);box-shadow:0 0 30px rgba(0,212,255,0.62),0 0 64px rgba(102,45,145,0.42),0 0 86px rgba(124,58,237,0.34),0 6px 22px rgba(0,0,0,0.5)}
         .gf-email-btn--brand:not(:disabled):hover{opacity:1;background:linear-gradient(135deg,#00f0ff 0%,#7c3aed 100%);box-shadow:0 0 40px rgba(0,212,255,0.78),0 0 86px rgba(102,45,145,0.5),0 0 110px rgba(124,58,237,0.38),0 8px 26px rgba(0,0,0,0.55);transform:translate3d(0,-1px,0)}
-        .gf-email-btn--gold{background:linear-gradient(135deg,#fbbf24 0%,#f59e0b 55%,#d97706 100%);font-weight:700;font-size:15px;letter-spacing:0.06em}
+        .gf-email-btn--gold{background:linear-gradient(135deg,#00e0ff 0%,#662d91 55%,#7c3aed 100%);color:#fff;border:1px solid rgba(255,255,255,0.28);text-shadow:0 1px 12px rgba(0,0,0,0.38);font-weight:700;font-size:15px;letter-spacing:0.06em}
         .gf-email-btn:disabled,.gf-email-btn--gold:disabled{opacity:1;cursor:not-allowed;filter:saturate(1.05) brightness(0.92)}
         .gf-arrow-run{display:inline-grid;animation:gfArrowRun .8s ease-in-out infinite}
         @media(max-width:640px){.gf-email-row::before,.gf-email-row::after{display:none}.gf-email-row{flex-direction:column;border-radius:16px;gap:10px;overflow:visible}.gf-email-btn,.gf-email-btn--gold{border-radius:12px !important;width:100%;min-height:48px;padding:14px 20px;font-size:12px;letter-spacing:0.08em}}
