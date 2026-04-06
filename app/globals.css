@@ -176,6 +176,50 @@ body {
   transform: translate3d(0, -2px, 0);
 }
 
+/* Giveaway CTA (brand): cyan + purple sa senkom #662d91 */
+.glow-btn--giveaway {
+  background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 13px !important;
+  letter-spacing: 0.10em;
+  padding: 12px 26px !important;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 0 24px rgba(0, 212, 255, 0.45),
+    0 0 52px rgba(124, 58, 237, 0.28),
+    0 0 64px rgba(102, 45, 145, 0.26),
+    0 4px 18px rgba(0, 0, 0, 0.42);
+  animation: giveawayCtaPulse 2.8s ease-in-out infinite;
+}
+.glow-btn--giveaway:hover {
+  background: linear-gradient(135deg, #00e0ff 0%, #8b5cf6 100%);
+  box-shadow:
+    0 0 34px rgba(0, 212, 255, 0.65),
+    0 0 74px rgba(124, 58, 237, 0.40),
+    0 0 92px rgba(102, 45, 145, 0.32),
+    0 4px 22px rgba(0, 0, 0, 0.5);
+  transform: translate3d(0, -2px, 0);
+}
+
+@keyframes giveawayCtaPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 22px rgba(0, 212, 255, 0.42),
+      0 0 48px rgba(124, 58, 237, 0.26),
+      0 0 60px rgba(102, 45, 145, 0.24),
+      0 4px 18px rgba(0, 0, 0, 0.42);
+  }
+  50% {
+    box-shadow:
+      0 0 30px rgba(0, 212, 255, 0.6),
+      0 0 64px rgba(124, 58, 237, 0.34),
+      0 0 78px rgba(102, 45, 145, 0.3),
+      0 4px 18px rgba(0, 0, 0, 0.42);
+  }
+}
+
 .text-glow {
   text-shadow: 0 0 60px rgba(0,212,255,0.12), 0 0 120px rgba(0,212,255,0.05);
 }
@@ -772,17 +816,17 @@ input:focus::placeholder {
   --gv-text-primary: #ffffff;
   --gv-text-secondary: #e2e8f0;
   --gv-text-muted: rgba(255, 255, 255, 0.5);
-  --gv-gold-primary: #fbbf24;
-  --gv-gold-secondary: #f59e0b;
-  --gv-gold-dark: #d97706;
-  --gv-gold-glow: rgba(251, 191, 36, 0.1);
-  --gv-gold-border: rgba(251, 191, 36, 0.2);
-  --gv-purple: #8b5cf6;
+  --gv-cyan: #00d4ff;
+  --gv-purple: #7c3aed;
+  --gv-shadow-purple: #662d91;
+  --gv-glow: rgba(0, 212, 255, 0.1);
+  --gv-border: rgba(0, 212, 255, 0.18);
   --gv-success: #4ade80;
   background-color: var(--gv-bg);
   position: relative;
   overflow-x: clip;
-  min-height: 100vh;
+  /* visina stranice = sadržaj — izbegava prazan skrol ispod sekcije */
+  min-height: auto;
 }
 
 .giveaway-page__bg {
@@ -803,7 +847,7 @@ input:focus::placeholder {
   height: 500px;
   transform: translate(-50%, -50%);
   margin-left: 0;
-  background: radial-gradient(ellipse, rgba(251, 191, 36, 1) 0%, transparent 68%);
+  background: radial-gradient(ellipse, rgba(0, 212, 255, 1) 0%, transparent 68%);
   opacity: 0.05;
   animation: giveawayGoldPulse 6s ease-in-out infinite;
   will-change: opacity;
@@ -816,7 +860,7 @@ input:focus::placeholder {
   width: 400px;
   height: 350px;
   transform: translate(-50%, -50%);
-  background: radial-gradient(ellipse, rgba(139, 92, 246, 1) 0%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(102, 45, 145, 1) 0%, transparent 70%);
   opacity: 0.05;
 }
 
@@ -843,18 +887,20 @@ input:focus::placeholder {
   will-change: transform;
 }
 
-.giveaway-page__sparkle--0 { left: 12%; top: 16%; width: 3px; height: 3px; background: var(--gv-gold-primary); opacity: 0.1; animation-duration: 5.2s; }
 .giveaway-page__sparkle--1 { left: 78%; top: 22%; width: 2px; height: 2px; background: #fff; opacity: 0.08; animation-duration: 6.5s; animation-delay: -1s; }
-.giveaway-page__sparkle--2 { left: 22%; top: 42%; width: 2px; height: 2px; background: var(--gv-gold-secondary); opacity: 0.12; animation-duration: 5.5s; animation-delay: -2s; }
+.giveaway-page__sparkle--0 { left: 12%; top: 16%; width: 3px; height: 3px; background: var(--gv-cyan); opacity: 0.1; animation-duration: 5.2s; }
+.giveaway-page__sparkle--2 { left: 22%; top: 42%; width: 2px; height: 2px; background: var(--gv-purple); opacity: 0.12; animation-duration: 5.5s; animation-delay: -2s; }
 .giveaway-page__sparkle--3 { left: 88%; top: 48%; width: 3px; height: 3px; background: #fff; opacity: 0.07; animation-duration: 7s; animation-delay: -0.5s; }
-.giveaway-page__sparkle--4 { left: 8%; top: 62%; width: 2px; height: 2px; background: var(--gv-gold-primary); opacity: 0.09; animation-duration: 5.8s; }
+.giveaway-page__sparkle--4 { left: 8%; top: 62%; width: 2px; height: 2px; background: var(--gv-cyan); opacity: 0.09; animation-duration: 5.8s; }
 .giveaway-page__sparkle--5 { left: 52%; top: 12%; width: 2px; height: 2px; background: #fff; opacity: 0.06; animation-duration: 6.2s; animation-delay: -3s; }
-.giveaway-page__sparkle--6 { left: 66%; top: 68%; width: 3px; height: 3px; background: var(--gv-gold-secondary); opacity: 0.11; animation-duration: 5.4s; animation-delay: -1.5s; }
+.giveaway-page__sparkle--6 { left: 66%; top: 68%; width: 3px; height: 3px; background: var(--gv-purple); opacity: 0.11; animation-duration: 5.4s; animation-delay: -1.5s; }
 .giveaway-page__sparkle--7 { left: 34%; top: 78%; width: 2px; height: 2px; background: #fff; opacity: 0.08; animation-duration: 6.8s; }
 
 .giveaway-page__main {
   position: relative;
   z-index: 1;
+  /* Fiksni header (72px): sadržaj i pozadina giveaway sekcije kreću ispod njega */
+  padding-top: 72px;
 }
 
 .giveaway-page__headline {
@@ -863,39 +909,70 @@ input:focus::placeholder {
   line-height: 1.12;
   margin: 0 auto 12px;
   max-width: 720px;
-  background: linear-gradient(135deg, var(--gv-gold-primary) 0%, var(--gv-gold-secondary) 45%, var(--gv-gold-dark) 100%);
+  background: linear-gradient(135deg, var(--gv-cyan) 0%, var(--gv-purple) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
   text-shadow: none;
-  filter: drop-shadow(0 2px 24px var(--gv-gold-glow));
+  filter: drop-shadow(0 2px 22px rgba(0, 212, 255, 0.14)) drop-shadow(0 0 22px rgba(102, 45, 145, 0.16));
 }
 
 .giveaway-page__subtitle {
   margin: 0 auto;
-  max-width: 640px;
-  color: rgba(255, 239, 209, 0.78);
+  max-width: 520px;
+  color: #ffffff;
   font-weight: 700;
   font-size: clamp(17px, 1.9vw, 20px);
   line-height: 1.55;
+  text-align: center;
+}
+
+.giveaway-page__accent-word {
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--gv-cyan) 0%, var(--gv-purple) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  filter: drop-shadow(0 2px 18px rgba(102, 45, 145, 0.16));
 }
 
 .giveaway-page__card {
+  position: relative;
   max-width: 640px;
   margin: 0 auto;
   border-radius: 28px;
-  border: 1px solid var(--gv-gold-border);
-  background: linear-gradient(180deg, rgba(251, 191, 36, 0.08) 0%, rgba(5, 5, 8, 0.92) 55%);
+  border: 1px solid rgba(79, 227, 240, 0.44);
+  background:
+    radial-gradient(500px 320px at 12% 14%, rgba(0, 212, 255, 0.07), transparent 58%),
+    radial-gradient(380px 260px at 84% 84%, rgba(102, 45, 145, 0.06), transparent 62%),
+    rgba(8, 14, 24, 0.78);
   box-shadow:
-    0 18px 80px rgba(0, 0, 0, 0.48),
-    0 0 60px var(--gv-gold-glow);
+    0 14px 44px rgba(0, 0, 0, 0.40),
+    0 0 46px rgba(0, 212, 255, 0.24),
+    0 0 70px rgba(102, 45, 145, 0.18);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   padding: 28px 24px;
+}
+.giveaway-page__card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  border: 1px solid rgba(79, 227, 240, 0.58);
+  box-shadow:
+    0 0 0 1px rgba(79, 227, 240, 0.22) inset,
+    0 0 36px rgba(79, 227, 240, 0.40),
+    0 0 56px rgba(123, 97, 255, 0.24);
 }
 
 @media (max-width: 640px) {
   .giveaway-page__section {
-    padding: 92px 16px 92px !important;
+    /* main već ima padding-top za header; ostaje samo bočni i kompaktniji donji razmak */
+    padding: 24px 16px 20px !important;
   }
 
   .giveaway-page__headline {
@@ -911,11 +988,15 @@ input:focus::placeholder {
   }
 
   .giveaway-page__card {
-    border-radius: 22px;
-    padding: 18px 14px 16px;
+    border-radius: 20px;
+    padding: 14px 12px 16px;
+    width: 100%;
+    max-width: 640px;
+    box-sizing: border-box;
     box-shadow:
       0 14px 46px rgba(0, 0, 0, 0.44),
-      0 0 36px var(--gv-gold-glow);
+      0 0 30px rgba(0, 212, 255, 0.10),
+      0 0 42px rgba(102, 45, 145, 0.12);
   }
 
   .giveaway-page__glow-gold {

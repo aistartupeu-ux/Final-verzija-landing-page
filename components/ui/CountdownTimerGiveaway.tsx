@@ -18,7 +18,7 @@ function AnimatedDigit({ value }: { value: string }) {
         animate={{ y: 0, opacity: 1, scale: 1, filter: "blur(0px)" }}
         exit={{ y: -12, opacity: 0, scale: 0.8, filter: "blur(4px)" }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="inline-block tabular-nums text-[30px] sm:text-[36px] font-extrabold leading-none bg-gradient-to-b from-[#fef3c7] via-[#fbbf24] to-[#b45309] bg-clip-text text-transparent"
+        className="inline-block tabular-nums text-[20px] min-[380px]:text-[22px] sm:text-[30px] md:text-[36px] font-extrabold leading-none bg-gradient-to-b from-[#bff5ff] via-[#00d4ff] to-[#7c3aed] bg-clip-text text-transparent"
       >
         {value}
       </motion.span>
@@ -43,15 +43,15 @@ function GiveawayTimeBlock({
       className="flex flex-col items-center group"
     >
       <div className="relative giveaway-timeblock">
-        <div className="absolute -inset-2 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-[radial-gradient(ellipse_at_center,rgba(251,191,36,0.08),transparent_70%)]" />
-        <div className="relative flex items-center justify-center w-[72px] h-[82px] sm:w-[84px] sm:h-[94px] rounded-2xl bg-gradient-to-b from-[#111827] to-[#0c1019] border border-white/[0.06] overflow-hidden group-hover:border-[#fbbf24]/[0.15] transition-all duration-500">
+        <div className="absolute -inset-2 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-[radial-gradient(ellipse_at_center,rgba(0,212,255,0.10),rgba(102,45,145,0.08),transparent_70%)]" />
+        <div className="relative flex items-center justify-center w-[58px] h-[68px] min-[380px]:w-[66px] min-[380px]:h-[76px] sm:w-[72px] sm:h-[82px] md:w-[84px] md:h-[94px] rounded-[14px] sm:rounded-2xl bg-gradient-to-b from-[#111827] to-[#0c1019] border border-white/[0.06] overflow-hidden group-hover:border-[#00d4ff]/[0.18] transition-all duration-500">
           <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/[0.03] to-transparent pointer-events-none" />
           <div className="absolute top-1/2 left-3 right-3 h-[1px] bg-gradient-to-r from-transparent via-white/[0.06] to-transparent -translate-y-[0.5px] pointer-events-none" />
           <div
             className="absolute inset-0 pointer-events-none bg-[length:200%_100%] giveaway-shimmer-sweep"
             style={{
               background:
-                "linear-gradient(110deg, transparent 30%, rgba(251,191,36,0.04) 50%, transparent 70%)",
+                "linear-gradient(110deg, transparent 30%, rgba(0,212,255,0.05) 50%, transparent 70%)",
               backgroundSize: "200% 100%",
             }}
           />
@@ -59,10 +59,10 @@ function GiveawayTimeBlock({
             <AnimatedDigit value={value[0] ?? "0"} />
             <AnimatedDigit value={value[1] ?? "0"} />
           </div>
-          <div className="absolute bottom-0 left-4 right-4 h-[1px] bg-gradient-to-r from-transparent via-[#fbbf24]/[0.10] to-transparent pointer-events-none" />
+          <div className="absolute bottom-0 left-4 right-4 h-[1px] bg-gradient-to-r from-transparent via-[#00d4ff]/[0.14] to-transparent pointer-events-none" />
         </div>
       </div>
-      <span className="giveaway-timeblock__unit mt-2.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.15em] text-white/30 group-hover:text-[#fbbf24]/50 transition-colors duration-500">
+      <span className="giveaway-timeblock__unit mt-1.5 sm:mt-2.5 text-[9px] sm:text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.12em] sm:tracking-[0.15em] text-white/30 group-hover:text-[#00d4ff]/55 transition-colors duration-500">
         {label}
       </span>
     </motion.div>
@@ -75,11 +75,11 @@ function GiveawaySeparator({ index }: { index: number }) {
       initial={{ opacity: 0, scale: 0 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4, delay: 0.1 * index + 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col items-center justify-center gap-2 self-center pb-1 sm:pb-0 h-[82px] sm:h-[94px]"
+      className="giveaway-timer__sep flex flex-col items-center justify-center gap-2 self-center pb-1 sm:pb-0 h-[68px] min-[380px]:h-[76px] sm:h-[82px] md:h-[94px]"
     >
-      <div className="w-[3px] h-[3px] rounded-full bg-[#fbbf24]/40 giveaway-separator-pulse" />
+      <div className="w-[3px] h-[3px] rounded-full bg-[#00d4ff]/40 giveaway-separator-pulse" />
       <div
-        className="w-[3px] h-[3px] rounded-full bg-[#fbbf24]/40 giveaway-separator-pulse"
+        className="w-[3px] h-[3px] rounded-full bg-[#00d4ff]/40 giveaway-separator-pulse"
         style={{ animationDelay: "0.6s" }}
       />
     </motion.div>
@@ -105,9 +105,9 @@ function GiveawayTimer({
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         className="w-full max-w-[420px] mx-auto text-center py-8"
       >
-        <div className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-[#fbbf24]/[0.08] border border-[#fbbf24]/[0.15]">
+        <div className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-[#00d4ff]/[0.08] border border-[#00d4ff]/[0.15]">
           <span className="text-lg">⏱</span>
-          <span className="text-[15px] font-bold text-[#fbbf24]">Vreme je isteklo!</span>
+          <span className="text-[15px] font-bold text-[#00d4ff]">Vreme je isteklo!</span>
         </div>
       </motion.div>
     );
@@ -119,15 +119,16 @@ function GiveawayTimer({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-        className="giveaway-timer__label text-center mb-3 -mt-0.5"
+        className="giveaway-timer__label text-center"
+        style={{ marginTop: -5, marginBottom: 14 }}
       >
-        <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.05] text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#fbbf24]/60 giveaway-live-dot" />
+        <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.04] border border-[#4FE3F0]/[0.20] text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#4FE3F0] giveaway-live-dot" />
           {label}
         </span>
       </motion.div>
 
-      <div className="giveaway-timer__row flex flex-nowrap items-center justify-center gap-1.5 sm:gap-2 w-full">
+      <div className="giveaway-timer__row flex flex-nowrap items-center justify-center gap-1 min-[380px]:gap-1.5 sm:gap-2 w-full max-w-full overflow-x-auto overflow-y-visible px-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden" style={{ marginTop: 3 }}>
         {blocks.map((block, i) => (
           <Fragment key={block.label}>
             <GiveawayTimeBlock value={block.value} label={block.label} index={i} />
@@ -155,12 +156,18 @@ function GiveawayTimer({
         @keyframes giveawayLiveDot {
           0%,
           100% {
-            opacity: 0.5;
-            box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.3);
+            opacity: 0.75;
+            box-shadow:
+              0 0 0 0 rgba(79, 227, 240, 0.46),
+              0 0 22px rgba(79, 227, 240, 0.42),
+              0 0 30px rgba(102, 45, 145, 0.26);
           }
           50% {
             opacity: 1;
-            box-shadow: 0 0 0 4px rgba(251, 191, 36, 0);
+            box-shadow:
+              0 0 0 5px rgba(79, 227, 240, 0),
+              0 0 28px rgba(79, 227, 240, 0.55),
+              0 0 38px rgba(102, 45, 145, 0.30);
           }
         }
         .giveaway-live-dot {
@@ -191,25 +198,22 @@ function GiveawayTimer({
           .giveaway-timer {
             max-width: 100%;
             margin-top: -2px;
+            padding-left: 2px;
+            padding-right: 2px;
           }
           .giveaway-timer__label {
-            margin-bottom: 8px;
+            margin-bottom: 10px;
+          }
+          .giveaway-timer__label span {
+            max-width: 100%;
+            padding-left: 10px;
+            padding-right: 10px;
+            text-wrap: balance;
+            line-height: 1.35;
           }
           .giveaway-timer__row {
-            gap: 4px;
-          }
-          .giveaway-timeblock > div {
-            width: 64px;
-            height: 74px;
-            border-radius: 14px;
-          }
-          .giveaway-timeblock .tabular-nums {
-            font-size: 26px;
-          }
-          .giveaway-timeblock__unit {
-            margin-top: 8px;
-            font-size: 9px;
-            letter-spacing: 0.13em;
+            gap: 3px;
+            justify-content: center;
           }
         }
       `}</style>
