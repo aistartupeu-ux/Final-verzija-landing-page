@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { arePromoLandingPagesEnabled } from "@/lib/promo-landing-pages";
+import { appendGiveawayToSheet } from "@/lib/leads-sheet";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = supabaseUrl && supabaseKey
+  ? createClient(supabaseUrl, supabaseKey)
+  : null;
 
 export async function POST(req: NextRequest) {
   if (!arePromoLandingPagesEnabled()) {
@@ -16,6 +24,9 @@ export async function POST(req: NextRequest) {
 
   const incoming = body as Record<string, unknown>;
   const hasText = (v: unknown): v is string => typeof v === "string" && v.trim().length > 0;
+  const email = hasText(incoming.email) ? incoming.email.trim().toLowerCase() : "";
+  const phone = hasText(incoming.phone) ? incoming.phone : "";
+  const name = hasText(incoming.name) ? incoming.name : "";
 
   const payload = {
     ...incoming,
@@ -26,6 +37,7 @@ export async function POST(req: NextRequest) {
     utm_source: hasText(incoming.utm_source) ? incoming.utm_source : "giveaway",
     utm_medium: hasText(incoming.utm_medium) ? incoming.utm_medium : "organic",
     utm_campaign: hasText(incoming.utm_campaign) ? incoming.utm_campaign : "giveaway_ref",
+    skip_leads_source_sheet: true,
   };
 
   const res = await fetch(target, {
@@ -35,7 +47,69 @@ export async function POST(req: NextRequest) {
     next: { revalidate: 0 },
   });
 
-  const out = await res.json().catch(() => ({}));
+  const out = (await res.json().catch(() => ({}))) as { duplicate?: boolean };
+
+  if (res.ok) {
+    if (supabase && email) {
+      try {
+        const { data: existingGw } = await supabase
+          .from("giveaway_leads")
+          .select("id, repeat_count")
+          .ilike("email", email)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingGw?.id) {
+          await supabase
+            .from("giveaway_leads")
+            .update({
+              phone: phone || null,
+              name: name || null,
+              source_tag: "giveaway",
+              utm_source: String(payload.utm_source ?? ""),
+              utm_medium: String(payload.utm_medium ?? ""),
+              utm_campaign: String(payload.utm_campaign ?? ""),
+              repeat_count: Number(existingGw.repeat_count ?? 0) + 1,
+              last_submitted_at: new Date().toISOString(),
+            })
+            .eq("id", existingGw.id);
+        } else {
+          await supabase.from("giveaway_leads").insert({
+            email,
+            phone: phone || null,
+            name: name || null,
+            source_tag: "giveaway",
+            utm_source: String(payload.utm_source ?? ""),
+            utm_medium: String(payload.utm_medium ?? ""),
+            utm_campaign: String(payload.utm_campaign ?? ""),
+            repeat_count: 0,
+            first_submitted_at: new Date().toISOString(),
+            last_submitted_at: new Date().toISOString(),
+          });
+        }
+      } catch (e) {
+        console.error("Giveaway Supabase write error:", e);
+      }
+    }
+
+    try {
+      await appendGiveawayToSheet({
+        date: new Date().toISOString(),
+        email,
+        phone,
+        name,
+        source_tag: "giveaway",
+        utm_source: String(payload.utm_source ?? ""),
+        utm_medium: String(payload.utm_medium ?? ""),
+        utm_campaign: String(payload.utm_campaign ?? ""),
+        affiliate_code: "",
+        status: out.duplicate ? "repeat" : "new",
+      });
+    } catch (e) {
+      console.error("Giveaway sheet write error:", e);
+    }
+  }
+
   return NextResponse.json(out, { status: res.status });
 }
 

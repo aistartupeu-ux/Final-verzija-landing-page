@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
       utm_campaign,
       affiliate_code: bodyAffiliate,
       source_tag,
+      skip_leads_source_sheet,
     } = body;
     const name = typeof body?.name === "string" ? body.name.trim() : null;
 
@@ -254,8 +255,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Leads by Source Sheet: webhook za Meta / affiliate tracking
+    const shouldWriteLeadsSource = !Boolean(skip_leads_source_sheet);
     const leadsSourceWebhook = process.env.LEADS_SOURCE_WEBHOOK_URL;
-    if (leadsSourceWebhook) {
+    if (shouldWriteLeadsSource && leadsSourceWebhook) {
       const payload = {
         date: new Date().toISOString(),
         email: emailNorm,
@@ -298,10 +300,12 @@ export async function POST(req: NextRequest) {
       affiliate_code: affiliateCode ?? "",
     };
     // Na Vercel-u moramo await — inače funkcija se ugasi pre nego Sheet upis stigne.
-    try {
-      await appendLeadsToSheet(row);
-    } catch (e) {
-      console.error("Leads Sheet append error:", e);
+    if (shouldWriteLeadsSource) {
+      try {
+        await appendLeadsToSheet(row);
+      } catch (e) {
+        console.error("Leads Sheet append error:", e);
+      }
     }
 
     // HighLevel: pošalji lead u jedan workflow (welcome + affiliate logika)

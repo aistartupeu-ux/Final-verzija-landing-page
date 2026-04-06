@@ -22,6 +22,19 @@ export type LeadsSourceRow = {
   affiliate_code: string;
 };
 
+export type GiveawaySheetRow = {
+  date: string;
+  email: string;
+  phone: string;
+  name: string;
+  source_tag: string;
+  utm_source: string;
+  utm_medium: string;
+  utm_campaign: string;
+  affiliate_code: string;
+  status: string;
+};
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
 const DATE_DMY = /^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})$/; // DD.MM.YYYY, DD-MM-YYYY
@@ -189,6 +202,60 @@ export async function appendLeadsToSheet(row: LeadsSourceRow): Promise<boolean> 
   }
 }
 
+/** Direktan upis u odvojeni giveaway tab (npr. "GW"). */
+export async function appendGiveawayToSheet(row: GiveawaySheetRow): Promise<boolean> {
+  const sheetId = process.env.GIVEAWAY_SHEET_ID || process.env.LEADS_SHEET_ID;
+  const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (!sheetId || !json) {
+    if (!sheetId) console.error("Giveaway Sheet: GIVEAWAY_SHEET_ID/LEADS_SHEET_ID env nije postavljen");
+    if (!json) console.error("Giveaway Sheet: GOOGLE_SERVICE_ACCOUNT_JSON env nije postavljen");
+    return false;
+  }
+
+  try {
+    const creds = JSON.parse(json) as { client_email?: string; private_key?: string };
+    if (!creds.client_email || !creds.private_key) {
+      console.error("Giveaway Sheet: missing client_email or private_key in JSON");
+      return false;
+    }
+    const privateKey = String(creds.private_key).replace(/\\n/g, "\n");
+    const credentials = { ...creds, private_key: privateKey };
+
+    const auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    });
+    const sheets = google.sheets({ version: "v4", auth });
+
+    const sheetName = process.env.GIVEAWAY_SHEET_NAME || "GW";
+    const values = [[
+      row.date,
+      row.email,
+      row.phone,
+      row.name,
+      row.source_tag,
+      row.utm_source,
+      row.utm_medium,
+      row.utm_campaign,
+      row.affiliate_code,
+      row.status,
+    ]];
+    const range = `'${sheetName}'!A:J`;
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: sheetId,
+      range,
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values },
+    });
+    return true;
+  } catch (e) {
+    const err = e as { message?: string };
+    console.error("Giveaway Sheet append error:", err?.message ?? e);
+    return false;
+  }
+}
+
 /** Čita sve leadove iz Sheet-a. Podržava varijabilnu strukturu redova (form, Make, Meta Lead Ads). */
 export async function getLeadsFromSheet(): Promise<LeadsSourceRow[]> {
   const sheetId = process.env.LEADS_SHEET_ID;
@@ -229,14 +296,25 @@ export async function getLeadsFromSheet(): Promise<LeadsSourceRow[]> {
   }
 }
 
+export type LeadsSheetPhoneExtras = {
+  ai_experience?: string;
+  survey_q1?: string;
+  survey_q2?: string;
+  survey_q3?: string;
+  survey_q4?: string;
+  survey_q5?: string;
+};
+
 /**
  * Ažurira kolonu C (telefon), opciono D (ime) za red čiji je email u koloni B — bez novog reda (Leads by Source).
+ * Opciono J–O: ai_experience + anketa (dodaj zaglavlja u Sheet ako koristiš).
  * Traži odozgo; ako ima duplikata emaila, ažurira prvi pogodak.
  */
 export async function updateLeadsSheetPhoneByEmail(
   email: string,
   phone: string,
-  name?: string
+  name?: string,
+  extras?: LeadsSheetPhoneExtras
 ): Promise<boolean> {
   const sheetId = process.env.LEADS_SHEET_ID;
   const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -284,6 +362,28 @@ export async function updateLeadsSheetPhoneByEmail(
     ];
     if (nameTrim) {
       data.push({ range: `'${sheetName}'!D${sheetRow}`, values: [[nameTrim]] });
+    }
+    const x = extras;
+    if (x) {
+      const clip = (s: string, max: number) => (s.length > max ? s.slice(0, max) : s);
+      if (x.ai_experience?.trim()) {
+        data.push({ range: `'${sheetName}'!J${sheetRow}`, values: [[clip(x.ai_experience.trim(), 500)]] });
+      }
+      if (x.survey_q1?.trim()) {
+        data.push({ range: `'${sheetName}'!K${sheetRow}`, values: [[clip(x.survey_q1.trim(), 300)]] });
+      }
+      if (x.survey_q2?.trim()) {
+        data.push({ range: `'${sheetName}'!L${sheetRow}`, values: [[clip(x.survey_q2.trim(), 1000)]] });
+      }
+      if (x.survey_q3?.trim()) {
+        data.push({ range: `'${sheetName}'!M${sheetRow}`, values: [[clip(x.survey_q3.trim(), 300)]] });
+      }
+      if (x.survey_q4?.trim()) {
+        data.push({ range: `'${sheetName}'!N${sheetRow}`, values: [[clip(x.survey_q4.trim(), 200)]] });
+      }
+      if (x.survey_q5?.trim()) {
+        data.push({ range: `'${sheetName}'!O${sheetRow}`, values: [[clip(x.survey_q5.trim(), 200)]] });
+      }
     }
     await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: sheetId,
