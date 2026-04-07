@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     source_tag: "giveaway",
     utm_source: hasText(incoming.utm_source) ? incoming.utm_source : "giveaway",
     utm_medium: hasText(incoming.utm_medium) ? incoming.utm_medium : "organic",
-    utm_campaign: hasText(incoming.utm_campaign) ? incoming.utm_campaign : "giveaway_ref",
+    utm_campaign: hasText(incoming.utm_campaign) ? incoming.utm_campaign : null,
     skip_leads_source_sheet: true,
     skip_ghl_webhook: true,
   };

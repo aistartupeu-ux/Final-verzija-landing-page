@@ -87,7 +87,7 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
           phone: skipPhone || !phone ? null : phone,
           utm_source: sourceData.utm_source,
           utm_medium: sourceData.utm_medium,
-          utm_campaign: sourceData.utm_campaign ?? "giveaway_5_mesta",
+          utm_campaign: sourceData.utm_campaign ?? null,
           affiliate_code: null,
           source_tag: "giveaway",
           event_id: eventId,
