@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Script from "next/script";
 import { LANDING_CHANNEL_STORAGE_KEY } from "@/lib/landing-attribution";
 import { peekStoredLeadLandingChannel } from "@/lib/tiktok-datalayer";
@@ -34,9 +34,7 @@ function resolvePixelChannel(pathname: string): "meta" | "tiktok" {
 
 export default function TrackingScripts() {
   const pathname = usePathname() ?? "";
-  const searchParams = useSearchParams();
   const [channel, setChannel] = useState<"meta" | "tiktok" | null>(null);
-  const pagePath = `${pathname}${searchParams?.toString() ? `?${searchParams.toString()}` : ""}`;
 
   useEffect(() => {
     setChannel(resolvePixelChannel(pathname));
@@ -48,12 +46,13 @@ export default function TrackingScripts() {
       gtag?: (...args: unknown[]) => void;
     };
     if (typeof w.gtag !== "function") return;
+    const pagePath = `${pathname}${window.location.search ?? ""}`;
     w.gtag("config", GA_MEASUREMENT_ID, {
       page_path: pagePath,
       page_location: window.location.href,
       page_title: document.title,
     });
-  }, [pagePath]);
+  }, [pathname]);
 
   const metaPixelId = META_PIXEL_ID;
   const gtmId = GTM_ID;
