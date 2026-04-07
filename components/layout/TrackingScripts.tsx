@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import Script from "next/script";
 import { LANDING_CHANNEL_STORAGE_KEY } from "@/lib/landing-attribution";
 import { peekStoredLeadLandingChannel } from "@/lib/tiktok-datalayer";
@@ -13,6 +13,7 @@ import { peekStoredLeadLandingChannel } from "@/lib/tiktok-datalayer";
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "2347723352398323";
 const TIKTOK_PIXEL_ID = process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID || "D6TSA9RC77UB4ENA7F70";
 const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID || "GTM-NCH883PC";
+const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "";
 
 function resolvePixelChannel(pathname: string): "meta" | "tiktok" {
   if (pathname.startsWith("/tiktok")) return "tiktok";
@@ -33,15 +34,31 @@ function resolvePixelChannel(pathname: string): "meta" | "tiktok" {
 
 export default function TrackingScripts() {
   const pathname = usePathname() ?? "";
+  const searchParams = useSearchParams();
   const [channel, setChannel] = useState<"meta" | "tiktok" | null>(null);
+  const pagePath = `${pathname}${searchParams?.toString() ? `?${searchParams.toString()}` : ""}`;
 
   useEffect(() => {
     setChannel(resolvePixelChannel(pathname));
   }, [pathname]);
 
+  useEffect(() => {
+    if (!GA_MEASUREMENT_ID || typeof window === "undefined") return;
+    const w = window as Window & {
+      gtag?: (...args: unknown[]) => void;
+    };
+    if (typeof w.gtag !== "function") return;
+    w.gtag("config", GA_MEASUREMENT_ID, {
+      page_path: pagePath,
+      page_location: window.location.href,
+      page_title: document.title,
+    });
+  }, [pagePath]);
+
   const metaPixelId = META_PIXEL_ID;
   const gtmId = GTM_ID;
   const tiktokPixelId = TIKTOK_PIXEL_ID;
+  const gaMeasurementId = GA_MEASUREMENT_ID;
 
   if (channel === null) return null;
 
@@ -64,6 +81,24 @@ export default function TrackingScripts() {
 
   return (
     <>
+      {gaMeasurementId && (
+        <>
+          <Script
+            id="ga4-src"
+            src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
+            strategy="afterInteractive"
+          />
+          <Script id="ga4-init" strategy="afterInteractive">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              window.gtag = window.gtag || gtag;
+              window.gtag('js', new Date());
+              window.gtag('config', '${gaMeasurementId}', { send_page_view: false });
+            `}
+          </Script>
+        </>
+      )}
       {metaPixelId && (
         <>
           <Script id="meta-pixel" strategy="lazyOnload">
