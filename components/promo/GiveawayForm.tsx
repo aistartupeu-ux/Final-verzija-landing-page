@@ -264,13 +264,24 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
         .gf-arrow-run{display:inline-grid;animation:gfArrowRun .8s ease-in-out infinite}
         @media(max-width:640px){.gf-email-row::before,.gf-email-row::after{display:none}.gf-email-row{flex-direction:column;border-radius:16px;gap:10px;overflow:visible}.gf-email-btn,.gf-email-btn--gold{border-radius:12px !important;width:100%;min-height:48px;padding:14px 20px;font-size:12px;letter-spacing:0.08em}}
         .gf-email-input{font-family:Montserrat, var(--font-inter), Inter, system-ui, -apple-system, sans-serif;font-weight:600}
-        .gf-email-input::placeholder{color:rgba(255,255,255,0.88);font-weight:600}
+        .gf-email-input::placeholder{color:#000000;font-weight:600}
+        .gf-email-hint{
+          text-align:center;
+          color:#ffffff;
+          font-weight:700;
+          font-size:clamp(14px,1.8vw,16px);
+          line-height:1.35;
+          margin:0 0 12px;
+          text-shadow:0 0 16px rgba(0,212,255,0.2);
+        }
         @media(max-width:640px){
           .gf-email-shell{border-radius:16px}
           .gf-email-input{font-size:16px!important;min-height:48px;padding:14px 40px 14px 16px!important}
+          .gf-email-hint{font-size:14px;margin-bottom:10px}
         }
       `}</style>
       <form onSubmit={submitEmail} style={{ maxWidth: 520, margin: "0 auto" }}>
+        <p className="gf-email-hint">👇 Upiši svoj mail da učesvuješ u Nagradnoj Igri</p>
         <div className="gf-email-shell">
           <div
             className="gf-email-row"
@@ -287,7 +298,18 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
               transition: "border-color 0.3s ease, box-shadow 0.3s ease",
             }}
           >
-            <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", position: "relative" }}>
+            <div
+              style={{
+                flex: 1,
+                minWidth: 0,
+                display: "flex",
+                alignItems: "center",
+                position: "relative",
+                background: "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,248,255,0.96))",
+                borderRight: "1px solid rgba(0,212,255,0.22)",
+                boxShadow: "inset 0 0 0 1px rgba(0,212,255,0.22), inset 0 8px 18px rgba(255,255,255,0.35)",
+              }}
+            >
               <input
                 type="email"
                 value={email}
@@ -300,7 +322,7 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
                 }}
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
-                placeholder="Unesi svoj email"
+                placeholder="Unesi svoj mail"
                 autoComplete="email"
                 inputMode="email"
                 required
@@ -309,10 +331,10 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
                   flex: 1,
                   minWidth: 0,
                   padding: "16px 44px 16px 20px",
-                  background: "transparent",
+                  background: "rgba(255,255,255,0.94)",
                   border: "none",
                   outline: "none",
-                  color: "#fff",
+                  color: "#0b1020",
                   fontSize: 15,
                   width: "100%",
                 }}

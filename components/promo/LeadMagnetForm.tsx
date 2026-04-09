@@ -142,6 +142,7 @@ export default function LeadMagnetForm() {
         .lm-row{display:flex;align-items:stretch;border-radius:50px;overflow:hidden}
         .lm-btn{padding:16px 22px;background:linear-gradient(135deg,#a855f7 0%,#7c3aed 100%);border:none;cursor:pointer;color:#050508;font-weight:800;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-family:inherit;transition:all 0.3s ease;flex-shrink:0}
         .lm-btn:disabled{opacity:0.6;cursor:not-allowed}
+        .lm-input::placeholder{color:#000;opacity:1;font-weight:600}
         @media(max-width:480px){.lm-row{flex-direction:column;border-radius:16px;gap:8px;overflow:visible}.lm-btn{border-radius:12px !important;width:100%;padding:14px 20px}}
       `}</style>
       <div
@@ -155,7 +156,17 @@ export default function LeadMagnetForm() {
           transition: "border-color 0.3s ease, box-shadow 0.3s ease",
         }}
       >
-        <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", position: "relative" }}>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            alignItems: "center",
+            position: "relative",
+            background: "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,248,255,0.96))",
+            borderRight: "1px solid rgba(168,85,247,0.2)",
+          }}
+        >
           <input
             type="email"
             value={email}
@@ -169,14 +180,15 @@ export default function LeadMagnetForm() {
             autoComplete="email"
             inputMode="email"
             required
+            className="lm-input"
             style={{
               flex: 1,
               minWidth: 0,
               padding: "16px 44px 16px 20px",
-              background: "transparent",
+              background: "rgba(255,255,255,0.94)",
               border: "none",
               outline: "none",
-              color: "#fff",
+              color: "#0b1020",
               fontSize: 15,
               fontFamily: "inherit",
               width: "100%",

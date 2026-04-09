@@ -203,6 +203,7 @@ function LeadForm({ onSuccess }: { onSuccess: () => void }) {
       <style>{`
         @keyframes lm-free-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .lm-free-row { display: flex; align-items: stretch; border-radius: 50px; overflow: hidden; }
+        .lm-free-input::placeholder { color: #000; opacity: 1; font-weight: 600; }
         .lm-free-btn {
           padding: 16px 22px;
           background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
@@ -254,7 +255,16 @@ function LeadForm({ onSuccess }: { onSuccess: () => void }) {
           transition: "border-color 0.3s ease, box-shadow 0.3s ease",
         }}
       >
-        <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center" }}>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            alignItems: "center",
+            background: "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,248,255,0.96))",
+            borderRight: "1px solid rgba(168,85,247,0.2)",
+          }}
+        >
           <input
             type="email"
             required
@@ -269,14 +279,15 @@ function LeadForm({ onSuccess }: { onSuccess: () => void }) {
             placeholder="Unesi svoj email"
             autoComplete="email"
             inputMode="email"
+            className="lm-free-input"
             style={{
               flex: 1,
               minWidth: 0,
               padding: "16px 20px",
-              background: "transparent",
+              background: "rgba(255,255,255,0.94)",
               border: "none",
               outline: "none",
-              color: "#fff",
+              color: "#0b1020",
               fontSize: 15,
               fontFamily: "inherit",
               width: "100%",
