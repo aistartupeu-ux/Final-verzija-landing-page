@@ -159,7 +159,168 @@ type MetaCampaignCpl = {
   blendedCpl: number | null;
 };
 
+type TrafficPoint = {
+  date: string;
+  traffic: number;
+  conversions: number;
+  conversionRate: number;
+};
+
+type GoogleTrafficPayload = {
+  configured: boolean;
+  from: string;
+  to: string;
+  points: TrafficPoint[];
+  totals: {
+    traffic: number;
+    conversions: number;
+    conversionRate: number;
+  };
+};
+
 const ADMIN_LEADS_INITIAL_DELAY_MS = 5000;
+const BELGRADE_YMD = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Belgrade",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function getBelgradeTodayYmd(): string {
+  return BELGRADE_YMD.format(new Date());
+}
+
+function subtractDaysYmd(ymd: string, days: number): string {
+  const d = new Date(`${ymd}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+function TrafficVsLeadsChart({ points }: { points: TrafficPoint[] }) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const width = 900;
+  const height = 280;
+  const padTop = 22;
+  const padBottom = 44;
+  const padLeft = 14;
+  const padRight = 14;
+  const innerW = width - padLeft - padRight;
+  const innerH = height - padTop - padBottom;
+  const maxValue = Math.max(
+    1,
+    ...points.map((p) => Math.max(p.traffic, p.conversions))
+  );
+  const stepX = points.length > 1 ? innerW / (points.length - 1) : 0;
+  const y = (value: number) => padTop + innerH - (value / maxValue) * innerH;
+  const x = (idx: number) => padLeft + idx * stepX;
+  const makePolyline = (values: number[]) =>
+    values.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+  const makeArea = (values: number[]) =>
+    `${padLeft},${padTop + innerH} ${values.map((v, i) => `${x(i)},${y(v)}`).join(" ")} ${padLeft + innerW},${padTop + innerH}`;
+  const xTicks =
+    points.length <= 10
+      ? points.map((_, i) => i)
+      : points
+          .map((_, i) => i)
+          .filter((i) => i === 0 || i === points.length - 1 || i % Math.ceil(points.length / 8) === 0);
+  const hovered = hoveredIdx != null ? points[hoveredIdx] : null;
+  const hoveredX = hoveredIdx != null ? x(hoveredIdx) : null;
+  const hoveredTrafficY = hovered ? y(hovered.traffic) : null;
+  const hoveredConversionsY = hovered ? y(hovered.conversions) : null;
+  const bandWidth = points.length > 1 ? innerW / points.length : innerW;
+
+  return (
+    <div className="admin-traffic-chart-wrap">
+      <svg viewBox={`0 0 ${width} ${height}`} className="admin-traffic-chart" role="img" aria-label="Traffic i konverzije po danu">
+        <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + innerH} stroke="rgba(255,255,255,0.16)" strokeWidth="1" />
+        <line x1={padLeft} y1={padTop + innerH} x2={padLeft + innerW} y2={padTop + innerH} stroke="rgba(255,255,255,0.16)" strokeWidth="1" />
+        <defs>
+          <linearGradient id="trafficArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#00d4ff" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#00d4ff" stopOpacity="0.02" />
+          </linearGradient>
+          <linearGradient id="convArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#22c55e" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="#22c55e" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+
+        <polygon
+          points={makeArea(points.map((p) => p.traffic))}
+          fill="url(#trafficArea)"
+        />
+        <polygon
+          points={makeArea(points.map((p) => p.conversions))}
+          fill="url(#convArea)"
+        />
+
+        <polyline
+          fill="none"
+          stroke="#00d4ff"
+          strokeWidth="2.5"
+          points={makePolyline(points.map((p) => p.traffic))}
+        />
+        <polyline
+          fill="none"
+          stroke="#22c55e"
+          strokeWidth="2.5"
+          points={makePolyline(points.map((p) => p.conversions))}
+        />
+
+        {points.map((point, idx) => (
+          <rect
+            key={`hit-band-${point.date}`}
+            x={Math.max(padLeft, x(idx) - bandWidth / 2)}
+            y={padTop}
+            width={Math.max(1, bandWidth)}
+            height={innerH}
+            fill="transparent"
+            onMouseEnter={() => setHoveredIdx(idx)}
+            onMouseLeave={() => setHoveredIdx(null)}
+          />
+        ))}
+
+        {hovered && hoveredX != null && hoveredTrafficY != null && hoveredConversionsY != null && (
+          <>
+            <line
+              x1={hoveredX}
+              y1={padTop}
+              x2={hoveredX}
+              y2={padTop + innerH}
+              stroke="rgba(255,255,255,0.18)"
+              strokeDasharray="4 4"
+            />
+            <circle cx={hoveredX} cy={hoveredTrafficY} r="4" fill="#00d4ff" />
+            <circle cx={hoveredX} cy={hoveredConversionsY} r="4" fill="#22c55e" />
+          </>
+        )}
+
+        {xTicks.map((idx) => (
+          <text
+            key={idx}
+            x={x(idx)}
+            y={height - 14}
+            textAnchor={idx === 0 ? "start" : idx === points.length - 1 ? "end" : "middle"}
+            fill="#777"
+            fontSize="11"
+          >
+            {points[idx].date.slice(5)}
+          </text>
+        ))}
+      </svg>
+      {hovered ? (
+        <div className="admin-traffic-tooltip">
+          <span className="admin-traffic-tooltip-date">{hovered.date}</span>
+          <span><i style={{ background: "#00d4ff" }} />Traffic: {hovered.traffic}</span>
+          <span><i style={{ background: "#22c55e" }} />Konverzije: {hovered.conversions}</span>
+          <span>CVR: {hovered.conversionRate.toFixed(2)}%</span>
+        </div>
+      ) : (
+        <div className="admin-traffic-tooltip-placeholder">Pređi mišem preko linije za detalje po datumu.</div>
+      )}
+    </div>
+  );
+}
 
 export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }) {
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -168,6 +329,8 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   const [error, setError] = useState<string | null>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [graphFrom, setGraphFrom] = useState("");
+  const [graphTo, setGraphTo] = useState("");
   const [metaAds, setMetaAds] = useState<{
     configured?: boolean;
     instagram: { spend: number; leads: number; cpl: number | null };
@@ -194,21 +357,46 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   } | null>(null);
   const [tiktokSpend, setTiktokSpend] = useState("");
   const [todayData, setTodayData] = useState<AnalyticsData | null>(null);
+  const [googleTraffic, setGoogleTraffic] = useState<GoogleTrafficPayload | null>(null);
+  const [googleTrafficError, setGoogleTrafficError] = useState<string | null>(null);
+  const [selectedRange, setSelectedRange] = useState<"2d" | "3d" | "7d" | "30d" | "custom">("custom");
+  const [liveMode, setLiveMode] = useState<"off" | "30s" | "90s" | "live_today">("30s");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const now = new Date();
-    const todayYmd = now.toISOString().slice(0, 10);
+    const todayYmd = getBelgradeTodayYmd();
     if (legacy) {
       // Stari prikaz: ceo opseg do preseka — ne samo tekući mesec (inače „prethodni” meseci nestanu).
       setFrom((f) => f || "2020-01-01");
       setTo((t) => t || todayYmd);
+      setGraphFrom((f) => f || subtractDaysYmd(todayYmd, 29));
+      setGraphTo((t) => t || todayYmd);
       return;
     }
-    const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
-    setFrom((f) => f || firstDayOfYear.toISOString().slice(0, 10));
+    const from30 = subtractDaysYmd(todayYmd, 29);
+    setFrom((f) => f || from30);
     setTo((t) => t || todayYmd);
+    setGraphFrom((f) => f || from30);
+    setGraphTo((t) => t || todayYmd);
+    setSelectedRange((s) => (s === "custom" ? "30d" : s));
   }, [legacy]);
+
+  const applyRangePreset = useCallback((range: "2d" | "3d" | "7d" | "30d") => {
+    const today = getBelgradeTodayYmd();
+    const days = range === "2d" ? 2 : range === "3d" ? 3 : range === "7d" ? 7 : 30;
+    setGraphTo(today);
+    setGraphFrom(subtractDaysYmd(today, days - 1));
+    setSelectedRange(range);
+    setLiveMode("30s");
+  }, []);
+
+  const handleReturnToLive = useCallback(() => {
+    const today = getBelgradeTodayYmd();
+    setGraphTo(today);
+    setGraphFrom(today);
+    setLiveMode("live_today");
+    setSelectedRange("custom");
+  }, []);
 
   const fetchTodayData = useCallback(async () => {
     try {
@@ -292,6 +480,30 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     }
   }, [legacy, from, to, fetchTodayData]);
 
+  const fetchGoogleTraffic = useCallback(async (customFrom?: string, customTo?: string) => {
+    const fromValue = customFrom ?? graphFrom;
+    const toValue = customTo ?? graphTo;
+    if (!fromValue || !toValue) return;
+    setGoogleTrafficError(null);
+    try {
+      const params = new URLSearchParams();
+      params.set("from", fromValue);
+      params.set("to", toValue);
+      const res = await fetch(`/api/admin/google-analytics?${params}`, { credentials: "include" });
+      if (res.status === 401) {
+        redirectToLogin();
+        return;
+      }
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(typeof json?.error === "string" ? json.error : "Greška pri učitavanju Google analitike.");
+      }
+      setGoogleTraffic(json);
+    } catch (e) {
+      setGoogleTrafficError(e instanceof Error ? e.message : "Greška pri učitavanju Google analitike.");
+    }
+  }, [graphFrom, graphTo]);
+
   const handleLogout = async () => {
     try {
       await fetch("/api/admin/logout", { method: "POST", credentials: "include" });
@@ -333,6 +545,15 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     void fetchData();
   }, [from, to, fetchData]);
 
+  const lastFetchedGraphRangeRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!graphFrom || !graphTo) return;
+    const key = `${graphFrom}|${graphTo}`;
+    if (lastFetchedGraphRangeRef.current === key) return;
+    lastFetchedGraphRangeRef.current = key;
+    void fetchGoogleTraffic();
+  }, [graphFrom, graphTo, fetchGoogleTraffic]);
+
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (legacy || !data) return;
@@ -347,6 +568,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
           if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
           fetchDebounceRef.current = setTimeout(() => {
             fetchData(true);
+            fetchGoogleTraffic();
             fetchDebounceRef.current = null;
           }, 2500);
         }
@@ -356,15 +578,29 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
         client.removeChannel(ch);
       };
     }
-  }, [legacy, data, fetchData]);
+  }, [legacy, data, fetchData, fetchGoogleTraffic]);
 
   useEffect(() => {
-    if (legacy || !data) return;
-    const id = setInterval(() => fetchData(true), 90_000);
+    if (legacy || !data || liveMode === "off") return;
+    const refreshMs = liveMode === "90s" ? 90_000 : 30_000;
+    const id = setInterval(() => {
+      if (liveMode === "live_today") {
+        const today = getBelgradeTodayYmd();
+        setGraphFrom(today);
+        setGraphTo(today);
+        fetchGoogleTraffic(today, today);
+      } else {
+        fetchGoogleTraffic();
+      }
+      fetchData(true);
+    }, refreshMs);
     return () => clearInterval(id);
-  }, [legacy, data, fetchData]);
+  }, [legacy, data, fetchData, fetchGoogleTraffic, liveMode]);
 
-  const handleRefresh = () => fetchData();
+  const handleRefresh = () => {
+    fetchData();
+    fetchGoogleTraffic();
+  };
   const handleCountdownReset = useCallback(() => {
     void fetchTodayData();
   }, [fetchTodayData]);
@@ -605,6 +841,101 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
             </div>
 
             <div style={{ marginBottom: 28 }}>
+              <div className="admin-graph-toolbar">
+                <div className="admin-period-row">
+                  <span className="admin-period-label">Graph period:</span>
+                  <input
+                    type="date"
+                    value={graphFrom}
+                    onChange={(e) => {
+                      setGraphFrom(e.target.value);
+                      setSelectedRange("custom");
+                      if (liveMode === "live_today") setLiveMode("30s");
+                    }}
+                    className="admin-date-input"
+                  />
+                  <span style={{ color: "#555" }}>—</span>
+                  <input
+                    type="date"
+                    value={graphTo}
+                    onChange={(e) => {
+                      setGraphTo(e.target.value);
+                      setSelectedRange("custom");
+                      if (liveMode === "live_today") setLiveMode("30s");
+                    }}
+                    className="admin-date-input"
+                  />
+                </div>
+                <div className="admin-range-row">
+                  <button type="button" className={`admin-range-btn ${selectedRange === "2d" ? "active" : ""}`} onClick={() => applyRangePreset("2d")}>2d</button>
+                  <button type="button" className={`admin-range-btn ${selectedRange === "3d" ? "active" : ""}`} onClick={() => applyRangePreset("3d")}>3d</button>
+                  <button type="button" className={`admin-range-btn ${selectedRange === "7d" ? "active" : ""}`} onClick={() => applyRangePreset("7d")}>7d</button>
+                  <button type="button" className={`admin-range-btn ${selectedRange === "30d" ? "active" : ""}`} onClick={() => applyRangePreset("30d")}>30d</button>
+                  <button type="button" className="admin-range-btn admin-range-btn-live" onClick={handleReturnToLive}>
+                    Vrati na uzivo
+                  </button>
+                  <label className="admin-live-select-wrap">
+                    Auto osvezavanje:
+                    <select
+                      className="admin-live-select"
+                      value={liveMode}
+                      onChange={(e) => setLiveMode(e.target.value as "off" | "30s" | "90s" | "live_today")}
+                    >
+                      <option value="off">Pauza</option>
+                      <option value="30s">Na 30 sek</option>
+                      <option value="90s">Na 90 sek</option>
+                      <option value="live_today">Uzivo danas</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <div className="admin-graph-help">
+                Izaberi period za graf ili klikni <strong>Vrati na uzivo</strong> da prati poslednje dane i osvezava automatski.
+              </div>
+              <h2 style={{ fontSize: "clamp(16px, 4vw, 18px)", fontWeight: 700, color: "#fff", marginBottom: 14 }}>
+                Traffic vs konverzije (po danu)
+              </h2>
+              <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
+                Plava linija je ukupni dnevni traffic iz Google Analytics (sessions), zelena linija su dnevne konverzije
+                (broj jedinstvenih email leadova). Osvežavanje ide periodično (na ~90s) da ne optereti sajt.
+              </p>
+
+              {googleTrafficError && (
+                <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444", fontSize: 12 }}>
+                  Google Analytics: {googleTrafficError}
+                </div>
+              )}
+
+              {googleTraffic && googleTraffic.configured === false && (
+                <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "rgba(250,204,21,0.1)", border: "1px solid rgba(250,204,21,0.25)", color: "#facc15", fontSize: 12 }}>
+                  GA nije potpuno podešen. Potrebni su `GA4_PROPERTY_ID` i `GOOGLE_ANALYTICS_SERVICE_ACCOUNT_JSON` (plus Supabase env-ovi).
+                </div>
+              )}
+
+              {!googleTraffic && !googleTrafficError ? (
+                <div style={{ marginBottom: 20, fontSize: 12, color: "#666" }}>
+                  Učitavanje grafikona...
+                </div>
+              ) : googleTraffic && googleTraffic.points.length > 0 ? (
+                <>
+                  <TrafficVsLeadsChart points={googleTraffic.points} />
+                  <div className="admin-traffic-legend">
+                    <span><i style={{ background: "#00d4ff" }} />Traffic: {googleTraffic.totals.traffic}</span>
+                    <span><i style={{ background: "#22c55e" }} />Konverzije: {googleTraffic.totals.conversions}</span>
+                    <span>CVR: {googleTraffic.totals.conversionRate.toFixed(2)}%</span>
+                    <span>
+                      Auto-refresh: {liveMode === "off" ? "off" : liveMode === "live_today" ? "uzivo danas (30s)" : liveMode}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ marginBottom: 20, fontSize: 12, color: "#666" }}>
+                  Nema podataka za odabrani period.
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 28 }}>
               <h2 style={{ fontSize: "clamp(16px, 4vw, 18px)", fontWeight: 700, color: "#fff", marginBottom: 14 }}>Cost per Lead (CPL)</h2>
               <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
                 Meta (kartice ispod): potrošnja iz Ads API, CPL = potrošnja ÷ leadovi <strong style={{ color: "#aaa" }}>sa sajta</strong> (ukupno po
@@ -802,6 +1133,15 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
         .admin-link-back { display: inline-flex; align-items: center; gap: 6px; color: #666; text-decoration: none; font-size: 13px; min-height: 44px; padding: 0 4px; }
         .admin-live-badge { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #22c55e; }
         .admin-period-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .admin-range-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .admin-graph-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; padding: 10px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; background: rgba(255,255,255,0.02); }
+        .admin-range-btn { min-height: 32px; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.03); color: #bbb; font-size: 12px; cursor: pointer; }
+        .admin-range-btn.active { border-color: rgba(0,212,255,0.45); color: #00d4ff; background: rgba(0,212,255,0.1); }
+        .admin-range-btn-live { border-color: rgba(34,197,94,0.4); color: #86efac; background: rgba(34,197,94,0.1); }
+        .admin-live-select-wrap { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #888; }
+        .admin-live-select { min-height: 32px; border-radius: 8px; padding: 4px 8px; background: #f4f4f5; border: 1px solid rgba(255,255,255,0.12); color: #111; font-weight: 600; }
+        .admin-live-select option { color: #111; background: #fff; }
+        .admin-graph-help { font-size: 12px; color: #8a8a8a; margin-bottom: 10px; }
         .admin-period-label { font-size: 12px; color: #555; }
         .admin-period-hint { font-size: 11px; color: #666; max-width: 140px; line-height: 1.3; }
         .admin-date-input { padding: 10px 12px; min-height: 44px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 14px; touch-action: manipulation; }
@@ -833,6 +1173,16 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
         .admin-campaign-table th:first-child, .admin-campaign-table td:first-child { text-align: left; }
         .admin-campaign-table th { color: #888; font-weight: 600; background: rgba(255,255,255,0.03); }
         .admin-campaign-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+        .admin-traffic-chart-wrap { margin-bottom: 12px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); padding: 12px; overflow-x: auto; }
+        .admin-traffic-chart { width: 100%; min-width: 640px; height: auto; display: block; }
+        .admin-traffic-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: #aaa; margin-bottom: 18px; }
+        .admin-traffic-legend span { display: inline-flex; align-items: center; gap: 6px; }
+        .admin-traffic-legend i { width: 10px; height: 10px; border-radius: 99px; display: inline-block; }
+        .admin-traffic-tooltip { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 12px; color: #cfcfcf; padding: 10px 4px 2px; }
+        .admin-traffic-tooltip-date { color: #fff; font-weight: 700; margin-right: 6px; }
+        .admin-traffic-tooltip span { display: inline-flex; align-items: center; gap: 6px; }
+        .admin-traffic-tooltip i { width: 10px; height: 10px; border-radius: 99px; display: inline-block; }
+        .admin-traffic-tooltip-placeholder { font-size: 12px; color: #666; padding: 10px 4px 2px; }
         @media (min-width: 640px) {
           .admin-danas-card { margin-bottom: 24px; padding: 20px; border-radius: 18px; }
           .admin-danas-num { font-size: 36px; }
