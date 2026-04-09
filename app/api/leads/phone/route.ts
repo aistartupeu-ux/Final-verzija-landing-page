@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { updateLeadsSheetPhoneByEmail } from "@/lib/leads-sheet";
 import { THANK_YOU_AI_EXPERIENCE_OPTIONS } from "@/lib/thank-you-ai-experience";
+import {
+  normalizeSurveyGoal,
+  THANK_YOU_SURVEY_Q1_OPTIONS,
+  THANK_YOU_SURVEY_Q3_OPTIONS,
+  THANK_YOU_SURVEY_Q4_OPTIONS,
+  THANK_YOU_SURVEY_Q5_OPTIONS,
+} from "@/lib/thank-you-forum-survey";
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 15;
@@ -61,6 +68,23 @@ export async function PATCH(req: NextRequest) {
     )
       ? aiRaw
       : "";
+    const q1Raw = typeof body?.survey_q1_interest === "string" ? body.survey_q1_interest.trim() : "";
+    const q1 = THANK_YOU_SURVEY_Q1_OPTIONS.includes(q1Raw as (typeof THANK_YOU_SURVEY_Q1_OPTIONS)[number])
+      ? q1Raw
+      : "";
+    const q2 = normalizeSurveyGoal(body?.survey_q2_goal);
+    const q3Raw = typeof body?.survey_q3_blocker === "string" ? body.survey_q3_blocker.trim() : "";
+    const q3 = THANK_YOU_SURVEY_Q3_OPTIONS.includes(q3Raw as (typeof THANK_YOU_SURVEY_Q3_OPTIONS)[number])
+      ? q3Raw
+      : "";
+    const q4Raw = typeof body?.survey_q4_system_apply === "string" ? body.survey_q4_system_apply.trim() : "";
+    const q4 = THANK_YOU_SURVEY_Q4_OPTIONS.includes(q4Raw as (typeof THANK_YOU_SURVEY_Q4_OPTIONS)[number])
+      ? q4Raw
+      : "";
+    const q5Raw = typeof body?.survey_q5_occupation === "string" ? body.survey_q5_occupation.trim() : "";
+    const q5 = THANK_YOU_SURVEY_Q5_OPTIONS.includes(q5Raw as (typeof THANK_YOU_SURVEY_Q5_OPTIONS)[number])
+      ? q5Raw
+      : "";
 
     if (!email || !email.includes("@")) {
       return NextResponse.json({ error: "Invalid email" }, { status: 400 });
@@ -73,6 +97,9 @@ export async function PATCH(req: NextRequest) {
     }
     if (!aiExperience) {
       return NextResponse.json({ error: "Invalid ai_experience" }, { status: 400 });
+    }
+    if (!q1 || !q2 || !q3 || !q4 || !q5) {
+      return NextResponse.json({ error: "Invalid survey answers" }, { status: 400 });
     }
 
     if (!supabase) {
@@ -99,22 +126,16 @@ export async function PATCH(req: NextRequest) {
 
     const fullName = `${firstName} ${lastName}`.trim();
     const baseUpdate = { phone, name: fullName };
-    let updateErr = (
-      await supabase
-        .from("leads")
-        .update({ ...baseUpdate, ai_experience: aiExperience })
-        .eq("id", leadRow.id)
-    ).error;
-
-    if (updateErr) {
-      const hint = updateErr.message.toLowerCase();
-      if (hint.includes("ai_experience") || hint.includes("column") || hint.includes("schema")) {
-        updateErr = (await supabase.from("leads").update(baseUpdate).eq("id", leadRow.id)).error;
-        if (!updateErr) {
-          console.warn("leads.ai_experience kolona nedostaje — upisano phone+name; pokreni supabase-leads-ai-experience-migration.sql");
-        }
-      }
-    }
+    const surveyUpdate = {
+      survey_q1_interest: q1,
+      survey_q2_goal: q2,
+      survey_q3_blocker: q3,
+      survey_q4_system_apply: q4,
+      survey_q5_occupation: q5,
+    };
+    const withAi = { ...baseUpdate, ai_experience: aiExperience };
+    const fullUpdate = { ...withAi, ...surveyUpdate };
+    const { error: updateErr } = await supabase.from("leads").update(fullUpdate).eq("id", leadRow.id);
 
     if (updateErr) {
       console.error("Supabase phone update error:", updateErr.message);
@@ -122,7 +143,14 @@ export async function PATCH(req: NextRequest) {
     }
 
     try {
-      await updateLeadsSheetPhoneByEmail(emailNorm, phone, fullName);
+      await updateLeadsSheetPhoneByEmail(emailNorm, phone, fullName, {
+        ai_experience: aiExperience,
+        survey_q1: q1,
+        survey_q2: q2,
+        survey_q3: q3,
+        survey_q4: q4,
+        survey_q5: q5,
+      });
     } catch (e) {
       console.error("Sheet phone update:", e);
     }
@@ -144,6 +172,11 @@ export async function PATCH(req: NextRequest) {
               name: fullName,
               phone,
               ai_experience: aiExperience,
+              survey_q1_interest: q1,
+              survey_q2_goal: q2,
+              survey_q3_blocker: q3,
+              survey_q4_system_apply: q4,
+              survey_q5_occupation: q5,
               source: affiliateCode ? "affiliate" : "AI Hype Academy",
               affiliate_code: affiliateCode,
               city: leadRow.city ?? "",
