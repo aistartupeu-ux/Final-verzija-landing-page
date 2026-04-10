@@ -12,16 +12,8 @@ import { landingChannelFromPathname } from "@/lib/landing-attribution";
 
 const CONFIG = {
   formAction: "/api/lead-magnet",
-  guideName: "AI Starter Kit",
-  guidePages: "32",
-  guideFormat: "PDF",
   // TODO: zameni sa pravim URL-om kad odlučiš (download ili redirect)
   downloadUrl: "#",
-  socialLinks: {
-    instagram: "https://www.instagram.com/aihype.official?igsh=MTBrbWp1Y3V5NDBwMA==",
-    tiktok: "https://www.tiktok.com/@ai.hype.akademija?_r=1&_t=ZN-94bDDZdy9Sw",
-    youtube: "https://youtube.com/@aihypeacademy",
-  },
 } as const;
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -89,7 +81,14 @@ const LM_STYLES = `
     will-change: transform;
   }
 
-  .lm-row { display: flex; align-items: stretch; border-radius: 50px; overflow: hidden; }
+  .lm-page-root {
+    overflow-x: hidden;
+    max-width: 100vw;
+    touch-action: pan-y;
+    overscroll-behavior-x: none;
+  }
+  .lm-row { display: flex; align-items: stretch; border-radius: 50px; overflow: hidden; max-width: 100%; }
+  .lm-input-wrap { flex: 1; min-width: 0; display: flex; align-items: center; background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,248,255,0.96)); border-right: 1px solid rgba(168,85,247,0.2); }
   .lm-input::placeholder { color: #000; opacity: 1; font-weight: 600; }
   .lm-btn {
     padding: 16px 24px;
@@ -106,6 +105,40 @@ const LM_STYLES = `
   }
   .lm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  /* Lista: jasan razmak gore/dole (padding sprečava margin-collapse na mobile) */
+  .lm-bullets-wrap {
+    padding-top: 1.75rem;
+    padding-bottom: 1.75rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  @media (min-width: 641px) {
+    .lm-bullets-wrap {
+      padding-top: 2.25rem;
+      padding-bottom: 2.25rem;
+      margin-top: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+  }
+  .lm-bullets-wrap ul {
+    list-style-position: outside;
+    padding-left: 1.35rem;
+  }
+  .lm-bullets-wrap li {
+    margin-bottom: 0.65rem;
+    padding-left: 0.35rem;
+  }
+  .lm-bullets-wrap li:last-child { margin-bottom: 0; }
+  .lm-bullets-wrap ul li::marker {
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  /* Email polje: iOS / touch */
+  .lm-input {
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+  }
+
   @media (max-width: 640px) {
     .lm-wrap {
       max-width: 560px !important;
@@ -116,28 +149,42 @@ const LM_STYLES = `
       padding-left: 16px !important;
       padding-right: 16px !important;
       padding-bottom: 24px !important;
+      overflow-x: hidden !important;
     }
     .lm-shell {
       border-radius: 20px !important;
       padding: 20px 16px 20px !important;
+      overflow-x: hidden !important;
     }
     .lm-copy {
-      padding-left: 8px !important;
-      padding-right: 8px !important;
+      padding-left: 10px !important;
+      padding-right: 10px !important;
     }
     .lm-copy ul {
-      padding-left: 1.45rem !important;
-    }
-    .lm-copy li {
-      margin-bottom: 6px !important;
+      padding-left: 1.5rem !important;
     }
     .lm-copy p {
       line-height: 1.65 !important;
     }
+    .lm-form { width: 100% !important; max-width: 100% !important; padding-left: 0; padding-right: 0; box-sizing: border-box; }
+    .lm-input { font-size: 16px !important; line-height: 1.35 !important; }
   }
   @media (max-width: 480px) {
-    .lm-row { flex-direction: column; border-radius: 16px; gap: 8px; overflow: visible; }
-    .lm-btn { border-radius: 12px !important; width: 100%; padding: 14px 20px; }
+    .lm-row { flex-direction: column; border-radius: 16px; gap: 0; overflow: hidden; width: 100%; }
+    .lm-input-wrap {
+      border-right: none !important;
+      border-bottom: 1px solid rgba(168,85,247,0.22) !important;
+      border-radius: 16px 16px 0 0 !important;
+      min-height: 54px;
+      padding-left: 4px;
+      padding-right: 4px;
+    }
+    .lm-input {
+      padding: 16px 14px !important;
+      min-height: 52px !important;
+      border-radius: 0 !important;
+    }
+    .lm-btn { border-radius: 0 0 16px 16px !important; width: 100%; padding: 16px 20px; min-height: 54px; }
     .lm-main { padding-left: 14px !important; padding-right: 14px !important; }
   }
 `;
@@ -225,7 +272,7 @@ function LeadForm({ onSuccess }: { onSuccess: (email: string, eventId: string) =
   const showError = status === "error" || !!fieldError?.trim();
 
   return (
-    <form onSubmit={handleSubmit} className="w-[min(100%,430px)] mx-auto">
+    <form onSubmit={handleSubmit} className="lm-form w-full max-w-[min(100%,430px)] mx-auto">
       <div
         className="lm-row"
         style={{
@@ -235,23 +282,27 @@ function LeadForm({ onSuccess }: { onSuccess: (email: string, eventId: string) =
           transition: "border-color 0.3s ease, box-shadow 0.3s ease",
         }}
       >
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            display: "flex",
-            alignItems: "center",
-            background: "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,248,255,0.96))",
-            borderRight: "1px solid rgba(168,85,247,0.2)",
-          }}
-        >
+        <div className="lm-input-wrap">
           <input
             type="email" required value={email}
             onChange={(e) => { setEmail(e.target.value); if (status === "error") setStatus("idle"); if (fieldError) setFieldError(null); }}
             onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
             placeholder="Unesi svoj email" autoComplete="email" inputMode="email"
             className="lm-input"
-            style={{ flex: 1, minWidth: 0, padding: "16px 20px", background: "rgba(255,255,255,0.94)", border: "none", outline: "none", color: "#0b1020", fontSize: 15, fontFamily: "inherit", width: "100%" }}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: "16px 18px",
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              color: "#0b1020",
+              fontSize: 15,
+              fontFamily: "inherit",
+              width: "100%",
+              minHeight: 48,
+              WebkitAppearance: "none",
+            }}
           />
         </div>
         <button type="submit" disabled={!canSubmit} className="lm-btn">
@@ -456,6 +507,22 @@ export default function LeadMagnetPage() {
   const [redirectEventId, setRedirectEventId] = useState<string | null>(null);
 
   useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOx = html.style.overflowX;
+    const prevBodyOx = body.style.overflowX;
+    const prevHtmlTa = html.style.touchAction;
+    html.style.overflowX = "hidden";
+    body.style.overflowX = "hidden";
+    html.style.touchAction = "pan-y";
+    return () => {
+      html.style.overflowX = prevHtmlOx;
+      body.style.overflowX = prevBodyOx;
+      html.style.touchAction = prevHtmlTa;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!submitted) return;
     const id = globalThis.window.setTimeout(() => {
       const suffix = redirectEventId ? `?eid=${encodeURIComponent(redirectEventId)}` : "";
@@ -471,7 +538,7 @@ export default function LeadMagnetPage() {
   };
 
   return (
-    <div className="relative min-h-screen text-white antialiased overflow-x-hidden" style={{ background: "#050508" }}>
+    <div className="lm-page-root relative min-h-screen text-white antialiased" style={{ background: "#050508" }}>
       <style>{LM_STYLES}</style>
       <BackgroundEffects />
       <Header />
@@ -498,22 +565,10 @@ export default function LeadMagnetPage() {
               {/* ── Tekst + Forma ── */}
               <div className="w-full text-center max-w-[620px] mx-auto">
 
-                {/* Badge */}
-                <motion.div
-                  initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.1 }} className="mb-5"
-                >
-                  <span className="lm-pill-animated inline-flex items-center gap-2.5 px-5 py-2 rounded-full text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.12em]"
-                    style={{ background: "rgba(0,212,255,0.07)", border: "1px solid rgba(0,212,255,0.18)", color: "#00d4ff" }}>
-                    <span className="w-1.5 h-1.5 rounded-full lm-badge-dot" style={{ background: "#00d4ff" }} />
-                    Besplatan {CONFIG.guideFormat}
-                  </span>
-                </motion.div>
-
                 {/* Heading */}
                 <motion.h1
                   initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.2, ease }}
+                  transition={{ duration: 0.6, delay: 0.1, ease }}
                   className="text-[30px] sm:text-[32px] font-extrabold leading-[1.12] tracking-tight mb-6 sm:mb-8"
                 >
                   Preuzmi{" "}
@@ -540,24 +595,24 @@ export default function LeadMagnetPage() {
                 <motion.div
                   initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.28, ease }}
-                  className="lm-copy text-white/70 text-[14px] sm:text-[15px] leading-relaxed mt-2 sm:mt-4 mb-7 sm:mb-9 max-w-[560px] mx-auto text-left"
+                  className="lm-copy text-white/95 text-[14px] sm:text-[15px] leading-relaxed mt-2 sm:mt-4 mb-7 sm:mb-9 max-w-[560px] mx-auto text-left"
                 >
-                  <p className="mt-0">
+                  <p className="mt-0 text-white">
                     Kako je AI profil sa 0 došao do 60.000 pratilaca i preko 80 miliona pregleda za samo 6 dana, bez
                     pokazivanja lica.
                   </p>
-                  <p className="mt-8 sm:mt-12">
+                  <p className="mt-8 sm:mt-10 text-white">
                     U ovom PDF-u otkrivamo osnovu sistema koji stoji iza viralnih AI influensera, uključujući:
                   </p>
-                  <div className="mt-8 mb-8 sm:mt-9 sm:mb-9">
-                    <ul className="space-y-2 list-disc pl-7 sm:pl-6 text-white/75">
+                  <div className="lm-bullets-wrap">
+                    <ul className="list-disc text-white">
                       <li>Strukturu koja omogućava brz rast profila</li>
                       <li>Kako se pravi vizuelno dosledan AI lik</li>
                       <li>Zašto većina ljudi ne dobije nikakav reach</li>
                       <li>I kako se postavlja profil da algoritam “razume” kome da prikazuje sadržaj</li>
                     </ul>
                   </div>
-                  <p className="mt-4">
+                  <p className="mt-0 text-white">
                     Ovo je samo deo sistema koji koristimo, ali dovoljno da vidiš kako stvari zapravo funkcionišu iza
                     scene.
                   </p>
@@ -569,16 +624,17 @@ export default function LeadMagnetPage() {
                   transition={{ duration: 0.6, delay: 0.4, ease }} className="mb-4 sm:mb-6"
                 >
                   <div
+                    className="lm-form-section"
                     style={{
                       borderTop: "1px solid rgba(255,255,255,0.1)",
-                      marginTop: 6,
-                      paddingTop: 18,
+                      marginTop: 8,
+                      paddingTop: 20,
                     }}
                   >
-                  <p className="text-[14px] sm:text-[15px] font-semibold text-white/85 mb-2 px-1">
+                  <p className="text-[14px] sm:text-[15px] font-semibold text-white/85 mb-2 px-0 sm:px-1">
                       👇 Upisi svoj mail i preuzmi Starter Kit
                     </p>
-                  <p className="text-[12px] sm:text-[13px] text-white/60 mb-4 sm:mb-5 px-1">
+                  <p className="text-[12px] sm:text-[13px] text-white/60 mb-4 sm:mb-5 px-0 sm:px-1 leading-relaxed">
                     Takođe ulaziš na waitlistu, i moći ćeš kupiti kurs kad izađe.
                   </p>
                     <AnimatePresence mode="wait">
@@ -589,7 +645,7 @@ export default function LeadMagnetPage() {
                           key="form"
                           exit={{ opacity: 0, y: -8 }}
                           transition={{ duration: 0.25 }}
-                          className="flex justify-center"
+                          className="flex justify-center w-full"
                         >
                           <LeadForm onSuccess={(_, eventId) => { setRedirectEventId(eventId); setSubmitted(true); }} />
                         </motion.div>
