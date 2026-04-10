@@ -1,19 +1,20 @@
 "use client";
 
-import Image from "next/image";
-import { useState, useEffect, useRef, type FormEvent, type MouseEvent } from "react";
+import { useState, useRef, useEffect, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
-import { motion, AnimatePresence, useInView } from "framer-motion";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, Loader2, Download } from "lucide-react";
 import { getLeadSourceData } from "@/lib/affiliate-tracking";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 
 const CONFIG = {
   formAction: "/api/lead-magnet",
-  downloadCount: 1847,
   guideName: "AI Starter Kit",
   guidePages: "32",
   guideFormat: "PDF",
+  // TODO: zameni sa pravim URL-om kad odlučiš (download ili redirect)
+  downloadUrl: "#",
   socialLinks: {
     instagram: "https://www.instagram.com/aihype.official?igsh=MTBrbWp1Y3V5NDBwMA==",
     tiktok: "https://www.tiktok.com/@ai.hype.akademija?_r=1&_t=ZN-94bDDZdy9Sw",
@@ -21,120 +22,114 @@ const CONFIG = {
   },
 } as const;
 
-const GUIDE_CONTENTS = [
-  {
-    icon: "🎯",
-    title: "5 AI alata koja moraš znati",
-    desc: "Koji alati su najbitniji i kako da ih odmah počneš koristiti.",
-  },
-  {
-    icon: "🎬",
-    title: "AI content formula",
-    desc: "Korak-po-korak proces za pravljenje sadržaja koji ljudi gledaju.",
-  },
-  {
-    icon: "💡",
-    title: "3 projekta koja možeš pokrenuti danas",
-    desc: "Konkretne ideje koje možeš testirati odmah — bez iskustva.",
-  },
-  {
-    icon: "💰",
-    title: "Kako monetizovati AI znanje",
-    desc: "Gde su prilike i kako da napraviš prvi prihod sa AI.",
-  },
-];
-
 const ease = [0.16, 1, 0.3, 1] as const;
 
-const fadeUp = {
-  initial: { opacity: 0, y: 24 },
-  animate: { opacity: 1, y: 0 },
-};
+const SPIN_DURATION = 700; // ms — mora da se poklopi sa CSS animacijom
 
-const fadeIn = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1 },
-};
+const LM_STYLES = `
+  @keyframes lm-float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+  @keyframes lm-glow-breathe {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+  @keyframes lm-dot-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+  @keyframes lm-unlock-glow {
+    0%, 100% { box-shadow: 0 0 30px rgba(0,212,255,0.2), 0 0 60px rgba(124,58,237,0.12); }
+    50% { box-shadow: 0 0 50px rgba(0,212,255,0.35), 0 0 100px rgba(124,58,237,0.2); }
+  }
+  @keyframes lm-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes lm-pill-glow {
+    0%, 100% {
+      box-shadow: 0 0 14px rgba(0,212,255,0.20), 0 0 28px rgba(124,58,237,0.10);
+    }
+    50% {
+      box-shadow: 0 0 22px rgba(0,212,255,0.32), 0 0 44px rgba(124,58,237,0.16);
+    }
+  }
+  @keyframes lm-pill-sheen {
+    0%, 15% { transform: translateX(-130%); }
+    55%, 100% { transform: translateX(130%); }
+  }
 
-const scaleIn = {
-  initial: { opacity: 0, scale: 0.92 },
-  animate: { opacity: 1, scale: 1 },
-};
+  /* Kartica spin — samo rotateY, GPU compositor */
+  @keyframes lm-card-spin {
+    0%   { transform: rotateY(0deg); }
+    100% { transform: rotateY(360deg); }
+  }
 
-const PARTICLE_PRESETS = [
-  { w: 3, left: 12, top: 18, opacity: 0.08, duration: 6.2, delay: 0.1 },
-  { w: 2, left: 78, top: 22, opacity: 0.07, duration: 5.5, delay: 0.4 },
-  { w: 2.5, left: 22, top: 42, opacity: 0.1, duration: 7.0, delay: 1.2 },
-  { w: 3, left: 88, top: 48, opacity: 0.06, duration: 5.8, delay: 0.2 },
-  { w: 2, left: 8, top: 62, opacity: 0.09, duration: 6.4, delay: 2.0 },
-  { w: 2, left: 52, top: 12, opacity: 0.05, duration: 5.9, delay: 0.8 },
-  { w: 3, left: 66, top: 68, opacity: 0.11, duration: 6.1, delay: 1.5 },
-  { w: 2, left: 34, top: 78, opacity: 0.08, duration: 5.7, delay: 0.3 },
-];
+  .lm-card-float    { animation: lm-float 5s ease-in-out infinite; will-change: transform; }
+  .lm-glow-breathe  { animation: lm-glow-breathe 3s ease-in-out infinite; }
+  .lm-badge-dot     { animation: lm-dot-pulse 2s ease-in-out infinite; will-change: transform, opacity; }
+  .lm-unlock-glow   { animation: lm-unlock-glow 2.5s ease-in-out infinite; }
+  .lm-pill-animated {
+    position: relative;
+    overflow: hidden;
+    animation: lm-pill-glow 2.2s ease-in-out infinite;
+  }
+  .lm-pill-animated::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(110deg, transparent 26%, rgba(255,255,255,0.42) 50%, transparent 74%);
+    transform: translateX(-130%);
+    animation: lm-pill-sheen 2.6s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .lm-card-spinning {
+    animation: lm-card-spin ${SPIN_DURATION}ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    will-change: transform;
+  }
 
-function useCountUp(target: number, duration = 2000) {
-  const [count, setCount] = useState(0);
-  const started = useRef(false);
-  const ref = useRef<HTMLSpanElement>(null);
+  .lm-row { display: flex; align-items: stretch; border-radius: 50px; overflow: hidden; }
+  .lm-input::placeholder { color: #000; opacity: 1; font-weight: 600; }
+  .lm-btn {
+    padding: 16px 24px;
+    background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+    border: none; cursor: pointer; color: #fff;
+    font-weight: 800; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    white-space: nowrap; font-family: inherit; transition: all 0.3s ease; flex-shrink: 0;
+    box-shadow: 0 0 24px rgba(0,212,255,0.3), 0 0 48px rgba(124,58,237,0.15), 0 4px 14px rgba(0,0,0,0.4);
+  }
+  .lm-btn:hover:not(:disabled) {
+    filter: brightness(1.1);
+    box-shadow: 0 0 36px rgba(0,212,255,0.45), 0 0 72px rgba(124,58,237,0.2), 0 4px 18px rgba(0,0,0,0.5);
+  }
+  .lm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting && !started.current) {
-          started.current = true;
-          const t0 = performance.now();
-          const step = (now: number) => {
-            const p = Math.min((now - t0) / duration, 1);
-            const eased = 1 - Math.pow(1 - p, 3);
-            setCount(Math.floor(eased * target));
-            if (p < 1) requestAnimationFrame(step);
-          };
-          requestAnimationFrame(step);
-        }
-      },
-      { threshold: 0.5 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [target, duration]);
+  @media (max-width: 480px) {
+    .lm-row { flex-direction: column; border-radius: 16px; gap: 8px; overflow: visible; }
+    .lm-btn { border-radius: 12px !important; width: 100%; padding: 14px 20px; }
+  }
+`;
 
-  return { count, ref };
-}
-
+/* ─── Background ─── */
 function BackgroundEffects() {
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
-      <div
-        className="absolute inset-0 opacity-100"
-        style={{
-          backgroundImage: "radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px)",
-          backgroundSize: "44px 44px",
-        }}
+      <img
+        src="/Leadmagnet-converted-from-png.png"
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover object-bottom"
+        style={{ opacity: 0.55 }}
+        fetchPriority="high"
+        decoding="async"
       />
-      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,0.08),transparent_65%)] lm-glow-pulse" />
-      <div className="absolute top-[30%] right-[-10%] w-[500px] h-[500px] bg-[radial-gradient(ellipse_at_center,rgba(125,211,252,0.05),transparent_65%)] lm-glow-pulse lm-glow-pulse--delay" />
-      <div className="absolute bottom-[-5%] left-[20%] w-[600px] h-[400px] bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,0.05),transparent_65%)] lm-glow-pulse lm-glow-pulse--delay-2" />
-      {PARTICLE_PRESETS.map((p, i) => (
-        <div
-          key={i}
-          className="absolute rounded-full bg-white lm-particle-float"
-          style={{
-            width: `${p.w}px`,
-            height: `${p.w}px`,
-            left: `${p.left}%`,
-            top: `${p.top}%`,
-            opacity: p.opacity,
-            animationDuration: `${p.duration}s`,
-            animationDelay: `${p.delay}s`,
-          }}
-        />
-      ))}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#050508] via-[#050508]/65 to-[#050508]/80" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[340px] bg-[radial-gradient(ellipse_at_top,rgba(0,212,255,0.07),transparent_65%)] lm-glow-breathe" />
+      <div className="absolute top-[20%] right-[-8%] w-[500px] h-[500px] bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,0.06),transparent_65%)] lm-glow-breathe" style={{ animationDelay: "1.5s" }} />
     </div>
   );
 }
 
+/* ─── Lead Form ─── */
 function LeadForm({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState("");
   const [focused, setFocused] = useState(false);
@@ -142,32 +137,24 @@ function LeadForm({ onSuccess }: { onSuccess: () => void }) {
   const [fieldError, setFieldError] = useState<string | null>(null);
 
   const trimmed = email.trim();
+  const isLocalhost = typeof window !== "undefined" && window.location.hostname === "localhost";
   const canSubmit =
-    trimmed.includes("@") &&
-    trimmed.length > 5 &&
-    isAllowedEmailDomain(trimmed) &&
-    status !== "loading";
+    trimmed.includes("@") && trimmed.length > 5 && (isLocalhost || isAllowedEmailDomain(trimmed)) && status !== "loading";
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    if (!isAllowedEmailDomain(trimmed)) {
-      setFieldError(EMAIL_DOMAIN_ERROR);
-      return;
-    }
-
-    setStatus("loading");
-    setFieldError(null);
-
+    // ── Localhost bypass: preskači validaciju i API poziv ──
+    if (isLocalhost) { onSuccess(); return; }
+    if (!isAllowedEmailDomain(trimmed)) { setFieldError(EMAIL_DOMAIN_ERROR); return; }
+    setStatus("loading"); setFieldError(null);
     try {
       const sourceData = getLeadSourceData();
       const res = await fetch(CONFIG.formAction, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: trimmed,
-          phone: null,
-          name: null,
+          email: trimmed, phone: null, name: null,
           utm_source: sourceData.utm_source,
           utm_medium: sourceData.utm_medium,
           utm_campaign: sourceData.utm_campaign ?? "lead_magnet",
@@ -175,83 +162,25 @@ function LeadForm({ onSuccess }: { onSuccess: () => void }) {
           source_tag: "lead_magnet",
         }),
       });
-
-      if (res.ok) {
-        setEmail("");
-        setStatus("idle");
-        onSuccess();
-      } else {
+      if (res.ok) { setEmail(""); setStatus("idle"); onSuccess(); }
+      else {
         const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
-        const msg =
-          typeof data.error === "string"
-            ? data.error
-            : typeof data.message === "string"
-              ? data.message
-              : null;
-        setFieldError(msg);
+        setFieldError(typeof data.error === "string" ? data.error : typeof data.message === "string" ? data.message : null);
         setStatus("error");
       }
-    } catch {
-      setStatus("error");
-    }
+    } catch { setStatus("error"); }
   };
 
-  const showFieldError = status === "error" || !!fieldError?.trim();
+  const showError = status === "error" || !!fieldError?.trim();
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-[520px] mx-auto">
-      <style>{`
-        @keyframes lm-free-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .lm-free-row { display: flex; align-items: stretch; border-radius: 50px; overflow: hidden; }
-        .lm-free-input::placeholder { color: #000; opacity: 1; font-weight: 600; }
-        .lm-free-btn {
-          padding: 16px 22px;
-          background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
-          border: none;
-          cursor: pointer;
-          color: #050508;
-          font-weight: 800;
-          font-size: 13px;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          white-space: nowrap;
-          font-family: inherit;
-          transition: all 0.3s ease;
-          flex-shrink: 0;
-          box-shadow:
-            0 0 22px rgba(168, 85, 247, 0.28),
-            0 0 48px rgba(168, 85, 247, 0.08),
-            0 4px 14px rgba(0, 0, 0, 0.35);
-        }
-        .lm-free-btn:hover:not(:disabled) {
-          filter: brightness(1.07);
-          box-shadow:
-            0 0 30px rgba(168, 85, 247, 0.4),
-            0 0 64px rgba(168, 85, 247, 0.1),
-            0 4px 18px rgba(0, 0, 0, 0.4);
-        }
-        .lm-free-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        @media (max-width: 480px) {
-          .lm-free-row { flex-direction: column; border-radius: 16px; gap: 8px; overflow: visible; }
-          .lm-free-btn { border-radius: 12px !important; width: 100%; padding: 14px 20px; }
-        }
-      `}</style>
+    <form onSubmit={handleSubmit} className="w-[min(100%,430px)] mx-auto">
       <div
-        className="lm-free-row"
+        className="lm-row"
         style={{
-          border: `1px solid ${
-            showFieldError
-              ? "rgba(239, 68, 68, 0.4)"
-              : focused
-                ? "rgba(168, 85, 247, 0.4)"
-                : "rgba(255, 255, 255, 0.1)"
-          }`,
+          border: `1px solid ${showError ? "rgba(239,68,68,0.45)" : focused ? "rgba(168,85,247,0.4)" : "rgba(255,255,255,0.1)"}`,
           background: "rgba(255, 255, 255, 0.03)",
-          boxShadow: focused && !showFieldError ? "0 0 30px rgba(168, 85, 247, 0.12)" : "none",
+          boxShadow: focused && !showError ? "0 0 30px rgba(168,85,247,0.12)" : "none",
           transition: "border-color 0.3s ease, box-shadow 0.3s ease",
         }}
       >
@@ -266,479 +195,401 @@ function LeadForm({ onSuccess }: { onSuccess: () => void }) {
           }}
         >
           <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              if (status === "error") setStatus("idle");
-              if (fieldError) setFieldError(null);
-            }}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            placeholder="Unesi svoj email"
-            autoComplete="email"
-            inputMode="email"
-            className="lm-free-input"
-            style={{
-              flex: 1,
-              minWidth: 0,
-              padding: "16px 20px",
-              background: "rgba(255,255,255,0.94)",
-              border: "none",
-              outline: "none",
-              color: "#0b1020",
-              fontSize: 15,
-              fontFamily: "inherit",
-              width: "100%",
-            }}
+            type="email" required value={email}
+            onChange={(e) => { setEmail(e.target.value); if (status === "error") setStatus("idle"); if (fieldError) setFieldError(null); }}
+            onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+            placeholder="Unesi svoj email" autoComplete="email" inputMode="email"
+            className="lm-input"
+            style={{ flex: 1, minWidth: 0, padding: "16px 20px", background: "rgba(255,255,255,0.94)", border: "none", outline: "none", color: "#0b1020", fontSize: 15, fontFamily: "inherit", width: "100%" }}
           />
         </div>
-        <button type="submit" disabled={!canSubmit} className="lm-free-btn">
-          {status === "loading" ? (
-            <>
-              <Loader2 size={16} style={{ animation: "lm-free-spin 1s linear infinite", willChange: "transform" }} />
-              Slanje...
-            </>
-          ) : (
-            <>
-              Preuzmi <ArrowRight size={15} strokeWidth={2.5} />
-            </>
-          )}
+        <button type="submit" disabled={!canSubmit} className="lm-btn">
+          {status === "loading"
+            ? <><Loader2 size={16} style={{ animation: "lm-spin 1s linear infinite" }} /> Slanje...</>
+            : <>Preuzmi <ArrowRight size={15} strokeWidth={2.5} /></>}
         </button>
       </div>
       {(status === "error" || fieldError) && (
-        <motion.p
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-red-400 text-[13px] mt-3 text-center"
-        >
-          {fieldError?.trim()
-            ? fieldError
-            : status === "error"
-              ? "Greška. Pokušaj ponovo."
-              : ""}
+        <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+          className="text-red-400 text-[13px] mt-3 text-center">
+          {fieldError?.trim() ? fieldError : "Greška. Pokušaj ponovo."}
         </motion.p>
       )}
     </form>
   );
 }
 
-function SuccessState() {
+/* ─── Success inline state (replaces form) ─── */
+function SuccessInline() {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.5, ease }}
-      className="w-full max-w-[520px] mx-auto text-center"
+      transition={{ duration: 0.45, ease }}
+      className="w-full max-w-[520px] mx-auto flex items-center gap-4 px-5 py-4 rounded-2xl"
+      style={{ background: "rgba(0,212,255,0.05)", border: "1px solid rgba(0,212,255,0.18)" }}
     >
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
-        className="
-          w-16 h-16 mx-auto mb-5 rounded-full
-          bg-gradient-to-br from-emerald-500/20 to-emerald-600/10
-          border border-emerald-500/20
-          flex items-center justify-center
-        "
-      >
-        <svg
-          className="w-7 h-7 text-emerald-400"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={3}
-          aria-hidden
-        >
+      <div className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
+        style={{ background: "rgba(0,212,255,0.1)", border: "1px solid rgba(0,212,255,0.2)" }}>
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}
+          style={{ color: "#00d4ff" }} aria-hidden>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
-      </motion.div>
-
-      <motion.h3
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.5, ease }}
-        className="text-xl font-bold text-white mb-2"
-      >
-        Proverite inbox! 📬
-      </motion.h3>
-
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5, duration: 0.5 }}
-        className="text-white/50 text-[15px] mb-6"
-      >
-        {CONFIG.guideName} je na putu ka vašem email-u.
-        <br />
-        Proverite i spam folder.
-      </motion.p>
-
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7, duration: 0.5, ease }}
-      >
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/25 mb-3">Prati nas dok čekaš</p>
-        <div className="flex items-center justify-center gap-3">
-          {[
-            { href: CONFIG.socialLinks.instagram, icon: "📸" },
-            { href: CONFIG.socialLinks.tiktok, icon: "🎵" },
-            { href: CONFIG.socialLinks.youtube, icon: "▶️" },
-          ].map((s, i) => (
-            <a
-              key={i}
-              href={s.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="
-                w-11 h-11 rounded-full flex items-center justify-center
-                bg-white/[0.03] border border-white/[0.06]
-                hover:border-violet-500/20 hover:bg-violet-500/[0.05]
-                hover:-translate-y-0.5 transition-all duration-300
-                text-sm
-              "
-            >
-              {s.icon}
-            </a>
-          ))}
-        </div>
-      </motion.div>
+      </div>
+      <div>
+        <p className="text-white font-semibold text-[14px] leading-tight">Inbox! 📬 Proveri email</p>
+        <p className="text-white/40 text-[12px] mt-0.5">Klikni na karticu desno da preuzmis vodič</p>
+      </div>
     </motion.div>
   );
 }
 
-function GuidePreview() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [rotate, setRotate] = useState({ x: 0, y: 0 });
+/* ─── PDF Card ─── */
+function GuideCard({ unlocked, onCardClick }: { unlocked: boolean; onCardClick: () => void }) {
+  // spinning — CSS klasa aktiva tokom okretanja
+  const [spinning, setSpinning] = useState(false);
+  // imageUnlocked — koja slika je prikazana (menja se na 180° = pola spina)
+  const [imageUnlocked, setImageUnlocked] = useState(false);
+  const triggered = useRef(false);
 
-  const handleMouse = (e: MouseEvent<HTMLDivElement>) => {
-    if (!ref.current) return;
+  // Pokretanje spin-a čim korisnik popuni formu
+  useEffect(() => {
+    if (unlocked && !triggered.current) {
+      triggered.current = true;
+      const raf = requestAnimationFrame(() => setSpinning(true));
+      // Na 180° (kartica okrenuta od usera) — swap slike
+      const t1 = setTimeout(() => setImageUnlocked(true), SPIN_DURATION / 2);
+      // Kraj spina — ukloni will-change
+      const t2 = setTimeout(() => setSpinning(false), SPIN_DURATION + 50);
+      return () => { cancelAnimationFrame(raf); clearTimeout(t1); clearTimeout(t2); };
+    }
+  }, [unlocked]);
+
+  // Tilt-on-hover (samo kad nije u spinu i kad je otključano)
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const ref = useRef<HTMLDivElement>(null);
+  const handleMouse = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!ref.current || spinning) return;
     const rect = ref.current.getBoundingClientRect();
     const x = (e.clientY - rect.top - rect.height / 2) / 20;
     const y = -(e.clientX - rect.left - rect.width / 2) / 20;
-    setRotate({ x: Math.max(-8, Math.min(8, x)), y: Math.max(-8, Math.min(8, y)) });
+    setTilt({ x: Math.max(-7, Math.min(7, x)), y: Math.max(-7, Math.min(7, y)) });
   };
+  const handleLeave = () => setTilt({ x: 0, y: 0 });
 
-  const handleLeave = () => setRotate({ x: 0, y: 0 });
+  // CSS klase za inner div
+  const innerClass = [
+    spinning ? "lm-card-spinning" : "",
+    !spinning && !unlocked ? "lm-card-float" : "",
+    !spinning && unlocked ? "lm-unlock-glow" : "",
+  ].filter(Boolean).join(" ");
 
   return (
     <motion.div
       ref={ref}
       onMouseMove={handleMouse}
       onMouseLeave={handleLeave}
-      {...scaleIn}
-      transition={{ duration: 0.8, delay: 0.3, ease }}
-      className="relative"
-      style={{ perspective: "1000px" }}
+      onClick={unlocked && !spinning ? onCardClick : undefined}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.7, delay: 0.3, ease }}
+      className={`relative select-none ${unlocked && !spinning ? "cursor-pointer" : "cursor-default"}`}
+      style={{ perspective: "900px" }}
+      title={unlocked ? "Klikni da preuzmеš" : "Popuni formu da otključaš"}
     >
+      {/* Glow iza kartice */}
+      <motion.div
+        className="absolute -inset-6 rounded-3xl blur-2xl pointer-events-none"
+        animate={{
+          background: unlocked
+            ? "radial-gradient(ellipse at center, rgba(0,212,255,0.22) 0%, rgba(139,92,246,0.15) 50%, transparent 75%)"
+            : "radial-gradient(ellipse at center, rgba(0,212,255,0.08) 0%, rgba(139,92,246,0.05) 50%, transparent 75%)",
+        }}
+        transition={{ duration: 0.9 }}
+      />
+
+      {/* Spin + tilt wrapper */}
       <div
-        className="relative transition-transform duration-300 ease-out"
-        style={{ transform: `rotateX(${rotate.x}deg) rotateY(${rotate.y}deg)` }}
+        className={`relative ${innerClass}`}
+        style={
+          !spinning
+            ? { transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`, transition: "transform 0.25s ease-out", borderRadius: "20px" }
+            : { borderRadius: "20px" }
+        }
       >
-        <div className="absolute -inset-4 bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,0.12),transparent_70%)] rounded-3xl blur-xl" />
+        {/* Kartica */}
         <div
-          className="
-            relative flex h-[300px] w-[220px] flex-col overflow-hidden rounded-2xl
-            border border-white/[0.08]
-            bg-gradient-to-br from-[#111827] via-[#0e1320] to-[#0b0f1a]
-            px-7 py-7 text-center
-            shadow-[0_20px_60px_rgba(0,0,0,0.5)]
-            sm:h-[350px] sm:w-[260px] sm:px-8 sm:py-8
-          "
+          className="relative w-[180px] sm:w-[210px] overflow-hidden rounded-[20px]"
+          style={{
+            aspectRatio: "1792 / 2400",
+            border: imageUnlocked ? "1.5px solid rgba(0,212,255,0.4)" : "1.5px solid rgba(0,212,255,0.2)",
+            transition: "border-color 0.5s ease",
+            // backface-visibility: hidden omogućava da kartica "nestane" na 90°-270°
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
+          }}
         >
-          <div className="pointer-events-none absolute left-0 right-0 top-0 z-[1] h-1/3 bg-gradient-to-b from-white/[0.04] to-transparent" />
-          <div
-            className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center"
-            aria-hidden
-          >
-            <Image
-              src="/logo.png"
-              alt=""
-              width={280}
-              height={92}
-              className="h-auto w-[82%] max-w-[210px] object-contain opacity-[0.2] sm:max-w-[240px]"
-            />
-          </div>
-          <div className="absolute right-4 top-4 z-20">
-            <span
-              className="
-                rounded-md border border-violet-500/20 bg-violet-500/15 px-2.5 py-1
-                text-[9px] font-bold uppercase tracking-wider text-violet-300
-              "
-            >
-              {CONFIG.guideFormat}
-            </span>
-          </div>
-          <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col justify-between px-0.5 pt-11 pb-6 sm:px-1 sm:pt-12 sm:pb-7">
-            <h3 className="mx-auto max-w-[92%] bg-gradient-to-r from-white via-white to-white/80 bg-clip-text pt-0.5 text-lg font-extrabold leading-snug text-transparent sm:text-xl">
-              {CONFIG.guideName}
-            </h3>
-            <div className="flex shrink-0 items-center justify-center gap-3 px-1 text-[11px] text-white/30 sm:gap-4">
-              <span className="flex items-center gap-1">📄 {CONFIG.guidePages} str.</span>
-              <span className="flex items-center gap-1">⚡ Besplatno</span>
-            </div>
-          </div>
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-10 h-20 bg-gradient-to-t from-[#0b0f1a] to-transparent" />
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function GuideContents() {
-  const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: "-50px" });
-
-  return (
-    <div ref={ref} className="w-full">
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={isInView ? { opacity: 1 } : {}}
-        transition={{ duration: 0.5 }}
-        className="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-400/70 mb-10 sm:mb-12 text-center"
-      >
-        Šta je unutra
-      </motion.p>
-
-      <div className="flex flex-col gap-12 sm:gap-14">
-        {GUIDE_CONTENTS.map((item, i) => (
-          <motion.div
-            key={item.title}
-            initial={{ opacity: 0, y: 16 }}
-            animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.5, delay: 0.1 + i * 0.1, ease }}
-            className="
-              group flex w-full flex-col items-center text-center gap-4
-              p-5 sm:p-6 rounded-xl
-              bg-white/[0.02] border border-white/[0.04]
-              hover:border-violet-500/15 hover:bg-violet-500/[0.02]
-              transition-all duration-300
-            "
-          >
-            <span className="text-xl leading-none" aria-hidden>
-              {item.icon}
-            </span>
-            <div>
-              <h4 className="text-[15px] font-semibold text-white mb-1">{item.title}</h4>
-              <p className="text-[13px] text-white/45 leading-relaxed">{item.desc}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SocialProof() {
-  const { count, ref } = useCountUp(CONFIG.downloadCount);
-
-  return (
-    <motion.div
-      {...fadeIn}
-      transition={{ duration: 0.6, delay: 0.15 }}
-      className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.02] px-6 py-8 sm:px-10 sm:py-10 text-center"
-    >
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-400/70 mb-8 sm:mb-10">
-        Brojke u jednom pogledu
-      </p>
-      <div className="flex w-full justify-center">
-        <div className="inline-flex max-w-full flex-row flex-wrap items-center justify-center gap-x-6 gap-y-5 sm:gap-x-10 md:gap-x-14">
-        <div className="text-center min-w-[88px]">
-          <span
-            ref={ref}
-            className="block text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-violet-400 to-cyan-300 bg-clip-text text-transparent tabular-nums"
-          >
-            {count.toLocaleString()}+
-          </span>
-          <span className="text-[10px] font-medium text-white/30 uppercase tracking-[0.1em] mt-1.5 block">
-            Preuzimanja
-          </span>
-        </div>
-        <div className="hidden sm:block w-px h-10 bg-white/[0.08]" aria-hidden />
-        <div className="text-center min-w-[72px]">
-          <span className="block text-2xl sm:text-3xl font-extrabold text-white">{CONFIG.guidePages}</span>
-          <span className="text-[10px] font-medium text-white/30 uppercase tracking-[0.1em] mt-1.5 block">
-            Stranica
-          </span>
-        </div>
-        <div className="hidden sm:block w-px h-10 bg-white/[0.08]" aria-hidden />
-        <div className="text-center min-w-[72px]">
-          <span className="block text-2xl sm:text-3xl font-extrabold text-emerald-400">€0</span>
-          <span className="text-[10px] font-medium text-white/30 uppercase tracking-[0.1em] mt-1.5 block">Cena</span>
-        </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function TrustBadges() {
-  return (
-    <motion.div
-      {...fadeIn}
-      transition={{ duration: 0.5, delay: 1.2 }}
-      className="flex flex-wrap items-center justify-center gap-4 text-[11px] text-white/30"
-    >
-      <span className="flex items-center gap-1.5">
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+          {/* Locked slika — prikazana kada !imageUnlocked */}
+          <img
+            src="/zakljucano-converted-from-png.png"
+            alt="Zaključano"
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{
+              opacity: imageUnlocked ? 0 : 1,
+              transition: "opacity 0.15s ease",
+              pointerEvents: "none",
+            }}
+            decoding="async"
           />
-        </svg>
-        Bez spama
-      </span>
-      <span className="w-1 h-1 rounded-full bg-white/10" />
-      <span className="flex items-center gap-1.5">⚡ Instant pristup</span>
-      <span className="w-1 h-1 rounded-full bg-white/10" />
-      <span className="flex items-center gap-1.5">🎁 100% besplatno</span>
+
+          {/* Unlocked slika — prikazana kada imageUnlocked */}
+          <img
+            src="/otkljucano-converted-from-png.png"
+            alt="Otključano"
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{
+              opacity: imageUnlocked ? 1 : 0,
+              transition: "opacity 0.15s ease",
+              pointerEvents: "none",
+            }}
+            decoding="async"
+          />
+
+          {/* Dark overlay — vidljiv kad je zaključano, nestaje po otključavanju */}
+          <div
+            className="absolute inset-0 z-[5] rounded-[20px] pointer-events-none"
+            style={{
+              background: "rgba(0,0,0,0.48)",
+              opacity: imageUnlocked ? 0 : 1,
+              transition: "opacity 0.7s ease",
+            }}
+          />
+
+          {/* Preuzmi CTA — pojavljuje se posle spina */}
+          <AnimatePresence>
+            {unlocked && !spinning && (
+              <motion.div
+                key="unlock-cta"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4, delay: 0.15 }}
+                className="absolute left-0 right-0 z-20 flex justify-center"
+                style={{ bottom: "10%", background: "transparent" }}
+              >
+                <div
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-full text-[13px] font-bold"
+                  style={{
+                    background: "rgba(0,212,255,0.18)",
+                    border: "1px solid rgba(0,212,255,0.4)",
+                    color: "#00d4ff",
+                    boxShadow: "0 0 18px rgba(0,212,255,0.2)",
+                  }}
+                >
+                  <Download size={13} strokeWidth={2.5} />
+                  Preuzmi
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
     </motion.div>
   );
 }
 
+/* ─── Page ─── */
 export default function LeadMagnetPage() {
+  const router = useRouter();
   const [submitted, setSubmitted] = useState(false);
 
+  useEffect(() => {
+    if (!submitted) return;
+    const id = globalThis.window.setTimeout(() => {
+      router.push("/thank-you-free-guide");
+    }, 2000);
+    return () => globalThis.window.clearTimeout(id);
+  }, [submitted, router]);
+
+  const handleCardClick = () => {
+    if (CONFIG.downloadUrl && CONFIG.downloadUrl !== "#") {
+      window.open(CONFIG.downloadUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
   return (
-    <div className="lead-magnet-wrapper relative min-h-screen bg-[#050508] text-white antialiased overflow-x-hidden">
+    <div className="relative min-h-screen text-white antialiased overflow-x-hidden" style={{ background: "#050508" }}>
+      <style>{LM_STYLES}</style>
       <BackgroundEffects />
       <Header />
 
-      <main className="relative z-10">
-        <section className="min-h-[calc(100dvh-72px)] flex items-center justify-center px-5 pt-24 pb-20 sm:pt-28 sm:pb-24">
-          <div className="w-full max-w-[1080px] mx-auto">
-            <div className="flex flex-col lg:flex-row items-center justify-center gap-12 lg:gap-20">
-              <div className="flex-1 max-w-[520px] text-center">
-                <motion.div {...fadeIn} transition={{ duration: 0.5, delay: 0.05 }} className="mb-6">
-                  <span
-                    className="
-                      inline-flex items-center gap-2 px-4 py-1.5
-                      rounded-full text-[10px] sm:text-[11px] font-semibold
-                      uppercase tracking-[0.12em]
-                      text-violet-300 bg-violet-500/10
-                      border border-violet-500/15
-                    "
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+      <main style={{ position: "relative", zIndex: 10, minHeight: "100vh", padding: "82px 16px 32px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ width: "100%", maxWidth: 680 }}>
+
+          {/* ── Shell ── */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease }}
+            style={{
+              borderRadius: 24,
+              border: "1px solid rgba(0,212,255,0.2)",
+              background: "linear-gradient(165deg, rgba(0,212,255,0.06) 0%, rgba(102,45,145,0.07) 36%, rgba(8,9,15,0.92) 100%)",
+              boxShadow: "0 0 34px rgba(0,212,255,0.1), 0 0 72px rgba(102,45,145,0.14), 0 18px 54px rgba(0,0,0,0.45)",
+              padding: "clamp(22px, 3.2vw, 30px) clamp(16px, 3vw, 26px) clamp(20px, 2.6vw, 26px)",
+            }}
+          >
+            <div className="flex flex-col items-center gap-9 sm:gap-10">
+
+              {/* ── Tekst + Forma ── */}
+              <div className="w-full text-center max-w-[620px] mx-auto">
+
+                {/* Badge */}
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.1 }} className="mb-5"
+                >
+                  <span className="lm-pill-animated inline-flex items-center gap-2.5 px-5 py-2 rounded-full text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.12em]"
+                    style={{ background: "rgba(0,212,255,0.07)", border: "1px solid rgba(0,212,255,0.18)", color: "#00d4ff" }}>
+                    <span className="w-1.5 h-1.5 rounded-full lm-badge-dot" style={{ background: "#00d4ff" }} />
                     Besplatan {CONFIG.guideFormat}
                   </span>
                 </motion.div>
 
+                {/* Heading */}
                 <motion.h1
-                  {...fadeUp}
-                  transition={{ duration: 0.6, delay: 0.25, ease }}
-                  className="text-[32px] sm:text-[42px] lg:text-[48px] font-extrabold leading-[1.1] tracking-tight mb-5"
+                  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.2, ease }}
+                  className="text-[22px] sm:text-[32px] font-extrabold leading-[1.12] tracking-tight mb-8"
                 >
                   Preuzmi{" "}
-                  <span className="bg-gradient-to-r from-violet-400 via-purple-300 to-cyan-300 bg-clip-text text-transparent">
-                    {CONFIG.guideName}
+                  <span style={{
+                    background: "linear-gradient(135deg, #00d4ff 0%, #a78bfa 60%, #7c3aed 100%)",
+                    WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+                  }}>
+                    AI Influencer Starter Kit
                   </span>
-                  <br />
-                  potpuno besplatno.
+                  <br />besplatno.
                 </motion.h1>
 
-                <motion.p
-                  {...fadeUp}
-                  transition={{ duration: 0.6, delay: 0.35, ease }}
-                  className="text-[16px] sm:text-[17px] text-white/55 leading-relaxed mb-8 max-w-[440px] mx-auto"
-                >
-                  {CONFIG.guidePages} stranica konkretnih AI strategija, alata i projekata koje možeš primeniti odmah. Bez teorije.
-                  Bez floskula.
-                </motion.p>
+                <div
+                  style={{
+                    width: "100%",
+                    maxWidth: 520,
+                    height: 1,
+                    margin: "0 auto 12px",
+                    background:
+                      "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0) 100%)",
+                  }}
+                />
 
-                <motion.div {...fadeUp} transition={{ duration: 0.6, delay: 0.45, ease }} className="mb-6">
-                  <AnimatePresence mode="wait">
-                    {submitted ? (
-                      <SuccessState key="success" />
-                    ) : (
-                      <motion.div key="form" exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
-                        <LeadForm onSuccess={() => setSubmitted(true)} />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.28, ease }}
+                  className="text-white/70 text-[14px] sm:text-[15px] leading-relaxed mt-3 sm:mt-4 mb-8 sm:mb-9 max-w-[560px] mx-auto text-left"
+                >
+                  <p className="mt-0">
+                    Kako je AI profil sa 0 došao do 60.000 pratilaca i preko 80 miliona pregleda za samo 6 dana, bez
+                    pokazivanja lica.
+                  </p>
+                  <p className="mt-12">
+                    U ovom PDF-u otkrivamo osnovu sistema koji stoji iza viralnih AI influensera, uključujući:
+                  </p>
+                  <div style={{ marginTop: 36, marginBottom: 36 }}>
+                    <ul className="space-y-2 list-disc pl-6 text-white/75">
+                      <li>Strukturu koja omogućava brz rast profila</li>
+                      <li>Kako se pravi vizuelno dosledan AI lik</li>
+                      <li>Zašto većina ljudi ne dobije nikakav reach</li>
+                      <li>I kako se postavlja profil da algoritam “razume” kome da prikazuje sadržaj</li>
+                    </ul>
+                  </div>
+                  <p className="mt-3">
+                    Ovo je samo deo sistema koji koristimo, ali dovoljno da vidiš kako stvari zapravo funkcionišu iza
+                    scene.
+                  </p>
                 </motion.div>
 
-                {!submitted && <TrustBadges />}
-              </div>
-
-              <div className="flex-shrink-0 hidden sm:block">
-                <GuidePreview />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="flex w-full justify-center px-5 pt-24 pb-36 sm:pt-32 sm:pb-44">
-          <div className="flex w-full max-w-[560px] flex-col gap-16 sm:gap-20">
-            <GuideContents />
-            <SocialProof />
-          </div>
-        </section>
-
-        <section className="relative overflow-hidden px-5 pt-20 pb-28 sm:pt-24 sm:pb-36 flex flex-col items-center">
-          <div className="absolute inset-0 pointer-events-none" aria-hidden>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[500px] bg-[radial-gradient(ellipse_at_center,rgba(139,92,246,0.06),transparent_60%)]" />
-          </div>
-
-          <div className="relative w-full max-w-[560px] mx-auto px-4 flex flex-col items-center text-center">
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, ease }}
-              className="text-[28px] sm:text-[36px] font-extrabold leading-[1.15] tracking-tight mb-5"
-            >
-              Ne propusti{" "}
-              <span className="bg-gradient-to-r from-violet-400 to-cyan-300 bg-clip-text text-transparent">
-                besplatan vodič.
-              </span>
-            </motion.h2>
-
-            <motion.p
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-white/45 text-[16px] mb-10"
-            >
-              Ostavi email. Instant pristup. Bez spama.
-            </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.2, ease }}
-              className="w-full flex flex-col items-center"
-            >
-              <AnimatePresence mode="wait">
-                {submitted ? (
-                  <motion.p
-                    key="done"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-emerald-400 font-semibold text-[15px] text-center"
+                {/* Forma ili success */}
+                <motion.div
+                  initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.4, ease }} className="mb-6"
+                >
+                  <div
+                    style={{
+                      borderTop: "1px solid rgba(255,255,255,0.1)",
+                      marginTop: 6,
+                      paddingTop: 18,
+                    }}
                   >
-                    ✅ Već si se prijavio! Proveri inbox.
-                  </motion.p>
-                ) : (
-                  <motion.div key="form2" exit={{ opacity: 0 }} className="w-full flex justify-center">
-                    <LeadForm onSuccess={() => setSubmitted(true)} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          </div>
-        </section>
+                  <p className="text-[14px] sm:text-[15px] font-semibold text-white/85 mb-2">
+                      👇 Upisi svoj mail i preuzmi Starter Kit
+                    </p>
+                  <p className="text-[12px] sm:text-[13px] text-white/60 mb-5">
+                    Takođe ulaziš na waitlistu, i moći ćeš kupiti kurs kad izađe.
+                  </p>
+                    <AnimatePresence mode="wait">
+                      {submitted ? (
+                        <SuccessInline key="success" />
+                      ) : (
+                        <motion.div
+                          key="form"
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.25 }}
+                          className="flex justify-center"
+                        >
+                          <LeadForm onSuccess={() => setSubmitted(true)} />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
 
-        <footer className="mt-6 sm:mt-10 border-t border-white/[0.03] py-10 sm:py-12 text-center">
-          <p className="text-[11px] text-white/20">© {new Date().getFullYear()} AI Hype Academy. Sva prava zadržana.</p>
-        </footer>
+                {/* Social links — nakon submita */}
+                <AnimatePresence>
+                  {submitted && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }} transition={{ duration: 0.4, delay: 0.3 }}
+                      className="mt-7 flex items-center justify-center gap-3"
+                    >
+                      <p className="text-[11px] text-white/25 uppercase tracking-[0.1em]">Prati nas:</p>
+                      {[
+                        { href: CONFIG.socialLinks.instagram, icon: "📸" },
+                        { href: CONFIG.socialLinks.tiktok, icon: "🎵" },
+                        { href: CONFIG.socialLinks.youtube, icon: "▶️" },
+                      ].map((s, i) => (
+                        <a key={i} href={s.href} target="_blank" rel="noopener noreferrer"
+                          className="w-9 h-9 rounded-full flex items-center justify-center text-sm transition-all duration-300"
+                          style={{ background: "rgba(0,212,255,0.04)", border: "1px solid rgba(0,212,255,0.1)" }}>
+                          {s.icon}
+                        </a>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* ── PDF kartica ── */}
+              <div className="flex flex-col items-center gap-3.5 sm:gap-4">
+                <GuideCard unlocked={submitted} onCardClick={handleCardClick} />
+                <motion.p
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5, delay: 0.6 }}
+                  className="text-[11px] text-center"
+                  style={{ color: submitted ? "rgba(0,212,255,0.5)" : "rgba(255,255,255,0.18)" }}
+                >
+                  {submitted ? "Kartica je otključana — klikni!" : "Popuni formu da otključaš"}
+                </motion.p>
+              </div>
+
+            </div>
+          </motion.div>
+        </div>
       </main>
 
+      <footer style={{ position: "relative", zIndex: 10, borderTop: "1px solid rgba(0,212,255,0.05)", padding: "32px 16px", textAlign: "center", width: "100%" }}>
+        <p className="text-[11px] text-white/15">© {new Date().getFullYear()} AI Hype Academy. Sva prava zadržana.</p>
+      </footer>
     </div>
   );
 }
