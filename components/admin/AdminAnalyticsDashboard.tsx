@@ -1135,7 +1135,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
         .admin-period-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .admin-range-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .admin-graph-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; padding: 10px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; background: rgba(255,255,255,0.02); }
-        .admin-range-btn { min-height: 32px; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.03); color: #bbb; font-size: 12px; cursor: pointer; }
+        .admin-range-btn { min-height: 36px; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.03); color: #bbb; font-size: 12px; cursor: pointer; }
         .admin-range-btn.active { border-color: rgba(0,212,255,0.45); color: #00d4ff; background: rgba(0,212,255,0.1); }
         .admin-range-btn-live { border-color: rgba(34,197,94,0.4); color: #86efac; background: rgba(34,197,94,0.1); }
         .admin-live-select-wrap { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #888; }
@@ -1174,7 +1174,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
         .admin-campaign-table th { color: #888; font-weight: 600; background: rgba(255,255,255,0.03); }
         .admin-campaign-table tbody tr:hover { background: rgba(255,255,255,0.02); }
         .admin-traffic-chart-wrap { margin-bottom: 12px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); padding: 12px; overflow-x: auto; }
-        .admin-traffic-chart { width: 100%; min-width: 640px; height: auto; display: block; }
+        .admin-traffic-chart { width: 100%; min-width: 520px; height: auto; display: block; }
         .admin-traffic-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: #aaa; margin-bottom: 18px; }
         .admin-traffic-legend span { display: inline-flex; align-items: center; gap: 6px; }
         .admin-traffic-legend i { width: 10px; height: 10px; border-radius: 99px; display: inline-block; }
@@ -1183,6 +1183,21 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
         .admin-traffic-tooltip span { display: inline-flex; align-items: center; gap: 6px; }
         .admin-traffic-tooltip i { width: 10px; height: 10px; border-radius: 99px; display: inline-block; }
         .admin-traffic-tooltip-placeholder { font-size: 12px; color: #666; padding: 10px 4px 2px; }
+        @media (max-width: 639px) {
+          .admin-graph-toolbar { align-items: stretch; padding: 12px; gap: 12px; }
+          .admin-graph-toolbar .admin-period-row { width: 100%; }
+          .admin-graph-toolbar .admin-date-input { flex: 1; min-width: 130px; }
+          .admin-graph-toolbar .admin-range-row { width: 100%; gap: 6px; }
+          .admin-range-btn { min-height: 40px; padding: 8px 10px; font-size: 12px; }
+          .admin-range-btn-live { width: 100%; order: 20; }
+          .admin-live-select-wrap { width: 100%; justify-content: space-between; margin-top: 2px; }
+          .admin-live-select { width: 170px; min-height: 40px; }
+          .admin-traffic-chart-wrap { padding: 10px; }
+          .admin-traffic-chart { min-width: 420px; }
+          .admin-traffic-tooltip { gap: 8px; font-size: 11px; }
+          .admin-traffic-tooltip-date { width: 100%; margin-right: 0; }
+          .admin-traffic-legend { gap: 8px; font-size: 11px; margin-bottom: 12px; }
+        }
         @media (min-width: 640px) {
           .admin-danas-card { margin-bottom: 24px; padding: 20px; border-radius: 18px; }
           .admin-danas-num { font-size: 36px; }
