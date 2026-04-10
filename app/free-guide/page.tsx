@@ -121,6 +121,19 @@ const LM_STYLES = `
       border-radius: 20px !important;
       padding: 20px 16px 20px !important;
     }
+    .lm-copy {
+      padding-left: 8px !important;
+      padding-right: 8px !important;
+    }
+    .lm-copy ul {
+      padding-left: 1.45rem !important;
+    }
+    .lm-copy li {
+      margin-bottom: 6px !important;
+    }
+    .lm-copy p {
+      line-height: 1.65 !important;
+    }
   }
   @media (max-width: 480px) {
     .lm-row { flex-direction: column; border-radius: 16px; gap: 8px; overflow: visible; }
@@ -527,24 +540,24 @@ export default function LeadMagnetPage() {
                 <motion.div
                   initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.28, ease }}
-                  className="text-white/70 text-[14px] sm:text-[15px] leading-relaxed mt-2 sm:mt-4 mb-6 sm:mb-9 max-w-[560px] mx-auto text-left"
+                  className="lm-copy text-white/70 text-[14px] sm:text-[15px] leading-relaxed mt-2 sm:mt-4 mb-7 sm:mb-9 max-w-[560px] mx-auto text-left"
                 >
                   <p className="mt-0">
                     Kako je AI profil sa 0 došao do 60.000 pratilaca i preko 80 miliona pregleda za samo 6 dana, bez
                     pokazivanja lica.
                   </p>
-                  <p className="mt-7 sm:mt-12">
+                  <p className="mt-8 sm:mt-12">
                     U ovom PDF-u otkrivamo osnovu sistema koji stoji iza viralnih AI influensera, uključujući:
                   </p>
-                  <div className="mt-7 mb-7 sm:mt-9 sm:mb-9">
-                    <ul className="space-y-2 list-disc pl-6 text-white/75">
+                  <div className="mt-8 mb-8 sm:mt-9 sm:mb-9">
+                    <ul className="space-y-2 list-disc pl-7 sm:pl-6 text-white/75">
                       <li>Strukturu koja omogućava brz rast profila</li>
                       <li>Kako se pravi vizuelno dosledan AI lik</li>
                       <li>Zašto većina ljudi ne dobije nikakav reach</li>
                       <li>I kako se postavlja profil da algoritam “razume” kome da prikazuje sadržaj</li>
                     </ul>
                   </div>
-                  <p className="mt-3">
+                  <p className="mt-4">
                     Ovo je samo deo sistema koji koristimo, ali dovoljno da vidiš kako stvari zapravo funkcionišu iza
                     scene.
                   </p>
