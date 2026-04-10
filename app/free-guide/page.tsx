@@ -106,18 +106,26 @@ const LM_STYLES = `
   }
   .lm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  @media (max-width: 640px) {
+    .lm-wrap {
+      max-width: 560px !important;
+      margin: 0 auto !important;
+    }
+    .lm-main {
+      padding-top: 78px !important;
+      padding-left: 16px !important;
+      padding-right: 16px !important;
+      padding-bottom: 24px !important;
+    }
+    .lm-shell {
+      border-radius: 20px !important;
+      padding: 20px 16px 20px !important;
+    }
+  }
   @media (max-width: 480px) {
     .lm-row { flex-direction: column; border-radius: 16px; gap: 8px; overflow: visible; }
     .lm-btn { border-radius: 12px !important; width: 100%; padding: 14px 20px; }
-    .lm-shell {
-      border-radius: 18px !important;
-      padding: 18px 14px 18px !important;
-    }
-    .lm-main {
-      padding-top: 74px !important;
-      padding-left: 12px !important;
-      padding-right: 12px !important;
-    }
+    .lm-main { padding-left: 14px !important; padding-right: 14px !important; }
   }
 `;
 
@@ -456,7 +464,7 @@ export default function LeadMagnetPage() {
       <Header />
 
       <main className="lm-main" style={{ position: "relative", zIndex: 10, minHeight: "100vh", padding: "82px 16px 32px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <div style={{ width: "100%", maxWidth: 680 }}>
+        <div className="lm-wrap" style={{ width: "100%", maxWidth: 680 }}>
 
           {/* ── Shell ── */}
           <motion.div
