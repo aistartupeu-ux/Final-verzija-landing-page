@@ -6,6 +6,8 @@
  * 1. Google Cloud Console → Service Account → JSON key
  * 2. Share Sheet sa service account email (Editor)
  * 3. Env: LEADS_SHEET_ID, GOOGLE_SERVICE_ACCOUNT_JSON (ceo JSON kao string)
+ * 4. Glavni tab: LEADS_SHEET_NAME (npr. Лист1). Ako nije setovan, koristi se prvi tab u dokumentu — nikad se ne bira automatski "LM".
+ * 5. Lead magnet (source_tag lead_magnet): tab iz LEAD_MAGNET_SHEET_NAME (podrazumevano "LM").
  */
 
 import { google } from "googleapis";
@@ -143,6 +145,27 @@ function parseRow(cells: string[]): LeadsSourceRow | null {
   };
 }
 
+type SheetsClient = ReturnType<typeof google.sheets>;
+
+async function getSpreadsheetTabTitles(sheets: SheetsClient, spreadsheetId: string): Promise<string[]> {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  return (meta.data.sheets ?? [])
+    .map((s) => String(s.properties?.title ?? "").trim())
+    .filter(Boolean);
+}
+
+/** Glavni funnel — nikad ne preferira LM samo zato što postoji. */
+function resolveMainLeadsSheetTabName(titles: string[], envExplicit: string | undefined): string {
+  const t = envExplicit?.trim();
+  if (t) return t;
+  return titles[0] ?? "Sheet1";
+}
+
+/** Samo za lead magnet (free-guide). */
+function resolveLeadMagnetSheetTabName(): string {
+  return process.env.LEAD_MAGNET_SHEET_NAME?.trim() || "LM";
+}
+
 export async function appendLeadsToSheet(row: LeadsSourceRow): Promise<boolean> {
   const sheetId = process.env.LEADS_SHEET_ID;
   const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -181,14 +204,11 @@ export async function appendLeadsToSheet(row: LeadsSourceRow): Promise<boolean> 
       ],
     ];
 
-    let sheetName = process.env.LEADS_SHEET_NAME;
-    if (!sheetName) {
-      const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
-      const titles = (meta.data.sheets ?? [])
-        .map((s) => String(s.properties?.title ?? "").trim())
-        .filter(Boolean);
-      sheetName = titles.includes("LM") ? "LM" : (titles[0] || "LM");
-    }
+    const titles = await getSpreadsheetTabTitles(sheets, sheetId);
+    const isLeadMagnet = String(row.source_tag ?? "").trim().toLowerCase() === "lead_magnet";
+    const sheetName = isLeadMagnet
+      ? resolveLeadMagnetSheetTabName()
+      : resolveMainLeadsSheetTabName(titles, process.env.LEADS_SHEET_NAME);
     const range = `'${sheetName}'!A:I`;
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
@@ -277,14 +297,8 @@ export async function getLeadsFromSheet(): Promise<LeadsSourceRow[]> {
     });
 
     const sheets = google.sheets({ version: "v4", auth });
-    let sheetName = process.env.LEADS_SHEET_NAME;
-    if (!sheetName) {
-      const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
-      const titles = (meta.data.sheets ?? [])
-        .map((s) => String(s.properties?.title ?? "").trim())
-        .filter(Boolean);
-      sheetName = titles.includes("LM") ? "LM" : (titles[0] || "LM");
-    }
+    const titles = await getSpreadsheetTabTitles(sheets, sheetId);
+    const sheetName = resolveMainLeadsSheetTabName(titles, process.env.LEADS_SHEET_NAME);
     const range = `'${sheetName}'!A2:Z`;
     const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range });
     const rows = (res.data.values ?? []) as string[][];
@@ -321,15 +335,105 @@ const LEADS_SHEET_EXTRAS_HEADERS = [
 ] as const;
 
 /**
+ * Ažurira jedan tab: kolona C (telefon), opciono D (ime); J–O ekstra polja.
+ * Traži odozgo; prvi email match.
+ */
+async function updateLeadsSheetPhoneInTab(
+  sheets: SheetsClient,
+  sheetId: string,
+  sheetName: string,
+  emailNorm: string,
+  phoneVal: string,
+  name: string | undefined,
+  extras: LeadsSheetPhoneExtras | undefined
+): Promise<boolean> {
+  const rangeRead = `'${sheetName}'!A2:O`;
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: rangeRead });
+  const rows = (res.data.values ?? []) as string[][];
+  const headerRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: `'${sheetName}'!A1:O1`,
+  });
+  const headers = (headerRes.data.values?.[0] ?? []).map((h) => String(h ?? "").trim().toLowerCase());
+
+  const headersRead = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: `'${sheetName}'!J1:O1`,
+  });
+  const existingHeaders = (headersRead.data.values?.[0] ?? []).map((x) => String(x ?? "").trim());
+  const hasAllHeaders = LEADS_SHEET_EXTRAS_HEADERS.every((h, i) => existingHeaders[i] === h);
+  if (!hasAllHeaders) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `'${sheetName}'!J1:O1`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [[...LEADS_SHEET_EXTRAS_HEADERS]] },
+    });
+  }
+
+  const headerEmailIdx = headers.findIndex((h) => h === "email");
+  const emailIdx = headerEmailIdx >= 0 ? headerEmailIdx : 1;
+  let sheetRow = -1;
+  for (let i = 0; i < rows.length; i++) {
+    const cell = String(rows[i]?.[emailIdx] ?? "").trim().toLowerCase();
+    if (cell === emailNorm) {
+      sheetRow = i + 2;
+      break;
+    }
+  }
+  if (sheetRow < 0) return false;
+
+  const nameTrim = typeof name === "string" ? name.trim() : "";
+  const data: { range: string; values: string[][] }[] = [
+    { range: `'${sheetName}'!C${sheetRow}`, values: [[phoneVal]] },
+  ];
+  if (nameTrim) {
+    data.push({ range: `'${sheetName}'!D${sheetRow}`, values: [[nameTrim]] });
+  }
+  const x = extras;
+  if (x) {
+    const clip = (s: string, max: number) => (s.length > max ? s.slice(0, max) : s);
+    if (x.ai_experience?.trim()) {
+      data.push({ range: `'${sheetName}'!J${sheetRow}`, values: [[clip(x.ai_experience.trim(), 500)]] });
+    }
+    if (x.survey_q1?.trim()) {
+      data.push({ range: `'${sheetName}'!K${sheetRow}`, values: [[clip(x.survey_q1.trim(), 300)]] });
+    }
+    if (x.survey_q2?.trim()) {
+      data.push({ range: `'${sheetName}'!L${sheetRow}`, values: [[clip(x.survey_q2.trim(), 1000)]] });
+    }
+    if (x.survey_q3?.trim()) {
+      data.push({ range: `'${sheetName}'!M${sheetRow}`, values: [[clip(x.survey_q3.trim(), 300)]] });
+    }
+    if (x.survey_q4?.trim()) {
+      data.push({ range: `'${sheetName}'!N${sheetRow}`, values: [[clip(x.survey_q4.trim(), 200)]] });
+    }
+    if (x.survey_q5?.trim()) {
+      data.push({ range: `'${sheetName}'!O${sheetRow}`, values: [[clip(x.survey_q5.trim(), 200)]] });
+    }
+  }
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: sheetId,
+    requestBody: {
+      valueInputOption: "USER_ENTERED",
+      data,
+    },
+  });
+  return true;
+}
+
+/**
  * Ažurira kolonu C (telefon), opciono D (ime) za red čiji je email u koloni B — bez novog reda (Leads by Source).
  * Opciono J–O: ai_experience + anketa (dodaj zaglavlja u Sheet ako koristiš).
- * Traži odozgo; ako ima duplikata emaila, ažurira prvi pogodak.
+ * Glavni tab: LEADS_SHEET_NAME ili prvi tab u dokumentu. Lead magnet thank-you: opts.sourceTag === "lead_magnet" → tab LM (ili LEAD_MAGNET_SHEET_NAME).
+ * Ostali: prvo glavni tab, pa LM ako red nije nađen (stari pogrešni upisi).
  */
 export async function updateLeadsSheetPhoneByEmail(
   email: string,
   phone: string,
   name?: string,
-  extras?: LeadsSheetPhoneExtras
+  extras?: LeadsSheetPhoneExtras,
+  opts?: { sourceTag?: string }
 ): Promise<boolean> {
   const sheetId = process.env.LEADS_SHEET_ID;
   const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -351,88 +455,21 @@ export async function updateLeadsSheetPhoneByEmail(
     });
 
     const sheets = google.sheets({ version: "v4", auth });
-    let sheetName = process.env.LEADS_SHEET_NAME;
-    if (!sheetName) {
-      const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
-      const titles = (meta.data.sheets ?? [])
-        .map((s) => String(s.properties?.title ?? "").trim())
-        .filter(Boolean);
-      sheetName = titles.includes("LM") ? "LM" : (titles[0] || "LM");
+    const titles = await getSpreadsheetTabTitles(sheets, sheetId);
+    const mainName = resolveMainLeadsSheetTabName(titles, process.env.LEADS_SHEET_NAME);
+    const lmName = resolveLeadMagnetSheetTabName();
+
+    const tag = String(opts?.sourceTag ?? "").trim().toLowerCase();
+    if (tag === "lead_magnet") {
+      return updateLeadsSheetPhoneInTab(sheets, sheetId, lmName, emailNorm, phoneVal, name, extras);
     }
 
-    const rangeRead = `'${sheetName}'!A2:O`;
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: rangeRead });
-    const rows = (res.data.values ?? []) as string[][];
-    const headerRes = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: `'${sheetName}'!A1:O1`,
-    });
-    const headers = (headerRes.data.values?.[0] ?? []).map((h) => String(h ?? "").trim().toLowerCase());
-
-    const headersRead = await sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: `'${sheetName}'!J1:O1`,
-    });
-    const existingHeaders = (headersRead.data.values?.[0] ?? []).map((x) => String(x ?? "").trim());
-    const hasAllHeaders = LEADS_SHEET_EXTRAS_HEADERS.every((h, i) => existingHeaders[i] === h);
-    if (!hasAllHeaders) {
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: sheetId,
-        range: `'${sheetName}'!J1:O1`,
-        valueInputOption: "USER_ENTERED",
-        requestBody: { values: [[...LEADS_SHEET_EXTRAS_HEADERS]] },
-      });
+    const okMain = await updateLeadsSheetPhoneInTab(sheets, sheetId, mainName, emailNorm, phoneVal, name, extras);
+    if (okMain) return true;
+    if (lmName !== mainName && titles.includes(lmName)) {
+      return updateLeadsSheetPhoneInTab(sheets, sheetId, lmName, emailNorm, phoneVal, name, extras);
     }
-
-    const headerEmailIdx = headers.findIndex((h) => h === "email");
-    const emailIdx = headerEmailIdx >= 0 ? headerEmailIdx : 1;
-    let sheetRow = -1;
-    for (let i = 0; i < rows.length; i++) {
-      const cell = String(rows[i]?.[emailIdx] ?? "").trim().toLowerCase();
-      if (cell === emailNorm) {
-        sheetRow = i + 2;
-        break;
-      }
-    }
-    if (sheetRow < 0) return false;
-
-    const nameTrim = typeof name === "string" ? name.trim() : "";
-    const data: { range: string; values: string[][] }[] = [
-      { range: `'${sheetName}'!C${sheetRow}`, values: [[phoneVal]] },
-    ];
-    if (nameTrim) {
-      data.push({ range: `'${sheetName}'!D${sheetRow}`, values: [[nameTrim]] });
-    }
-    const x = extras;
-    if (x) {
-      const clip = (s: string, max: number) => (s.length > max ? s.slice(0, max) : s);
-      if (x.ai_experience?.trim()) {
-        data.push({ range: `'${sheetName}'!J${sheetRow}`, values: [[clip(x.ai_experience.trim(), 500)]] });
-      }
-      if (x.survey_q1?.trim()) {
-        data.push({ range: `'${sheetName}'!K${sheetRow}`, values: [[clip(x.survey_q1.trim(), 300)]] });
-      }
-      if (x.survey_q2?.trim()) {
-        data.push({ range: `'${sheetName}'!L${sheetRow}`, values: [[clip(x.survey_q2.trim(), 1000)]] });
-      }
-      if (x.survey_q3?.trim()) {
-        data.push({ range: `'${sheetName}'!M${sheetRow}`, values: [[clip(x.survey_q3.trim(), 300)]] });
-      }
-      if (x.survey_q4?.trim()) {
-        data.push({ range: `'${sheetName}'!N${sheetRow}`, values: [[clip(x.survey_q4.trim(), 200)]] });
-      }
-      if (x.survey_q5?.trim()) {
-        data.push({ range: `'${sheetName}'!O${sheetRow}`, values: [[clip(x.survey_q5.trim(), 200)]] });
-      }
-    }
-    await sheets.spreadsheets.values.batchUpdate({
-      spreadsheetId: sheetId,
-      requestBody: {
-        valueInputOption: "USER_ENTERED",
-        data,
-      },
-    });
-    return true;
+    return false;
   } catch (e) {
     const err = e as { message?: string };
     console.error("Leads Sheet update phone error:", err?.message ?? e);

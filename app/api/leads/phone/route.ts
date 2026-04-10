@@ -146,14 +146,20 @@ export async function PATCH(req: NextRequest) {
     }
 
     try {
-      await updateLeadsSheetPhoneByEmail(emailNorm, phone, fullName, {
-        ai_experience: aiExperience,
-        survey_q1: q1,
-        survey_q2: q2,
-        survey_q3: q3,
-        survey_q4: q4,
-        survey_q5: q5,
-      });
+      await updateLeadsSheetPhoneByEmail(
+        emailNorm,
+        phone,
+        fullName,
+        {
+          ai_experience: aiExperience,
+          survey_q1: q1,
+          survey_q2: q2,
+          survey_q3: q3,
+          survey_q4: q4,
+          survey_q5: q5,
+        },
+        { sourceTag }
+      );
     } catch (e) {
       console.error("Sheet phone update:", e);
     }
