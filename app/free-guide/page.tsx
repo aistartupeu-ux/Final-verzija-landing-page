@@ -109,6 +109,15 @@ const LM_STYLES = `
   @media (max-width: 480px) {
     .lm-row { flex-direction: column; border-radius: 16px; gap: 8px; overflow: visible; }
     .lm-btn { border-radius: 12px !important; width: 100%; padding: 14px 20px; }
+    .lm-shell {
+      border-radius: 18px !important;
+      padding: 18px 14px 18px !important;
+    }
+    .lm-main {
+      padding-top: 74px !important;
+      padding-left: 12px !important;
+      padding-right: 12px !important;
+    }
   }
 `;
 
@@ -141,14 +150,15 @@ function LeadForm({ onSuccess }: { onSuccess: (email: string, eventId: string) =
 
   const trimmed = email.trim();
   const isLocalhost = typeof window !== "undefined" && window.location.hostname === "localhost";
+  const localhostBypass = isLocalhost && process.env.NEXT_PUBLIC_FREE_GUIDE_LOCAL_BYPASS === "true";
   const canSubmit =
-    trimmed.includes("@") && trimmed.length > 5 && (isLocalhost || isAllowedEmailDomain(trimmed)) && status !== "loading";
+    trimmed.includes("@") && trimmed.length > 5 && (localhostBypass || isAllowedEmailDomain(trimmed)) && status !== "loading";
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
     // ── Localhost bypass: preskači validaciju i API poziv ──
-    if (isLocalhost) {
+    if (localhostBypass) {
       const emailNorm = trimmed.toLowerCase();
       const localhostEventId = `localhost-${Date.now()}`;
       storeLeadForThankYou(emailNorm, null, localhostEventId, landingChannelFromPathname(pathname));
@@ -445,7 +455,7 @@ export default function LeadMagnetPage() {
       <BackgroundEffects />
       <Header />
 
-      <main style={{ position: "relative", zIndex: 10, minHeight: "100vh", padding: "82px 16px 32px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <main className="lm-main" style={{ position: "relative", zIndex: 10, minHeight: "100vh", padding: "82px 16px 32px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center" }}>
         <div style={{ width: "100%", maxWidth: 680 }}>
 
           {/* ── Shell ── */}
@@ -453,6 +463,7 @@ export default function LeadMagnetPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease }}
+            className="lm-shell"
             style={{
               borderRadius: 24,
               border: "1px solid rgba(0,212,255,0.2)",
@@ -461,7 +472,7 @@ export default function LeadMagnetPage() {
               padding: "clamp(22px, 3.2vw, 30px) clamp(16px, 3vw, 26px) clamp(20px, 2.6vw, 26px)",
             }}
           >
-            <div className="flex flex-col items-center gap-9 sm:gap-10">
+            <div className="flex flex-col items-center gap-7 sm:gap-10">
 
               {/* ── Tekst + Forma ── */}
               <div className="w-full text-center max-w-[620px] mx-auto">
@@ -482,7 +493,7 @@ export default function LeadMagnetPage() {
                 <motion.h1
                   initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.2, ease }}
-                  className="text-[22px] sm:text-[32px] font-extrabold leading-[1.12] tracking-tight mb-8"
+                  className="text-[30px] sm:text-[32px] font-extrabold leading-[1.12] tracking-tight mb-6 sm:mb-8"
                 >
                   Preuzmi{" "}
                   <span style={{
@@ -508,16 +519,16 @@ export default function LeadMagnetPage() {
                 <motion.div
                   initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.28, ease }}
-                  className="text-white/70 text-[14px] sm:text-[15px] leading-relaxed mt-3 sm:mt-4 mb-8 sm:mb-9 max-w-[560px] mx-auto text-left"
+                  className="text-white/70 text-[14px] sm:text-[15px] leading-relaxed mt-2 sm:mt-4 mb-6 sm:mb-9 max-w-[560px] mx-auto text-left"
                 >
                   <p className="mt-0">
                     Kako je AI profil sa 0 došao do 60.000 pratilaca i preko 80 miliona pregleda za samo 6 dana, bez
                     pokazivanja lica.
                   </p>
-                  <p className="mt-12">
+                  <p className="mt-7 sm:mt-12">
                     U ovom PDF-u otkrivamo osnovu sistema koji stoji iza viralnih AI influensera, uključujući:
                   </p>
-                  <div style={{ marginTop: 36, marginBottom: 36 }}>
+                  <div className="mt-7 mb-7 sm:mt-9 sm:mb-9">
                     <ul className="space-y-2 list-disc pl-6 text-white/75">
                       <li>Strukturu koja omogućava brz rast profila</li>
                       <li>Kako se pravi vizuelno dosledan AI lik</li>
@@ -534,7 +545,7 @@ export default function LeadMagnetPage() {
                 {/* Forma ili success */}
                 <motion.div
                   initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.4, ease }} className="mb-6"
+                  transition={{ duration: 0.6, delay: 0.4, ease }} className="mb-4 sm:mb-6"
                 >
                   <div
                     style={{
@@ -543,10 +554,10 @@ export default function LeadMagnetPage() {
                       paddingTop: 18,
                     }}
                   >
-                  <p className="text-[14px] sm:text-[15px] font-semibold text-white/85 mb-2">
+                  <p className="text-[14px] sm:text-[15px] font-semibold text-white/85 mb-2 px-1">
                       👇 Upisi svoj mail i preuzmi Starter Kit
                     </p>
-                  <p className="text-[12px] sm:text-[13px] text-white/60 mb-5">
+                  <p className="text-[12px] sm:text-[13px] text-white/60 mb-4 sm:mb-5 px-1">
                     Takođe ulaziš na waitlistu, i moći ćeš kupiti kurs kad izađe.
                   </p>
                     <AnimatePresence mode="wait">
@@ -597,7 +608,7 @@ export default function LeadMagnetPage() {
                 <motion.p
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                   transition={{ duration: 0.5, delay: 0.6 }}
-                  className="text-[11px] text-center"
+                  className="text-[11px] text-center max-w-[220px]"
                   style={{ color: submitted ? "rgba(0,212,255,0.5)" : "rgba(255,255,255,0.18)" }}
                 >
                   {submitted ? "Kartica je otključana — klikni!" : "Popuni formu da otključaš"}
