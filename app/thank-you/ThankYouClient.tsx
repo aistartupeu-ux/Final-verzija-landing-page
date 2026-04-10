@@ -339,10 +339,10 @@ export default function ThankYouClient() {
                 initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={reduced ? { duration: 0 } : { duration: 0.6, delay: 1.0, ease }}
-                className="max-w-[min(440px,100%)] text-[15px] leading-[1.65] md:max-lg:text-[16px] md:max-lg:leading-[1.7] lg:text-[18px]"
+                className="mx-auto max-w-[min(440px,100%)] text-center text-[15px] leading-[1.65] md:max-lg:text-[16px] md:max-lg:leading-[1.7] lg:text-[18px]"
                 style={{ color: "rgba(255,255,255,0.75)" }}
               >
-                Proveri svoj inbox — poslaćemo ti sve detalje u narednim danima.
+                Proveri svoj inbox, stigo ti je Starter Kit.
               </motion.p>
             </div>
 
