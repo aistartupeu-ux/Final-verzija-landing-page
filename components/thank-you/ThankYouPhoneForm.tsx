@@ -88,10 +88,12 @@ export default function ThankYouPhoneForm({
   email,
   defaultCountryCode,
   isLocalDesignPreview = false,
+  sourceTag,
 }: {
   email: string;
   defaultCountryCode: string;
   isLocalDesignPreview?: boolean;
+  sourceTag?: "lead_magnet";
 }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -160,6 +162,7 @@ export default function ThankYouPhoneForm({
         body: JSON.stringify({
           email,
           phone,
+          source_tag: sourceTag,
           first_name: fn,
           last_name: ln,
           ai_experience: aiExperience,
