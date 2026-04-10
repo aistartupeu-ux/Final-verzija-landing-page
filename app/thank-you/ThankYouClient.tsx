@@ -303,9 +303,9 @@ export default function ThankYouClient() {
 
       <BackgroundEffects />
 
-      <div className="relative z-10 flex min-h-dvh w-full max-w-[100vw] flex-col items-center justify-center px-4 py-5 max-md:py-6 md:max-lg:px-6 md:max-lg:py-9 lg:px-6 lg:py-11">
+      <div className="relative z-10 flex min-h-dvh w-full max-w-[100vw] flex-col items-center justify-center px-3 py-4 max-md:py-5 md:max-lg:px-6 md:max-lg:py-9 lg:px-6 lg:py-11">
         <div
-          className="w-full max-w-[min(720px,100%)] rounded-[20px] border px-4 pt-6 pb-8 md:max-lg:max-w-[640px] md:max-lg:rounded-[22px] md:max-lg:px-8 md:max-lg:pt-9 md:max-lg:pb-10 lg:max-w-[720px] lg:rounded-[24px] lg:px-10 lg:pt-12 lg:pb-14"
+          className="w-full max-w-[min(720px,100%)] rounded-[18px] border px-3 pt-5 pb-6 md:max-lg:max-w-[640px] md:max-lg:rounded-[22px] md:max-lg:px-8 md:max-lg:pt-9 md:max-lg:pb-10 lg:max-w-[720px] lg:rounded-[24px] lg:px-10 lg:pt-12 lg:pb-14"
           style={{
             background: "#0b0f1a",
             borderColor: "rgba(255,255,255,0.06)",
@@ -320,7 +320,7 @@ export default function ThankYouClient() {
                 initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={reduced ? { duration: 0 } : { duration: 0.6, delay: 0.8, ease }}
-                className="text-[26px] font-extrabold leading-[1.12] md:max-lg:text-[34px] md:max-lg:leading-[1.14] lg:text-[42px] lg:leading-[1.15]"
+                className="text-[23px] font-extrabold leading-[1.14] md:max-lg:text-[34px] md:max-lg:leading-[1.14] lg:text-[42px] lg:leading-[1.15]"
                 style={{ color: "#fff" }}
               >
                 Uspešno!{" "}
@@ -341,7 +341,7 @@ export default function ThankYouClient() {
                 initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={reduced ? { duration: 0 } : { duration: 0.6, delay: 1.0, ease }}
-                className="mx-auto max-w-[min(440px,100%)] text-center text-[15px] leading-[1.65] md:max-lg:text-[16px] md:max-lg:leading-[1.7] lg:text-[18px]"
+                className="mx-auto max-w-[min(440px,100%)] text-center text-[14px] leading-[1.6] md:max-lg:text-[16px] md:max-lg:leading-[1.7] lg:text-[18px]"
                 style={{ color: "rgba(255,255,255,0.75)" }}
               >
                 Proveri svoj inbox, stigo ti je Starter Kit.
@@ -363,7 +363,7 @@ export default function ThankYouClient() {
                   initial={reduced ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={reduced ? { duration: 0 } : { duration: 0.5, delay: 1.4 + idx * 0.15, ease }}
-                  className="group flex items-center gap-3 rounded-[14px] border px-4 py-3.5 text-left md:max-lg:gap-4 md:max-lg:px-5 md:max-lg:py-4 lg:gap-4 lg:px-6 lg:py-5"
+                  className="group flex items-center gap-2.5 rounded-[13px] border px-3 py-3 text-left md:max-lg:gap-4 md:max-lg:px-5 md:max-lg:py-4 lg:gap-4 lg:px-6 lg:py-5"
                   style={{
                     background: "rgba(255,255,255,0.03)",
                     borderColor: "rgba(255,255,255,0.05)",
@@ -380,7 +380,7 @@ export default function ThankYouClient() {
                   >
                     {idx + 1}
                   </div>
-                  <div className="text-[14px] font-medium leading-[1.45] md:max-lg:text-[15px] lg:text-[15px] lg:leading-[1.5]" style={{ color: "#fff" }}>
+                  <div className="text-[13px] font-medium leading-[1.4] md:max-lg:text-[15px] lg:text-[15px] lg:leading-[1.5]" style={{ color: "#fff" }}>
                     {t}
                   </div>
                 </motion.div>

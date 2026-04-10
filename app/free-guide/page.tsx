@@ -577,29 +577,6 @@ export default function LeadMagnetPage() {
                   </div>
                 </motion.div>
 
-                {/* Social links — nakon submita */}
-                <AnimatePresence>
-                  {submitted && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }} transition={{ duration: 0.4, delay: 0.3 }}
-                      className="mt-7 flex items-center justify-center gap-3"
-                    >
-                      <p className="text-[11px] text-white/25 uppercase tracking-[0.1em]">Prati nas:</p>
-                      {[
-                        { href: CONFIG.socialLinks.instagram, icon: "📸" },
-                        { href: CONFIG.socialLinks.tiktok, icon: "🎵" },
-                        { href: CONFIG.socialLinks.youtube, icon: "▶️" },
-                      ].map((s, i) => (
-                        <a key={i} href={s.href} target="_blank" rel="noopener noreferrer"
-                          className="w-9 h-9 rounded-full flex items-center justify-center text-sm transition-all duration-300"
-                          style={{ background: "rgba(0,212,255,0.04)", border: "1px solid rgba(0,212,255,0.1)" }}>
-                          {s.icon}
-                        </a>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
 
               {/* ── PDF kartica ── */}
