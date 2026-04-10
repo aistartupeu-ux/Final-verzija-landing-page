@@ -184,7 +184,10 @@ export async function appendLeadsToSheet(row: LeadsSourceRow): Promise<boolean> 
     let sheetName = process.env.LEADS_SHEET_NAME;
     if (!sheetName) {
       const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
-      sheetName = meta.data.sheets?.[0]?.properties?.title || "Sheet1";
+      const titles = (meta.data.sheets ?? [])
+        .map((s) => String(s.properties?.title ?? "").trim())
+        .filter(Boolean);
+      sheetName = titles.includes("LM") ? "LM" : (titles[0] || "LM");
     }
     const range = `'${sheetName}'!A:I`;
     await sheets.spreadsheets.values.append({
@@ -277,7 +280,10 @@ export async function getLeadsFromSheet(): Promise<LeadsSourceRow[]> {
     let sheetName = process.env.LEADS_SHEET_NAME;
     if (!sheetName) {
       const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
-      sheetName = meta.data.sheets?.[0]?.properties?.title || "Sheet1";
+      const titles = (meta.data.sheets ?? [])
+        .map((s) => String(s.properties?.title ?? "").trim())
+        .filter(Boolean);
+      sheetName = titles.includes("LM") ? "LM" : (titles[0] || "LM");
     }
     const range = `'${sheetName}'!A2:Z`;
     const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range });
@@ -304,6 +310,15 @@ export type LeadsSheetPhoneExtras = {
   survey_q4?: string;
   survey_q5?: string;
 };
+
+const LEADS_SHEET_EXTRAS_HEADERS = [
+  "ai_experience",
+  "survey_q1_interest",
+  "survey_q2_goal",
+  "survey_q3_blocker",
+  "survey_q4_system_apply",
+  "survey_q5_occupation",
+] as const;
 
 /**
  * Ažurira kolonu C (telefon), opciono D (ime) za red čiji je email u koloni B — bez novog reda (Leads by Source).
@@ -339,16 +354,41 @@ export async function updateLeadsSheetPhoneByEmail(
     let sheetName = process.env.LEADS_SHEET_NAME;
     if (!sheetName) {
       const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
-      sheetName = meta.data.sheets?.[0]?.properties?.title || "Sheet1";
+      const titles = (meta.data.sheets ?? [])
+        .map((s) => String(s.properties?.title ?? "").trim())
+        .filter(Boolean);
+      sheetName = titles.includes("LM") ? "LM" : (titles[0] || "LM");
     }
 
-    const rangeRead = `'${sheetName}'!A2:I`;
+    const rangeRead = `'${sheetName}'!A2:O`;
     const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: rangeRead });
     const rows = (res.data.values ?? []) as string[][];
+    const headerRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `'${sheetName}'!A1:O1`,
+    });
+    const headers = (headerRes.data.values?.[0] ?? []).map((h) => String(h ?? "").trim().toLowerCase());
 
+    const headersRead = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `'${sheetName}'!J1:O1`,
+    });
+    const existingHeaders = (headersRead.data.values?.[0] ?? []).map((x) => String(x ?? "").trim());
+    const hasAllHeaders = LEADS_SHEET_EXTRAS_HEADERS.every((h, i) => existingHeaders[i] === h);
+    if (!hasAllHeaders) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `'${sheetName}'!J1:O1`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [[...LEADS_SHEET_EXTRAS_HEADERS]] },
+      });
+    }
+
+    const headerEmailIdx = headers.findIndex((h) => h === "email");
+    const emailIdx = headerEmailIdx >= 0 ? headerEmailIdx : 1;
     let sheetRow = -1;
     for (let i = 0; i < rows.length; i++) {
-      const cell = String(rows[i]?.[1] ?? "").trim().toLowerCase();
+      const cell = String(rows[i]?.[emailIdx] ?? "").trim().toLowerCase();
       if (cell === emailNorm) {
         sheetRow = i + 2;
         break;
