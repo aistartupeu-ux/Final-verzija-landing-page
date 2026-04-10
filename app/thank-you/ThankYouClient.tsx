@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { useMemo, type CSSProperties } from "react";
@@ -249,7 +249,9 @@ export default function ThankYouClient() {
   const reduced = useReducedMotion();
   const ease = [0.16, 1, 0.3, 1] as const;
   const searchParams = useSearchParams();
+  const pathname = usePathname() ?? "";
   const eventIdFromUrl = searchParams.get("eid");
+  const isLeadMagnetThankYou = pathname.startsWith("/thank-you-free-guide");
   const [leadEmail] = useState<string | null>(() => {
     const stored = readStoredLeadConfirm();
     return stored?.email ?? null;
@@ -396,6 +398,7 @@ export default function ThankYouClient() {
                   email={phoneFormEmail}
                   defaultCountryCode={defaultCountry}
                   isLocalDesignPreview={phoneFormIsLocalPreview}
+                  sourceTag={isLeadMagnetThankYou ? "lead_magnet" : undefined}
                 />
               </motion.div>
             ) : null}

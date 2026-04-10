@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Loader2, Download } from "lucide-react";
 import { getLeadSourceData } from "@/lib/affiliate-tracking";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
+import { storeLeadForThankYou } from "@/lib/tiktok-datalayer";
+import { landingChannelFromPathname } from "@/lib/landing-attribution";
 
 const CONFIG = {
   formAction: "/api/lead-magnet",
@@ -130,7 +132,8 @@ function BackgroundEffects() {
 }
 
 /* ─── Lead Form ─── */
-function LeadForm({ onSuccess }: { onSuccess: () => void }) {
+function LeadForm({ onSuccess }: { onSuccess: (email: string, eventId: string) => void }) {
+  const pathname = usePathname() ?? "";
   const [email, setEmail] = useState("");
   const [focused, setFocused] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -145,24 +148,41 @@ function LeadForm({ onSuccess }: { onSuccess: () => void }) {
     e.preventDefault();
     if (!canSubmit) return;
     // ── Localhost bypass: preskači validaciju i API poziv ──
-    if (isLocalhost) { onSuccess(); return; }
+    if (isLocalhost) {
+      const emailNorm = trimmed.toLowerCase();
+      const localhostEventId = `localhost-${Date.now()}`;
+      storeLeadForThankYou(emailNorm, null, localhostEventId, landingChannelFromPathname(pathname));
+      onSuccess(emailNorm, localhostEventId);
+      return;
+    }
     if (!isAllowedEmailDomain(trimmed)) { setFieldError(EMAIL_DOMAIN_ERROR); return; }
     setStatus("loading"); setFieldError(null);
     try {
+      const eventId =
+        typeof globalThis.crypto !== "undefined" && typeof globalThis.crypto.randomUUID === "function"
+          ? globalThis.crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const sourceData = getLeadSourceData();
+      const emailNorm = trimmed.toLowerCase();
       const res = await fetch(CONFIG.formAction, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: trimmed, phone: null, name: null,
+          email: emailNorm, phone: null, name: null,
           utm_source: sourceData.utm_source,
           utm_medium: sourceData.utm_medium,
           utm_campaign: sourceData.utm_campaign ?? "lead_magnet",
           affiliate_code: sourceData.affiliate_code,
           source_tag: "lead_magnet",
+          event_id: eventId,
         }),
       });
-      if (res.ok) { setEmail(""); setStatus("idle"); onSuccess(); }
+      if (res.ok) {
+        storeLeadForThankYou(emailNorm, null, eventId, landingChannelFromPathname(pathname));
+        setEmail("");
+        setStatus("idle");
+        onSuccess(emailNorm, eventId);
+      }
       else {
         const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
         setFieldError(typeof data.error === "string" ? data.error : typeof data.message === "string" ? data.message : null);
@@ -226,7 +246,7 @@ function SuccessInline() {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.45, ease }}
-      className="w-full max-w-[520px] mx-auto flex items-center gap-4 px-5 py-4 rounded-2xl"
+      className="w-full max-w-[520px] mx-auto flex items-center justify-center gap-4 px-5 py-4 rounded-2xl text-center"
       style={{ background: "rgba(0,212,255,0.05)", border: "1px solid rgba(0,212,255,0.18)" }}
     >
       <div className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
@@ -236,7 +256,7 @@ function SuccessInline() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       </div>
-      <div>
+      <div className="text-center">
         <p className="text-white font-semibold text-[14px] leading-tight">Inbox! 📬 Proveri email</p>
         <p className="text-white/40 text-[12px] mt-0.5">Klikni na karticu desno da preuzmis vodič</p>
       </div>
@@ -402,14 +422,16 @@ function GuideCard({ unlocked, onCardClick }: { unlocked: boolean; onCardClick: 
 export default function LeadMagnetPage() {
   const router = useRouter();
   const [submitted, setSubmitted] = useState(false);
+  const [redirectEventId, setRedirectEventId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!submitted) return;
     const id = globalThis.window.setTimeout(() => {
-      router.push("/thank-you-free-guide");
+      const suffix = redirectEventId ? `?eid=${encodeURIComponent(redirectEventId)}` : "";
+      router.push(`/thank-you-free-guide${suffix}`);
     }, 2000);
     return () => globalThis.window.clearTimeout(id);
-  }, [submitted, router]);
+  }, [submitted, redirectEventId, router]);
 
   const handleCardClick = () => {
     if (CONFIG.downloadUrl && CONFIG.downloadUrl !== "#") {
@@ -537,7 +559,7 @@ export default function LeadMagnetPage() {
                           transition={{ duration: 0.25 }}
                           className="flex justify-center"
                         >
-                          <LeadForm onSuccess={() => setSubmitted(true)} />
+                          <LeadForm onSuccess={(_, eventId) => { setRedirectEventId(eventId); setSubmitted(true); }} />
                         </motion.div>
                       )}
                     </AnimatePresence>
