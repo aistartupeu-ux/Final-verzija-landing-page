@@ -6,11 +6,13 @@
  * 1. Google Cloud Console → Service Account → JSON key
  * 2. Share Sheet sa service account email (Editor)
  * 3. Env: LEADS_SHEET_ID, GOOGLE_SERVICE_ACCOUNT_JSON (ceo JSON kao string)
- * 4. Glavni tab: LEADS_SHEET_NAME (npr. Лист1). Ako nije setovan, koristi se prvi tab u dokumentu — nikad se ne bira automatski "LM".
- * 5. Lead magnet (source_tag lead_magnet): tab iz LEAD_MAGNET_SHEET_NAME (podrazumevano "LM").
+ * 4. Glavni tab: LEADS_SHEET_NAME (npr. Лист1). Bez env-a koristi se prvi tab koji NIJE lead-magnet tab (LM često prvi u fajlu).
+ * 5. Tab LM: samo source_tag lead_magnet (čist LM). lead_magnet_affiliate i ostalo → glavni list (Лист1). GW → appendGiveawayToSheet.
  */
 
 import { google } from "googleapis";
+import { formatBelgradeDateOnly } from "@/lib/time-belgrade";
+import { usesLeadMagnetSheetTab } from "@/lib/lead-source-tags";
 
 export type LeadsSourceRow = {
   date: string;
@@ -133,7 +135,7 @@ function parseRow(cells: string[]): LeadsSourceRow | null {
   }
 
   return {
-    date: date || new Date().toISOString().slice(0, 10),
+    date: date || formatBelgradeDateOnly(),
     email,
     phone,
     name: "",
@@ -154,16 +156,24 @@ async function getSpreadsheetTabTitles(sheets: SheetsClient, spreadsheetId: stri
     .filter(Boolean);
 }
 
-/** Glavni funnel — nikad ne preferira LM samo zato što postoji. */
+function leadMagnetSheetTabName(): string {
+  return process.env.LEAD_MAGNET_SHEET_NAME?.trim() || "LM";
+}
+
+/**
+ * Glavni funnel: LEADS_SHEET_NAME ili prvi tab koji NIJE lead-magnet tab (da LM može biti levo u dokumentu).
+ */
 function resolveMainLeadsSheetTabName(titles: string[], envExplicit: string | undefined): string {
   const t = envExplicit?.trim();
   if (t) return t;
-  return titles[0] ?? "Sheet1";
+  const lm = leadMagnetSheetTabName().toLowerCase();
+  const nonLm = titles.find((title) => title.trim().toLowerCase() !== lm);
+  return nonLm ?? titles[0] ?? "Sheet1";
 }
 
-/** Samo za lead magnet (free-guide). */
+/** Samo za lead magnet (free-guide), kada je source_tag lead_magnet sa pouzdanog proxy-ja. */
 function resolveLeadMagnetSheetTabName(): string {
-  return process.env.LEAD_MAGNET_SHEET_NAME?.trim() || "LM";
+  return leadMagnetSheetTabName();
 }
 
 export async function appendLeadsToSheet(row: LeadsSourceRow): Promise<boolean> {
@@ -190,6 +200,9 @@ export async function appendLeadsToSheet(row: LeadsSourceRow): Promise<boolean> 
     });
 
     const sheets = google.sheets({ version: "v4", auth });
+    const useLmTab = usesLeadMagnetSheetTab(row.source_tag);
+    // LM tab: bez affiliate kolone — affiliate ide samo u Лист1 (lead_magnet_affiliate).
+    const affiliateCell = useLmTab ? "" : String(row.affiliate_code ?? "");
     const values = [
       [
         row.date,
@@ -200,13 +213,12 @@ export async function appendLeadsToSheet(row: LeadsSourceRow): Promise<boolean> 
         row.utm_source,
         row.utm_medium,
         row.utm_campaign,
-        row.affiliate_code,
+        affiliateCell,
       ],
     ];
 
     const titles = await getSpreadsheetTabTitles(sheets, sheetId);
-    const isLeadMagnet = String(row.source_tag ?? "").trim().toLowerCase() === "lead_magnet";
-    const sheetName = isLeadMagnet
+    const sheetName = useLmTab
       ? resolveLeadMagnetSheetTabName()
       : resolveMainLeadsSheetTabName(titles, process.env.LEADS_SHEET_NAME);
     const range = `'${sheetName}'!A:I`;
@@ -425,7 +437,7 @@ async function updateLeadsSheetPhoneInTab(
 /**
  * Ažurira kolonu C (telefon), opciono D (ime) za red čiji je email u koloni B — bez novog reda (Leads by Source).
  * Opciono J–O: ai_experience + anketa (dodaj zaglavlja u Sheet ako koristiš).
- * Glavni tab: LEADS_SHEET_NAME ili prvi tab u dokumentu. Lead magnet thank-you: opts.sourceTag === "lead_magnet" → tab LM (ili LEAD_MAGNET_SHEET_NAME).
+ * Glavni tab: LEADS_SHEET_NAME ili prvi tab koji nije LM. Thank-you: opts.sourceTag tačno lead_magnet → tab LM; affiliate LM ide u glavni list.
  * Ostali: prvo glavni tab, pa LM ako red nije nađen (stari pogrešni upisi).
  */
 export async function updateLeadsSheetPhoneByEmail(
@@ -460,7 +472,7 @@ export async function updateLeadsSheetPhoneByEmail(
     const lmName = resolveLeadMagnetSheetTabName();
 
     const tag = String(opts?.sourceTag ?? "").trim().toLowerCase();
-    if (tag === "lead_magnet") {
+    if (usesLeadMagnetSheetTab(tag)) {
       return updateLeadsSheetPhoneInTab(sheets, sheetId, lmName, emailNorm, phoneVal, name, extras);
     }
 
