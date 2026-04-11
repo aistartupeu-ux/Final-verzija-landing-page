@@ -187,8 +187,11 @@ type GoogleTrafficPayload = {
   };
 };
 
-/** Klijentski timeout — kraći da UI brzo prikaže grešku ako edge/server zapne. */
-const ADMIN_PRIMARY_FETCH_TIMEOUT_MS = 48_000;
+/**
+ * Mora biti > server `maxDuration` za /api/admin/analytics (60s) + mreža,
+ * inače klijent prekida zahtev PRE odgovora funkcije — lažni „timeout“ iako bi server još stigao.
+ */
+const ADMIN_PRIMARY_FETCH_TIMEOUT_MS = 95_000;
 
 function isAbortError(e: unknown): boolean {
   if (e instanceof Error && e.name === "AbortError") return true;
@@ -757,7 +760,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
             <Loader2 size={32} color="#00d4ff" style={{ animation: "spin 1s linear infinite", willChange: "transform" }} />
             <span style={{ maxWidth: 380, lineHeight: 1.55 }}>
               Preuzimanje analitike (Sheet + Supabase)
-              {loadSeconds > 0 ? ` — ${loadSeconds}s` : ""}. Veliki period može dugo da traje; suzi datume ako možeš. Ako pređe ~48s, pojaviće se timeout poruka (Vercel limit).
+              {loadSeconds > 0 ? ` — ${loadSeconds}s` : ""}. Veliki opseg može potrajati. Ako čekanje predugo traje, suzi datume ili proveri Vercel log (plan / limit funkcije).
             </span>
           </div>
         ) : data ? (
