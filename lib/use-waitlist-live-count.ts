@@ -9,7 +9,8 @@ const DEFAULT_POLL_MS = 30_000;
 type ApiPayload = { total?: number; configured?: boolean };
 
 /**
- * Broj za prikaz = WAITLIST_DISPLAY_BASE (server, default 9000) + broj redova u `leads` (opciono samo posle WAITLIST_COUNT_SINCE_ISO).
+ * Broj za prikaz = WAITLIST_DISPLAY_BASE (server, default 9000) + novi leadovi u `leads`
+ * (server podrazumevano broji od WAITLIST_DEFAULT_COUNT_SINCE_ISO; vidi /api/public/waitlist-count).
  */
 export function useWaitlistLiveCount(options: { min?: number; pollIntervalMs?: number } = {}) {
   const { min, pollIntervalMs = DEFAULT_POLL_MS } = options;

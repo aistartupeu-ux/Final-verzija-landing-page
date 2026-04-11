@@ -176,7 +176,7 @@ export default function SocialProofSection() {
           className={`sr-fade ${iv ? "sr-inview" : ""}`}
           style={{ fontSize: "clamp(15px,2vw,18px)", color: "#666", marginBottom: 36, fontWeight: 400, "--sr-delay": reducedHook ? "0s" : "0.4s", "--sr-d": "0.5s" } as CSSProperties}
         >
-          osoba ceka na kurs
+          preko 9.000 na listi čekanja — broj raste sa svakom novom prijavom (uživo)
         </div>
 
         <div
