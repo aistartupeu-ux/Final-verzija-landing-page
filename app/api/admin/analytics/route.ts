@@ -311,6 +311,13 @@ export async function GET(req: NextRequest) {
     upsertLeadByEmail(emailKey, tagForRow, Number.isNaN(ts) ? 0 : ts);
   }
 
+  const sheetBySourceSum = Object.values(sheetBySourceInPeriod).reduce((a, c) => a + c, 0);
+  if (sheetBySourceSum !== sheetRowsUsed) {
+    console.warn(
+      `admin analytics: sheetBySource sum ${sheetBySourceSum} !== sheetRowsInPeriod ${sheetRowsUsed}`
+    );
+  }
+
   const supabaseUniqueEmailsInPeriodSet = new Set<string>();
   for (const lead of listSupabase) {
     const emailKey = (lead.email ?? "").trim().toLowerCase();
