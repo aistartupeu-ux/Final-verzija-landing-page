@@ -946,30 +946,40 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
                     ))}
                   </div>
                 )}
+                {(() => {
+                  const ig = data.bySource.instagram ?? 0;
+                  const fb = data.bySource.facebook ?? 0;
+                  const tt = data.tiktokLeads;
+                  const dir = data.direct;
+                  const aff = data.affiliate ?? 0;
+                  const other = Object.entries(data.bySource)
+                    .filter(([k]) => !["instagram", "facebook", "tiktok", "direct", "affiliate"].includes(k))
+                    .reduce((s, [, v]) => s + v, 0);
+                  const sum = ig + fb + tt + dir + aff + other;
+                  const ok = sum === data.total;
+                  return (
+                    <div
+                      style={{
+                        marginTop: 16,
+                        marginBottom: 0,
+                        padding: 14,
+                        borderRadius: 12,
+                        background: ok ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
+                        border: "1px solid " + (ok ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"),
+                      }}
+                    >
+                      <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>
+                        Provera: Instagram + Facebook + TikTok + Direktno + Affiliate + ostalo = Ukupno
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: ok ? "#22c55e" : "#ef4444" }}>
+                        {ig} + {fb} + {tt} + {dir} + {aff}
+                        {other > 0 ? " + " + other : ""} = {sum} {ok ? "✓" : "≠ " + data.total + " ✗"}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
-
-            {(() => {
-              const ig = data.bySource.instagram ?? 0;
-              const fb = data.bySource.facebook ?? 0;
-              const tt = data.tiktokLeads;
-              const dir = data.direct;
-              const aff = data.affiliate ?? 0;
-              const other = Object.entries(data.bySource)
-                .filter(([k]) => !["instagram", "facebook", "tiktok", "direct", "affiliate"].includes(k))
-                .reduce((s, [, v]) => s + v, 0);
-              const sum = ig + fb + tt + dir + aff + other;
-              const ok = sum === data.total;
-              return (
-                <div style={{ marginBottom: 24, padding: 14, borderRadius: 12, background: ok ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)", border: "1px solid " + (ok ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)") }}>
-                  <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>Provera: Instagram + Facebook + TikTok + Direktno + Affiliate + ostalo = Ukupno</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: ok ? "#22c55e" : "#ef4444" }}>
-                    {ig} + {fb} + {tt} + {dir} + {aff}
-                    {other > 0 ? " + " + other : ""} = {sum} {ok ? "✓" : "≠ " + data.total + " ✗"}
-                  </div>
-                </div>
-              );
-            })()}
 
             <div style={{ marginBottom: 28, contain: "layout" }}>
               <h2 style={{ fontSize: "clamp(15px, 4vw, 16px)", fontWeight: 700, color: "#fff", marginBottom: 14 }}>Raspodela po izvoru</h2>
