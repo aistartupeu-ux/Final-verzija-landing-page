@@ -282,6 +282,8 @@ export async function GET(req: NextRequest) {
 
   const sheetRowsByTab = { main: 0, lm: 0, gw: 0 };
   const sheetUniqueEmailsInPeriodSet = new Set<string>();
+  /** Broji samo redove u istom periodu kao analitika (ne ceo Sheet). */
+  const sheetBySourceInPeriod: Record<string, number> = {};
 
   let sheetRowsUsed = 0;
   for (const row of sheetRows) {
@@ -290,6 +292,14 @@ export async function GET(req: NextRequest) {
     if (!sheetRowYmdInPeriod(rowYmd, fromYmd, toYmd)) continue;
     if (legacyLastInclusiveSheetYmd !== null && rowYmd > legacyLastInclusiveSheetYmd) continue;
     sheetRowsUsed += 1;
+    const tagForRow = normalizeSourceTag(
+      row.source_tag,
+      row.utm_source,
+      row.utm_medium,
+      row.utm_campaign,
+      row.affiliate_code
+    );
+    sheetBySourceInPeriod[tagForRow] = (sheetBySourceInPeriod[tagForRow] ?? 0) + 1;
     const tab = row.sheetTab ?? "main";
     if (tab === "lm") sheetRowsByTab.lm += 1;
     else if (tab === "gw") sheetRowsByTab.gw += 1;
@@ -297,15 +307,8 @@ export async function GET(req: NextRequest) {
     const emailKey = (row.email ?? "").trim().toLowerCase();
     if (!emailKey) continue;
     sheetUniqueEmailsInPeriodSet.add(emailKey);
-    const tag = normalizeSourceTag(
-      row.source_tag,
-      row.utm_source,
-      row.utm_medium,
-      row.utm_campaign,
-      row.affiliate_code
-    );
     const ts = Date.parse(`${rowYmd}T12:00:00.000Z`);
-    upsertLeadByEmail(emailKey, tag, Number.isNaN(ts) ? 0 : ts);
+    upsertLeadByEmail(emailKey, tagForRow, Number.isNaN(ts) ? 0 : ts);
   }
 
   const supabaseUniqueEmailsInPeriodSet = new Set<string>();
@@ -375,17 +378,6 @@ export async function GET(req: NextRequest) {
   }
 
   if (debug) {
-    const sheetBySource: Record<string, number> = {};
-    for (const row of sheetRows) {
-      const tag = normalizeSourceTag(
-        row.source_tag,
-        row.utm_source,
-        row.utm_medium,
-        row.utm_campaign,
-        row.affiliate_code
-      );
-      sheetBySource[tag] = (sheetBySource[tag] ?? 0) + 1;
-    }
     payload.debug = {
       sheetFetchMs,
       supabaseFetchMs,
@@ -403,7 +395,7 @@ export async function GET(req: NextRequest) {
       mergedUniqueEmails: leadByEmail.size,
       legacyMode,
       legacyLastInclusiveSheetYmd: legacyLastInclusiveSheetYmd,
-      sheetBySource,
+      sheetBySource: sheetBySourceInPeriod,
       sheetSample: sheetRows.slice(0, 5).map((r) => ({
         date: r.date,
         sheetTab: r.sheetTab ?? "main",

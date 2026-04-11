@@ -935,7 +935,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
                   <span style={{ color: "#ccc" }}>{data.debug.supabaseCreatedAtLte ?? "—"}</span>
                 </div>
                 <div style={{ fontSize: 12, color: "#aaa", marginBottom: 8 }}>
-                  Po izvoru na Sheet-u (pre filtra): {JSON.stringify(data.debug.sheetBySource)}
+                  Sheet po izvoru (u periodu; zbir = redovi u periodu): {JSON.stringify(data.debug.sheetBySource)}
                 </div>
                 {data.debug.sheetSample?.length > 0 && (
                   <div style={{ fontSize: 11, color: "#888", fontFamily: "monospace" }}>
