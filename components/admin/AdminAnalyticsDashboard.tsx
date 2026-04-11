@@ -187,7 +187,7 @@ type GoogleTrafficPayload = {
   };
 };
 
-const ADMIN_LEADS_INITIAL_DELAY_MS = 5000;
+const ADMIN_LEADS_INITIAL_DELAY_MS = 400;
 const BELGRADE_YMD = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Europe/Belgrade",
   year: "numeric",
@@ -526,7 +526,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   const lastFetchedRangeRef = useRef<string | null>(null);
   const firstLoadTimerForKeyRef = useRef<string | null>(null);
 
-  // Prvo učitavanje: 5s pauza (manje opterećenje). Promena datuma posle toga: odmah.
+  // Prvo učitavanje: kratka pauza (layout). Promena datuma posle toga: odmah.
   // lastFetchedRange sprečava ponovni fetch samo zbog promene reference na fetchData.
   useEffect(() => {
     if (!from || !to) return;
@@ -565,32 +565,31 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (legacy || !data) return;
+    if (legacy) return;
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (url && key) {
-      const client = createClient(url, key);
-      const ch = client.channel("admin-leads").on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "leads" },
-        () => {
-          if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
-          fetchDebounceRef.current = setTimeout(() => {
-            fetchData(true);
-            fetchGoogleTraffic();
-            fetchDebounceRef.current = null;
-          }, 2500);
-        }
-      ).subscribe();
-      return () => {
+    if (!url || !key) return;
+    const client = createClient(url, key);
+    const ch = client.channel("admin-leads").on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "leads" },
+      () => {
         if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
-        client.removeChannel(ch);
-      };
-    }
-  }, [legacy, data, fetchData, fetchGoogleTraffic]);
+        fetchDebounceRef.current = setTimeout(() => {
+          fetchData(true);
+          fetchGoogleTraffic();
+          fetchDebounceRef.current = null;
+        }, 800);
+      }
+    ).subscribe();
+    return () => {
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+      client.removeChannel(ch);
+    };
+  }, [legacy, fetchData, fetchGoogleTraffic]);
 
   useEffect(() => {
-    if (legacy || !data || liveMode === "off") return;
+    if (legacy || liveMode === "off") return;
     const refreshMs = liveMode === "90s" ? 90_000 : 30_000;
     const id = setInterval(() => {
       if (liveMode === "live_today") {
@@ -604,7 +603,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       fetchData(true);
     }, refreshMs);
     return () => clearInterval(id);
-  }, [legacy, data, fetchData, fetchGoogleTraffic, liveMode]);
+  }, [legacy, fetchData, fetchGoogleTraffic, liveMode]);
 
   const handleRefresh = () => {
     fetchData();

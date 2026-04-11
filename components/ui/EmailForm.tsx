@@ -8,6 +8,7 @@ import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { useEmailVerify } from "@/lib/use-email-verify";
 import { pushLeadToDataLayer, storeLeadForThankYou } from "@/lib/tiktok-datalayer";
 import { landingChannelFromPathname } from "@/lib/landing-attribution";
+import { broadcastWaitlistRefresh } from "@/lib/waitlist-refresh";
 import { useRouter, usePathname } from "next/navigation";
 
 const montserratHeroInput = Montserrat({
@@ -76,13 +77,14 @@ export default function EmailForm({
           event_id: eventId,
         }),
       });
+      const leadJson = (await res.json().catch(() => ({}))) as { duplicate?: boolean; error?: string };
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        console.error("Leads API error:", errJson);
+        console.error("Leads API error:", leadJson);
         setError("Došlo je do greške. Pokušajte ponovo ili nas kontaktirajte.");
         setLoading(false);
         return;
       }
+      if (!leadJson.duplicate) broadcastWaitlistRefresh();
       await pushLeadToDataLayer(email, null);
       storeLeadForThankYou(email.trim().toLowerCase(), null, eventId, landingChannelFromPathname(pathname));
       trackAffiliateLeadOnSubmit({ email, phone: null });

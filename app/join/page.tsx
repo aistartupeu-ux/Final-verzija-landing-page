@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { trackAffiliateLeadOnSubmit, getLeadSourceData } from "@/lib/affiliate-tracking";
+import { broadcastWaitlistRefresh } from "@/lib/waitlist-refresh";
 import { ttqLeadWithPii } from "@/lib/tiktok-datalayer";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { useEmailVerify } from "@/lib/use-email-verify";
@@ -81,15 +82,16 @@ function JoinContent() {
           source_tag: sourceData.source_tag,
         }),
       });
+      const leadJson = (await res.json().catch(() => ({}))) as { duplicate?: boolean; error?: string };
       if (res.ok && typeof window !== "undefined") {
         const w = window as unknown as { fbq?: (a: string, b: string) => void };
         if (w.fbq) w.fbq("track", "Lead");
         void ttqLeadWithPii({ email, phone: null });
       }
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Greška pri prijavi");
+        throw new Error(leadJson.error || "Greška pri prijavi");
       }
+      if (!leadJson.duplicate) broadcastWaitlistRefresh();
       trackAffiliateLeadOnSubmit({ email, phone: null });
     } catch (err) {
       setStatus("idle");

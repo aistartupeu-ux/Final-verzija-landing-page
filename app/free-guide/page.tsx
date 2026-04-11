@@ -9,6 +9,7 @@ import { getLeadSourceData } from "@/lib/affiliate-tracking";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { storeLeadForThankYou } from "@/lib/tiktok-datalayer";
 import { landingChannelFromPathname } from "@/lib/landing-attribution";
+import { broadcastWaitlistRefresh } from "@/lib/waitlist-refresh";
 
 const CONFIG = {
   formAction: "/api/lead-magnet",
@@ -256,6 +257,8 @@ function LeadForm({ onSuccess }: { onSuccess: (email: string, eventId: string) =
         }),
       });
       if (res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { duplicate?: boolean };
+        if (!body.duplicate) broadcastWaitlistRefresh();
         storeLeadForThankYou(emailNorm, null, eventId, landingChannelFromPathname(pathname));
         setEmail("");
         setStatus("idle");

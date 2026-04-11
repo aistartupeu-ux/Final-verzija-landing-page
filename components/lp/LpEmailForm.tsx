@@ -6,6 +6,7 @@ import { getLeadSourceData } from "@/lib/affiliate-tracking";
 import { useEmailVerify } from "@/lib/use-email-verify";
 import { pushLeadToDataLayer, storeLeadForThankYou } from "@/lib/tiktok-datalayer";
 import { landingChannelFromPathname } from "@/lib/landing-attribution";
+import { broadcastWaitlistRefresh } from "@/lib/waitlist-refresh";
 import { useRouter, usePathname } from "next/navigation";
 
 export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
@@ -48,13 +49,14 @@ export default function LpEmailForm({ microcopy }: { microcopy?: string }) {
           event_id: eventId,
         }),
       });
+      const leadJson = (await res.json().catch(() => ({}))) as { duplicate?: boolean };
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        console.error("Leads API error:", errJson);
+        console.error("Leads API error:", leadJson);
         setError("Došlo je do greške. Pokušajte ponovo.");
         setLoading(false);
         return;
       }
+      if (!leadJson.duplicate) broadcastWaitlistRefresh();
 
       // Meta/TikTok konverzije na thank-you (jednom). dataLayer na submit za GTM na Meta putu.
       await pushLeadToDataLayer(email, null);

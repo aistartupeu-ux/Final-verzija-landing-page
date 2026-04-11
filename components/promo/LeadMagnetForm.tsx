@@ -5,6 +5,7 @@ import { ArrowRight, CheckCircle, Download, Loader2, XCircle } from "lucide-reac
 import { getLeadSourceData } from "@/lib/affiliate-tracking";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { useEmailVerify } from "@/lib/use-email-verify";
+import { broadcastWaitlistRefresh } from "@/lib/waitlist-refresh";
 
 type Status = "idle" | "loading" | "done";
 
@@ -67,14 +68,15 @@ export default function LeadMagnetForm() {
           source_tag: "lead_magnet",
         }),
       });
+      const out = (await res.json().catch(() => ({}))) as { duplicate?: boolean; error?: string };
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error("Lead magnet API error:", err);
+        console.error("Lead magnet API error:", out);
         setError("Došlo je do greške. Pokušajte ponovo.");
         setLoading(false);
         setStatus("idle");
         return;
       }
+      if (!out.duplicate) broadcastWaitlistRefresh();
       setStatus("done");
     } catch {
       setError("Greška u konekciji. Pokušajte ponovo.");

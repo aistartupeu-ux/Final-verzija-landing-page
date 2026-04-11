@@ -5,9 +5,11 @@ import { Eye, Users, Play, BookOpen, Award, Zap } from "lucide-react";
 import { useInView } from "@/lib/use-in-view";
 import { useDocumentHtmlDataFlag } from "@/lib/use-html-data-flag";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
+import { useWaitlistLiveCount } from "@/lib/use-waitlist-live-count";
 
 const START_DATE = new Date(2026, 2, 11, 0, 0, 0);
-const START_VALUE = 1200;
+/** Fallback dok API ne učita; stvarni broj = WAITLIST_DISPLAY_BASE + leads (vidi /api/public/waitlist-count). */
+const WAITLIST_FALLBACK = 9000;
 
 const COUNTDOWN_END = new Date(2026, 3, 15, 0, 0, 0);
 const BAR_START_PCT = 58;
@@ -23,52 +25,6 @@ function getBarProgress(): number {
   const elapsed = now - start;
   const raw = elapsed / total;
   return BAR_START_PCT + (100 - BAR_START_PCT) * raw;
-}
-
-function getDaysSinceStart(d: Date): number {
-  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const start = new Date(START_DATE.getFullYear(), START_DATE.getMonth(), START_DATE.getDate()).getTime();
-  return Math.floor((day - start) / 86400000);
-}
-
-function getDailyLimit(dayIndex: number): number {
-  const base = 25;
-  const spread = 16;
-  return base + ((dayIndex * 7919 + 31) % spread);
-}
-
-function easeInOut(t: number): number {
-  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-}
-
-function getWaitlistCount(): number {
-  if (typeof window === "undefined") return START_VALUE;
-  const now = new Date();
-  const daysSinceStart = getDaysSinceStart(now);
-  if (daysSinceStart < 0) return START_VALUE;
-
-  let baseAtMidnight = START_VALUE;
-  for (let i = 0; i < daysSinceStart; i++) {
-    baseAtMidnight += getDailyLimit(i);
-  }
-
-  const todayLimit = getDailyLimit(daysSinceStart);
-  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const progress = easeInOut((now.getTime() - midnight) / 86400000);
-  const todayAdded = Math.floor(progress * todayLimit);
-
-  const computed = baseAtMidnight + todayAdded;
-
-  try {
-    const key = "aha_waitlist_max_v1";
-    const storedRaw = window.localStorage.getItem(key);
-    const stored = storedRaw ? parseInt(storedRaw, 10) : NaN;
-    const safe = Number.isFinite(stored) ? Math.max(computed, stored) : computed;
-    window.localStorage.setItem(key, String(safe));
-    return safe;
-  } catch {
-    return computed;
-  }
 }
 
 const ticks = [
@@ -87,26 +43,19 @@ export default function SocialProofSection() {
   const heroVslHeavy = useDocumentHtmlDataFlag("data-hero-vsl-heavy");
   const heavyOk = inView && !reducedHook && !heroVslHeavy;
 
-  // Keep initial SSR and client render identical to avoid hydration mismatch.
-  const [waitlist, setWaitlist] = useState(START_VALUE);
+  const { display: waitlist } = useWaitlistLiveCount({ min: WAITLIST_FALLBACK, pollIntervalMs: 35_000 });
   const [barProgress, setBarProgress] = useState(BAR_START_PCT);
 
   useEffect(() => {
     const t = window.setTimeout(() => {
-      setWaitlist(getWaitlistCount());
       setBarProgress(getBarProgress());
     }, 0);
     return () => window.clearTimeout(t);
   }, []);
 
   useEffect(() => {
-    let t: ReturnType<typeof setTimeout>;
-    const tick = () => {
-      setWaitlist(getWaitlistCount());
-      t = setTimeout(tick, 120000 + Math.random() * 120000);
-    };
-    t = setTimeout(tick, 60000 + Math.random() * 60000);
-    return () => clearTimeout(t);
+    const id = window.setInterval(() => setBarProgress(getBarProgress()), 60_000);
+    return () => window.clearInterval(id);
   }, []);
 
   useEffect(() => {

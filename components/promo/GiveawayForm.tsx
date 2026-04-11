@@ -9,6 +9,7 @@ import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR } from "@/lib/email-domains";
 import { useEmailVerify } from "@/lib/use-email-verify";
 import PhoneInput, { type Value } from "react-phone-number-input";
 import { usePathname, useRouter } from "next/navigation";
+import { broadcastWaitlistRefresh } from "@/lib/waitlist-refresh";
 import "react-phone-number-input/style.css";
 
 type Step = "email" | "phone" | "done";
@@ -94,13 +95,14 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
           name: null,
         }),
       });
+      const out = (await res.json().catch(() => ({}))) as { duplicate?: boolean };
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error("Giveaway API error:", err);
+        console.error("Giveaway API error:", out);
         setError("Došlo je do greške. Pokušajte ponovo.");
         setLoading(false);
         return;
       }
+      if (!out.duplicate) broadcastWaitlistRefresh();
       storeLeadForThankYou(email.trim().toLowerCase(), skipPhone || !phone ? null : phone, eventId, landingChannelFromPathname(pathname));
       setPendingEventId(eventId);
       setStep("done");

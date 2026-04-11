@@ -94,7 +94,7 @@ export default function PaidAdsLandingPage() {
                 ))}
               </div>
               <div style={{ color: "rgba(226,232,240,0.70)", fontSize: 13 }}>
-                <span style={{ color: "#4ade80", fontWeight: 700 }}><LpWaitlistCount min={1450} suffix="+" /></span> osoba već čeka na pristup
+                <span style={{ color: "#4ade80", fontWeight: 700 }}><LpWaitlistCount suffix="+" /></span> osoba već čeka na pristup
               </div>
             </div>
           </div>
@@ -232,13 +232,13 @@ export default function PaidAdsLandingPage() {
       <section style={{ padding: "0 0 70px" }}>
         <div className="section-container" style={{ maxWidth: 740, textAlign: "center" }}>
           <h2 style={{ fontSize: "clamp(22px, 3.5vw, 32px)", fontWeight: 900, marginBottom: 12 }}>
-            Već <span className="lp-gradient-text"><LpWaitlistCount min={1450} suffix="+" /></span> ljudi je odlučilo da ne prespava AI talas
+            Već <span className="lp-gradient-text"><LpWaitlistCount suffix="+" /></span> ljudi je odlučilo da ne prespava AI talas
           </h2>
 
           <div className="card" style={{ padding: 22, marginTop: 16 }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
               <span style={{ width: 8, height: 8, borderRadius: 99, background: "#4ade80", animation: "pulse 2s ease infinite" }} />
-              <span style={{ fontWeight: 800, color: "rgba(226,232,240,0.8)" }}>Live: <LpWaitlistCount min={1450} /> osoba na waitlisti</span>
+              <span style={{ fontWeight: 800, color: "rgba(226,232,240,0.8)" }}>Live: <LpWaitlistCount /> osoba na waitlisti</span>
             </div>
             <div style={{ color: "rgba(226,232,240,0.70)", lineHeight: 1.75 }}>
               “Konačno neko ko pokazuje šta zapravo raditi, a ne samo pričati o AI.”
