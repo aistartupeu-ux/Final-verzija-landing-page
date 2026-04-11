@@ -187,17 +187,6 @@ type GoogleTrafficPayload = {
   };
 };
 
-/**
- * Mora biti > server `maxDuration` za /api/admin/analytics (60s) + mreža,
- * inače klijent prekida zahtev PRE odgovora funkcije — lažni „timeout“ iako bi server još stigao.
- */
-const ADMIN_PRIMARY_FETCH_TIMEOUT_MS = 95_000;
-
-function isAbortError(e: unknown): boolean {
-  if (e instanceof Error && e.name === "AbortError") return true;
-  const o = e as { name?: string; code?: number } | null;
-  return o?.name === "AbortError" || o?.code === 20;
-}
 const BELGRADE_YMD = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Europe/Belgrade",
   year: "numeric",
@@ -460,17 +449,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       if (toAtStart) params.set("to", toAtStart);
       if (withDebug) params.set("debug", "1");
       if (legacyAtStart) params.set("legacy", "1");
-      const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), ADMIN_PRIMARY_FETCH_TIMEOUT_MS);
-      let res: Response;
-      try {
-        res = await fetch(`/api/admin/analytics?${params}`, {
-          credentials: "include",
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(tid);
-      }
+      const res = await fetch(`/api/admin/analytics?${params}`, { credentials: "include" });
       if (res.status === 401) {
         redirectToLogin();
         return;
@@ -485,13 +464,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     } catch (e) {
       if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
       if (silent && !rangeUnchanged()) return;
-      if (isAbortError(e)) {
-        setError(
-          "Zahtev za analitiku je predugo trajao (timeout). Suzi period datuma ili proveri Vercel log / limit funkcije."
-        );
-      } else {
-        setError(e instanceof Error ? e.message : "Greška pri učitavanju.");
-      }
+      setError(e instanceof Error ? e.message : "Greška pri učitavanju.");
     } finally {
       if (!silent && mySeq === leadRangeFetchSeqRef.current) {
         setLoading(false);
@@ -616,7 +589,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (legacy) return;
+    if (legacy || !data) return;
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !key) return;
@@ -637,10 +610,10 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
       client.removeChannel(ch);
     };
-  }, [legacy, fetchData, fetchGoogleTraffic]);
+  }, [legacy, data, fetchData, fetchGoogleTraffic]);
 
   useEffect(() => {
-    if (legacy || liveMode === "off") return;
+    if (legacy || !data || liveMode === "off") return;
     const refreshMs = liveMode === "90s" ? 90_000 : 30_000;
     const id = setInterval(() => {
       if (liveMode === "live_today") {
@@ -654,7 +627,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       fetchData(true);
     }, refreshMs);
     return () => clearInterval(id);
-  }, [legacy, fetchData, fetchGoogleTraffic, liveMode]);
+  }, [legacy, data, fetchData, fetchGoogleTraffic, liveMode]);
 
   const handleRefresh = () => {
     fetchData();
@@ -760,7 +733,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
             <Loader2 size={32} color="#00d4ff" style={{ animation: "spin 1s linear infinite", willChange: "transform" }} />
             <span style={{ maxWidth: 380, lineHeight: 1.55 }}>
               Preuzimanje analitike (Sheet + Supabase)
-              {loadSeconds > 0 ? ` — ${loadSeconds}s` : ""}. Veliki opseg može potrajati. Ako čekanje predugo traje, suzi datume ili proveri Vercel log (plan / limit funkcije).
+              {loadSeconds > 0 ? ` — ${loadSeconds}s` : ""}. Veliki opseg može potrajati; suzi datume ako treba.
             </span>
           </div>
         ) : data ? (
