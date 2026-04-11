@@ -281,6 +281,7 @@ export async function GET(req: NextRequest) {
   const supabaseFetchTruncated = supabaseBundle.truncated;
 
   const sheetRowsByTab = { main: 0, lm: 0, gw: 0 };
+  const sheetUniqueEmailsInPeriodSet = new Set<string>();
 
   let sheetRowsUsed = 0;
   for (const row of sheetRows) {
@@ -295,6 +296,7 @@ export async function GET(req: NextRequest) {
     else sheetRowsByTab.main += 1;
     const emailKey = (row.email ?? "").trim().toLowerCase();
     if (!emailKey) continue;
+    sheetUniqueEmailsInPeriodSet.add(emailKey);
     const tag = normalizeSourceTag(
       row.source_tag,
       row.utm_source,
@@ -306,9 +308,11 @@ export async function GET(req: NextRequest) {
     upsertLeadByEmail(emailKey, tag, Number.isNaN(ts) ? 0 : ts);
   }
 
+  const supabaseUniqueEmailsInPeriodSet = new Set<string>();
   for (const lead of listSupabase) {
     const emailKey = (lead.email ?? "").trim().toLowerCase();
     if (!emailKey) continue;
+    supabaseUniqueEmailsInPeriodSet.add(emailKey);
     const tag = normalizeSourceTag(
       lead.source_tag,
       lead.utm_source ?? null,
@@ -330,6 +334,9 @@ export async function GET(req: NextRequest) {
     console.warn(`Analytics: sum(bySource)=${sumBySource} !== total=${total}`);
   }
 
+  const sheetUniqueEmailsInPeriod = sheetUniqueEmailsInPeriodSet.size;
+  const supabaseUniqueEmailsInPeriod = supabaseUniqueEmailsInPeriodSet.size;
+
   const ig = bySource["instagram"] ?? 0;
   const fb = bySource["facebook"] ?? 0;
   const payload: Record<string, unknown> = {
@@ -340,12 +347,7 @@ export async function GET(req: NextRequest) {
     tiktokLeads: bySource["tiktok"] ?? 0,
     direct: bySource["direct"] ?? 0,
     affiliate: bySource["affiliate"] ?? 0,
-    supabaseRowsInPeriod: listSupabase.length,
-    sheetRowsInPeriod: sheetRowsUsed,
-    sheetRowsByTab,
     countingModel: "unique_email_sheet_plus_supabase_belgrade_day_bounds",
-    supabaseCreatedAtGte: supabaseGteIso,
-    supabaseCreatedAtLte: supabaseLteIso,
     supabaseFetchTruncated,
   };
   if (legacyMode && legacyCutoffDate && legacyLastInclusiveSheetYmd !== null) {
@@ -389,7 +391,12 @@ export async function GET(req: NextRequest) {
       supabaseFetchMs,
       sheetRowsTotal: sheetRows.length,
       sheetRowsAfterFilter: sheetRowsUsed,
+      sheetRowsInPeriod: sheetRowsUsed,
+      sheetRowsByTab,
+      sheetUniqueEmailsInPeriod,
       supabaseLeadsFetched: listSupabase.length,
+      supabaseRowsInPeriod: listSupabase.length,
+      supabaseUniqueEmailsInPeriod,
       supabaseFetchTruncated,
       supabaseCreatedAtGte: supabaseGteIso,
       supabaseCreatedAtLte: supabaseLteIso,

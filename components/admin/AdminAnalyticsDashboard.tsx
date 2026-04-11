@@ -33,16 +33,9 @@ type AnalyticsData = {
   tiktokLeads: number;
   direct: number;
   affiliate: number;
-  /** Broj redova u Supabase u periodu (created_at, Beograd); Table Editor COUNT za isti opseg. */
-  supabaseRowsInPeriod?: number;
   /** true ako API nije mogao da učita sve redove (limit 200k) — suzi period. */
   supabaseFetchTruncated?: boolean;
-  /** Sheet redovi u periodu (List1 + LM + GW), jedan red = jedna prijava u tabu. */
-  sheetRowsInPeriod?: number;
-  sheetRowsByTab?: { main: number; lm: number; gw: number };
   countingModel?: string;
-  supabaseCreatedAtGte?: string | null;
-  supabaseCreatedAtLte?: string | null;
   /** Samo kod legacy=1 — leadovi se broje samo do ovog trenutka. */
   legacyCutoffAt?: string;
   secondsUntilMidnight?: number;
@@ -51,12 +44,21 @@ type AnalyticsData = {
     sheetFetchMs?: number;
     supabaseFetchMs?: number;
     sheetRowsTotal: number;
+    sheetRowsAfterFilter?: number;
+    sheetRowsInPeriod?: number;
+    sheetRowsByTab?: { main: number; lm: number; gw: number };
+    sheetUniqueEmailsInPeriod?: number;
+    supabaseUniqueEmailsInPeriod?: number;
+    supabaseRowsInPeriod?: number;
     sheetBySource: Record<string, number>;
     sheetSample: { date: string; sheetTab?: string; source_tag: string; utm_source: string; utm_medium: string }[];
     supabaseLeadsFetched?: number;
     supabaseCreatedAtGte?: string | null;
     supabaseCreatedAtLte?: string | null;
     mergedUniqueEmails?: number;
+    supabaseFetchTruncated?: boolean;
+    legacyMode?: boolean;
+    legacyLastInclusiveSheetYmd?: string | null;
   };
 };
 
@@ -865,6 +867,53 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
             {data.debug && (
               <div style={{ marginBottom: 24, padding: 16, borderRadius: 12, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
                 <h3 style={{ fontSize: 14, fontWeight: 700, color: "#a78bfa", marginBottom: 12 }}>Debug – Sheet + Supabase</h3>
+                <div
+                  style={{
+                    marginBottom: 12,
+                    padding: 12,
+                    borderRadius: 8,
+                    background: "rgba(0,212,255,0.06)",
+                    border: "1px solid rgba(0,212,255,0.18)",
+                    fontSize: 12,
+                    color: "#94a3b8",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, color: "#e5e7eb", marginBottom: 8 }}>Rekonsilijacija (samo debug)</div>
+                  <div>
+                    <strong style={{ color: "#fff" }}>{data.debug.mergedUniqueEmails ?? data.total}</strong> — jedinstveni email posle spajanja Sheet-a i
+                    Supabase-a u periodu (ne duplira istu adresu). Kartica „Ukupno“: <strong style={{ color: "#fff" }}>{data.total}</strong>.
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    Sheet u periodu:{" "}
+                    <strong style={{ color: "#fff" }}>{data.debug.sheetRowsInPeriod ?? data.debug.sheetRowsAfterFilter ?? "—"}</strong> redova ·{" "}
+                    <strong style={{ color: "#fff" }}>{data.debug.sheetUniqueEmailsInPeriod ?? "—"}</strong> jedinstvenih email
+                  </div>
+                  <div style={{ marginTop: 4 }}>
+                    Supabase u periodu:{" "}
+                    <strong style={{ color: "#fff" }}>{data.debug.supabaseRowsInPeriod ?? data.debug.supabaseLeadsFetched ?? "—"}</strong> redova u bazi ·{" "}
+                    <strong style={{ color: "#fff" }}>{data.debug.supabaseUniqueEmailsInPeriod ?? "—"}</strong> jedinstvenih email
+                    {data.debug.supabaseRowsInPeriod != null &&
+                      data.debug.supabaseUniqueEmailsInPeriod != null &&
+                      data.debug.supabaseRowsInPeriod > data.debug.supabaseUniqueEmailsInPeriod && (
+                      <span style={{ color: "#fbbf24" }}>
+                        {" "}
+                        ({data.debug.supabaseRowsInPeriod - data.debug.supabaseUniqueEmailsInPeriod} dupli red u bazi za isti email)
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 11, color: "#6b7280" }}>
+                    Sheet API učitano (svi datumi):{" "}
+                    <strong style={{ color: "#9ca3af" }}>{data.debug.sheetRowsTotal}</strong> redova — u „Ukupno“ ulaze samo redovi u izabranom periodu (
+                    <strong style={{ color: "#9ca3af" }}>{data.debug.sheetRowsInPeriod ?? data.debug.sheetRowsAfterFilter ?? "—"}</strong>).
+                  </div>
+                  {data.debug.sheetRowsByTab && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: "#6b7280" }}>
+                      Sheet po tabu (fetch): main {data.debug.sheetRowsByTab.main} · LM {data.debug.sheetRowsByTab.lm} · GW{" "}
+                      {data.debug.sheetRowsByTab.gw}
+                    </div>
+                  )}
+                </div>
                 <div style={{ fontSize: 12, color: "#aaa", marginBottom: 8 }}>
                   {(data.debug.sheetFetchMs != null || data.debug.supabaseFetchMs != null) && (
                     <span style={{ display: "block", marginBottom: 6, color: "#94a3b8" }}>
@@ -872,13 +921,15 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
                       {data.debug.supabaseFetchMs ?? "—"} ms
                     </span>
                   )}
-                  Sheet redova: <strong style={{ color: "#fff" }}>{data.debug.sheetRowsTotal}</strong>
+                  Ukupno (kartica): <strong style={{ color: "#fff" }}>{data.total}</strong>
                   {" · "}
-                  Supabase učitano: <strong style={{ color: "#fff" }}>{data.debug.supabaseLeadsFetched ?? "—"}</strong>
+                  Sheet u periodu: <strong style={{ color: "#fff" }}>{data.debug.sheetRowsAfterFilter ?? data.debug.sheetRowsInPeriod ?? "—"}</strong> red /{" "}
+                  <strong style={{ color: "#fff" }}>{data.debug.sheetUniqueEmailsInPeriod ?? "—"}</strong> jedinstvenih
                   {" · "}
-                  merged email: <strong style={{ color: "#fff" }}>{data.debug.mergedUniqueEmails ?? data.total}</strong>
+                  Supabase: <strong style={{ color: "#fff" }}>{data.debug.supabaseLeadsFetched ?? "—"}</strong> red /{" "}
+                  <strong style={{ color: "#fff" }}>{data.debug.supabaseUniqueEmailsInPeriod ?? "—"}</strong> jedinstvenih
                   {" · "}
-                  created_at gte/lte:{" "}
+                  created_at:{" "}
                   <span style={{ color: "#ccc" }}>{data.debug.supabaseCreatedAtGte ?? "—"}</span>
                   {" → "}
                   <span style={{ color: "#ccc" }}>{data.debug.supabaseCreatedAtLte ?? "—"}</span>
