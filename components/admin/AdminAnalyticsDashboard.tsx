@@ -429,6 +429,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   const fetchData = useCallback(async (silent = false, withDebug = false) => {
     if (!silent) setLoading(true);
     setError(null);
+    let primaryOk = false;
     try {
       const params = new URLSearchParams();
       if (from) params.set("from", from);
@@ -443,49 +444,52 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       if (!res.ok) throw new Error(await res.text());
       const json = await res.json();
       setData(json);
-      fetchTodayData();
-
-      const mp = new URLSearchParams();
-      if (from) mp.set("from", from);
-      if (to) mp.set("to", to);
-      try {
-        const metaRes = await fetch(`/api/admin/meta-ads?${mp}&debug=1`, { credentials: "include" });
-        const metaJson = await metaRes.json();
-        setMetaAds({
-          configured: metaJson.configured !== false,
-          instagram: metaJson.instagram ?? { spend: 0, leads: 0, cpl: null },
-          facebook: metaJson.facebook ?? { spend: 0, leads: 0, cpl: null },
-          campaigns: Array.isArray(metaJson.campaigns) ? metaJson.campaigns : [],
-          error: metaJson.error,
-          _debug: metaJson._debug,
-        });
-      } catch {
-        // Meta API opciono
-      }
-      try {
-        const ttRes = await fetch(`/api/admin/tiktok-ads?${mp}&debug=1`, { credentials: "include" });
-        if (ttRes.status === 401) {
-          redirectToLogin();
-          return;
-        }
-        const ttJson = await ttRes.json();
-        setTiktokAds({
-          configured: ttJson.configured === true,
-          spend: Number(ttJson.spend) || 0,
-          leadsFromAds: Number(ttJson.leadsFromAds) || 0,
-          cpl: typeof ttJson.cpl === "number" ? ttJson.cpl : null,
-          campaigns: Array.isArray(ttJson.campaigns) ? ttJson.campaigns : [],
-          error: typeof ttJson.error === "string" ? ttJson.error : undefined,
-          startDate: typeof ttJson.startDate === "string" ? ttJson.startDate : undefined,
-          endDate: typeof ttJson.endDate === "string" ? ttJson.endDate : undefined,
-        });
-      } catch {
-        setTiktokAds(null);
-      }
+      void fetchTodayData();
+      primaryOk = true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Greška pri učitavanju.");
     } finally {
       if (!silent) setLoading(false);
+    }
+
+    // Meta / TikTok ne smeju da blokiraju glavni loader — inače UI „visi“ ako spoljni API ne odgovori.
+    if (!primaryOk) return;
+    const mp = new URLSearchParams();
+    if (from) mp.set("from", from);
+    if (to) mp.set("to", to);
+    try {
+      const metaRes = await fetch(`/api/admin/meta-ads?${mp}&debug=1`, { credentials: "include" });
+      const metaJson = await metaRes.json();
+      setMetaAds({
+        configured: metaJson.configured !== false,
+        instagram: metaJson.instagram ?? { spend: 0, leads: 0, cpl: null },
+        facebook: metaJson.facebook ?? { spend: 0, leads: 0, cpl: null },
+        campaigns: Array.isArray(metaJson.campaigns) ? metaJson.campaigns : [],
+        error: metaJson.error,
+        _debug: metaJson._debug,
+      });
+    } catch {
+      // Meta API opciono
+    }
+    try {
+      const ttRes = await fetch(`/api/admin/tiktok-ads?${mp}&debug=1`, { credentials: "include" });
+      if (ttRes.status === 401) {
+        redirectToLogin();
+        return;
+      }
+      const ttJson = await ttRes.json();
+      setTiktokAds({
+        configured: ttJson.configured === true,
+        spend: Number(ttJson.spend) || 0,
+        leadsFromAds: Number(ttJson.leadsFromAds) || 0,
+        cpl: typeof ttJson.cpl === "number" ? ttJson.cpl : null,
+        campaigns: Array.isArray(ttJson.campaigns) ? ttJson.campaigns : [],
+        error: typeof ttJson.error === "string" ? ttJson.error : undefined,
+        startDate: typeof ttJson.startDate === "string" ? ttJson.startDate : undefined,
+        endDate: typeof ttJson.endDate === "string" ? ttJson.endDate : undefined,
+      });
+    } catch {
+      setTiktokAds(null);
     }
   }, [legacy, from, to, fetchTodayData]);
 
