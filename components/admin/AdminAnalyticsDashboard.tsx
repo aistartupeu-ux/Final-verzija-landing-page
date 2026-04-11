@@ -414,8 +414,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     setSelectedRange("custom");
   }, []);
 
-  /** Google traffic tek posle prvog /analytics odgovora; brojač sprečava zastarele odgovore pri brzoj promeni perioda. */
-  const allowGoogleAfterPrimaryLoadsRef = useRef(false);
+  /** Brojač sprečava zastarele odgovore pri brzoj promeni perioda (glavni /analytics). */
   const leadRangeFetchSeqRef = useRef(0);
 
   const fetchTodayData = useCallback(async () => {
@@ -449,7 +448,6 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     if (!silent) {
       mySeq = ++leadRangeFetchSeqRef.current;
       setLoading(true);
-      allowGoogleAfterPrimaryLoadsRef.current = false;
     }
     setError(null);
     let primaryOk = false;
@@ -494,7 +492,6 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     } finally {
       if (!silent && mySeq === leadRangeFetchSeqRef.current) {
         setLoading(false);
-        allowGoogleAfterPrimaryLoadsRef.current = true;
       }
     }
 
@@ -605,14 +602,14 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   }, [from, to, legacy]);
 
   const lastFetchedGraphRangeRef = useRef<string | null>(null);
+  // Paralelno sa glavnom analitikom (kao ranije) — loader i dalje zavisi samo od /analytics.
   useEffect(() => {
     if (!graphFrom || !graphTo) return;
-    if (!allowGoogleAfterPrimaryLoadsRef.current) return;
     const key = `${graphFrom}|${graphTo}`;
     if (lastFetchedGraphRangeRef.current === key) return;
     lastFetchedGraphRangeRef.current = key;
     void fetchGoogleTraffic();
-  }, [graphFrom, graphTo, fetchGoogleTraffic, loading]);
+  }, [graphFrom, graphTo, fetchGoogleTraffic]);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
