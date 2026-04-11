@@ -115,32 +115,8 @@ export async function GET(req: NextRequest) {
     return rawTag;
   }
 
-  // 1) Leads by Source Sheet — primarni izvor (pouzdaniji)
+  // 1) Sheet + Supabase u paraleli (ranije sekvencijalno — duplo čekanje na wall-clock).
   // Datum: YYYY-MM-DD u Beogradu + period Od–Do + legacy presek (ne mešati sa Date() u lokalnom TZ servera).
-  const sheetRows = await getLeadsFromSheet();
-  let sheetRowsUsed = 0;
-  for (const row of sheetRows) {
-    const rowYmd = extractYmdFromSheetDate(row.date);
-    if (!rowYmd) continue;
-    if (!sheetRowYmdInPeriod(rowYmd, fromYmd, toYmd)) continue;
-    if (legacyCutoffDate && !sheetRowYmdAllowedForLegacy(rowYmd, legacyCutoffDate)) continue;
-    sheetRowsUsed += 1;
-    const emailKey = (row.email ?? "").trim().toLowerCase();
-    if (!emailKey) continue;
-    const tag = normalizeSourceTag(
-      row.source_tag,
-      row.utm_source,
-      row.utm_medium,
-      row.utm_campaign,
-      row.affiliate_code
-    );
-    const ts = Date.parse(`${rowYmd}T12:00:00.000Z`);
-    upsertLeadByEmail(emailKey, tag, Number.isNaN(ts) ? 0 : ts);
-  }
-
-  // 2) Supabase — dopuna (leadovi koji nisu u Sheet-u)
-  // Filter created_at po istom kalendarskom danu kao Sheet (Europe/Belgrade), ne po `Date("YYYY-MM-DD")` (UTC ponoć).
-  // PostgREST podrazumevano max 1000 redova po zahtevu — mora paginacija.
   let supabaseGteIso: string | null = null;
   let supabaseLteIso: string | null = null;
   if (fromYmd) {
@@ -170,26 +146,53 @@ export async function GET(req: NextRequest) {
   };
 
   const PAGE = 1000;
-  const listSupabase: LeadRow[] = [];
-  for (let offset = 0; ; offset += PAGE) {
-    let q = supabase
-      .from("leads")
-      .select("id, created_at, source_tag, utm_source, utm_medium, utm_campaign, affiliate_code, email");
-    if (supabaseGteIso) {
-      q = q.gte("created_at", supabaseGteIso);
+  async function fetchAllSupabaseLeadRows(): Promise<LeadRow[]> {
+    const listSupabase: LeadRow[] = [];
+    for (let offset = 0; ; offset += PAGE) {
+      let q = supabase
+        .from("leads")
+        .select("id, created_at, source_tag, utm_source, utm_medium, utm_campaign, affiliate_code, email");
+      if (supabaseGteIso) {
+        q = q.gte("created_at", supabaseGteIso);
+      }
+      if (supabaseLteIso) {
+        q = q.lte("created_at", supabaseLteIso);
+      }
+      const { data: batch, error } = await q.order("created_at", { ascending: true }).range(offset, offset + PAGE - 1);
+      if (error) {
+        console.error("admin analytics leads:", error.message);
+        break;
+      }
+      const rows = (batch ?? []) as LeadRow[];
+      listSupabase.push(...rows);
+      if (rows.length < PAGE) break;
     }
-    if (supabaseLteIso) {
-      q = q.lte("created_at", supabaseLteIso);
-    }
-    const { data: batch, error } = await q.order("created_at", { ascending: true }).range(offset, offset + PAGE - 1);
-    if (error) {
-      console.error("admin analytics leads:", error.message);
-      break;
-    }
-    const rows = (batch ?? []) as LeadRow[];
-    listSupabase.push(...rows);
-    if (rows.length < PAGE) break;
+    return listSupabase;
   }
+
+  const [sheetRows, listSupabase] = await Promise.all([getLeadsFromSheet(), fetchAllSupabaseLeadRows()]);
+
+  let sheetRowsUsed = 0;
+  for (const row of sheetRows) {
+    const rowYmd = extractYmdFromSheetDate(row.date);
+    if (!rowYmd) continue;
+    if (!sheetRowYmdInPeriod(rowYmd, fromYmd, toYmd)) continue;
+    if (legacyCutoffDate && !sheetRowYmdAllowedForLegacy(rowYmd, legacyCutoffDate)) continue;
+    sheetRowsUsed += 1;
+    const emailKey = (row.email ?? "").trim().toLowerCase();
+    if (!emailKey) continue;
+    const tag = normalizeSourceTag(
+      row.source_tag,
+      row.utm_source,
+      row.utm_medium,
+      row.utm_campaign,
+      row.affiliate_code
+    );
+    const ts = Date.parse(`${rowYmd}T12:00:00.000Z`);
+    upsertLeadByEmail(emailKey, tag, Number.isNaN(ts) ? 0 : ts);
+  }
+
+  // 2) Supabase — već učitano u paraleli sa Sheet-om; merge ispod.
   for (const lead of listSupabase) {
     const emailKey = (lead.email ?? "").trim().toLowerCase();
     if (!emailKey) continue;

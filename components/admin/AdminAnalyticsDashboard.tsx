@@ -187,10 +187,10 @@ type GoogleTrafficPayload = {
   };
 };
 
-/** Kratka pauša pre prvog fetch-a — smanjuje burst na server; kompletan Sheet + Supabase i dalje bez sečenja. */
-const ADMIN_LEADS_INITIAL_DELAY_MS = 1200;
-/** Klijentski timeout — izbegava „večiti“ spinner ako server/edge ne odgovori (Vercel limit, mreža). */
-const ADMIN_PRIMARY_FETCH_TIMEOUT_MS = 85_000;
+/** 0 = odmah prvi fetch (admin je već zaštićen sesijom). */
+const ADMIN_LEADS_INITIAL_DELAY_MS = 0;
+/** Klijentski timeout — kraći da UI brzo prikaže grešku ako edge/server zapne. */
+const ADMIN_PRIMARY_FETCH_TIMEOUT_MS = 48_000;
 
 function isAbortError(e: unknown): boolean {
   if (e instanceof Error && e.name === "AbortError") return true;
@@ -437,7 +437,10 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   }, [legacy]);
 
   const fetchData = useCallback(async (silent = false, withDebug = false) => {
-    if (!silent) setLoading(true);
+    if (!silent) {
+      setLoading(true);
+      allowGoogleAfterPrimaryLoadsRef.current = false;
+    }
     setError(null);
     let primaryOk = false;
     try {
@@ -475,7 +478,10 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
         setError(e instanceof Error ? e.message : "Greška pri učitavanju.");
       }
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent) {
+        setLoading(false);
+        allowGoogleAfterPrimaryLoadsRef.current = true;
+      }
     }
 
     // Meta / TikTok ne smeju da blokiraju glavni loader — inače UI „visi“ ako spoljni API ne odgovori.
@@ -572,6 +578,8 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   const isFirstLoadPassRef = useRef(true);
   const lastFetchedRangeRef = useRef<string | null>(null);
   const firstLoadTimerForKeyRef = useRef<string | null>(null);
+  /** Google traffic + konverzije tek posle glavnog /analytics odgovora — manje paralelnog pritiska na Supabase. */
+  const allowGoogleAfterPrimaryLoadsRef = useRef(false);
 
   // Prvo učitavanje: kratka pauza (layout). Promena datuma posle toga: odmah.
   // lastFetchedRange sprečava ponovni fetch samo zbog promene reference na fetchData.
@@ -582,6 +590,14 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     if (isFirstLoadPassRef.current) {
       if (firstLoadTimerForKeyRef.current === key) return;
       firstLoadTimerForKeyRef.current = key;
+
+      if (ADMIN_LEADS_INITIAL_DELAY_MS <= 0) {
+        isFirstLoadPassRef.current = false;
+        lastFetchedRangeRef.current = key;
+        void fetchDataRef.current();
+        return;
+      }
+
       setWaitingInitialDelay(true);
       const t = setTimeout(() => {
         isFirstLoadPassRef.current = false;
@@ -605,11 +621,12 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   const lastFetchedGraphRangeRef = useRef<string | null>(null);
   useEffect(() => {
     if (!graphFrom || !graphTo) return;
+    if (!allowGoogleAfterPrimaryLoadsRef.current) return;
     const key = `${graphFrom}|${graphTo}`;
     if (lastFetchedGraphRangeRef.current === key) return;
     lastFetchedGraphRangeRef.current = key;
     void fetchGoogleTraffic();
-  }, [graphFrom, graphTo, fetchGoogleTraffic]);
+  }, [graphFrom, graphTo, fetchGoogleTraffic, loading]);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -761,7 +778,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
               ) : loading ? (
                 <>
                   Preuzimanje analitike (Sheet + Supabase)
-                  {loadSeconds > 0 ? ` — ${loadSeconds}s` : ""}. Veliki period može dugo da traje na produkciji; ako stoji predugo, suzi datume ili proveri Vercel logove.
+                  {loadSeconds > 0 ? ` — ${loadSeconds}s` : ""}. Veliki period može dugo da traje; suzi datume ako možeš. Ako pređe ~48s, pojaviće se timeout poruka (Vercel limit).
                 </>
               ) : null}
             </span>

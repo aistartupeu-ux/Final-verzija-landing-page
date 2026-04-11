@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isAdminApiAuthorized } from "@/lib/admin-api-auth";
+import { belgradeYmdUtcInclusiveBounds } from "@/lib/analytics-legacy";
+
+export const maxDuration = 60;
 
 type TrafficRow = {
   date: string;
@@ -91,12 +94,51 @@ function isGoogleAnalyticsConfigured(): boolean {
   }
 }
 
-async function getLeadConversionsByDay(from: string, to: string): Promise<Map<string, number>> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !supabaseKey) return new Map();
+type RpcDayRow = { day?: string; conversions?: number | string | null };
+type LeadEmailRow = { created_at: string; email: string | null };
 
-  const supabase = createClient(supabaseUrl, supabaseKey);
+async function getLeadConversionsByDayRpc(
+  supabase: SupabaseClient,
+  fromYmd: string,
+  toYmd: string
+): Promise<Map<string, number> | null> {
+  const gte = belgradeYmdUtcInclusiveBounds(fromYmd)?.startIso;
+  const lte = belgradeYmdUtcInclusiveBounds(toYmd)?.endIso;
+  if (!gte || !lte) return null;
+
+  const { data, error } = await (
+    supabase as unknown as {
+      rpc(
+        name: string,
+        args: { p_gte: string; p_lte: string }
+      ): Promise<{ data: unknown; error: { message: string } | null }>;
+    }
+  ).rpc("admin_lead_conversions_by_day", { p_gte: gte, p_lte: lte });
+  if (error) {
+    console.warn("admin_lead_conversions_by_day RPC:", error.message);
+    return null;
+  }
+  if (!Array.isArray(data)) return null;
+
+  const byDay = new Map<string, number>();
+  for (const row of data as RpcDayRow[]) {
+    const day = typeof row.day === "string" ? row.day : "";
+    if (!day) continue;
+    const n =
+      typeof row.conversions === "number"
+        ? row.conversions
+        : Number(row.conversions ?? 0);
+    byDay.set(day, Number.isFinite(n) ? n : 0);
+  }
+  return byDay;
+}
+
+/** Sporo: paginacija — samo ako RPC `admin_lead_conversions_by_day` nije primenjen u bazi. */
+async function getLeadConversionsByDayPaginated(
+  supabase: SupabaseClient,
+  from: string,
+  to: string
+): Promise<Map<string, number>> {
   const pageSize = 1000;
   const uniqueLeadByDayAndEmail = new Set<string>();
 
@@ -122,7 +164,7 @@ async function getLeadConversionsByDay(from: string, to: string): Promise<Map<st
       throw new Error(`Supabase leads fetch failed: ${error.message}`);
     }
 
-    const rows = data ?? [];
+    const rows = (data ?? []) as LeadEmailRow[];
     for (const row of rows) {
       const email = (row.email ?? "").trim().toLowerCase();
       if (!email) continue;
@@ -140,6 +182,20 @@ async function getLeadConversionsByDay(from: string, to: string): Promise<Map<st
     byDay.set(day, (byDay.get(day) ?? 0) + 1);
   }
   return byDay;
+}
+
+async function getLeadConversionsByDay(from: string, to: string): Promise<Map<string, number>> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseKey) return new Map();
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  const ymdRe = /^\d{4}-\d{2}-\d{2}$/;
+  if (ymdRe.test(from) && ymdRe.test(to)) {
+    const fast = await getLeadConversionsByDayRpc(supabase, from, to);
+    if (fast) return fast;
+  }
+  return getLeadConversionsByDayPaginated(supabase, from, to);
 }
 
 function buildDateRange(from: string, to: string): string[] {
