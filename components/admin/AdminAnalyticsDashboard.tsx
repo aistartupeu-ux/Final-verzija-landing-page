@@ -415,10 +415,10 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     setSelectedRange("custom");
   }, []);
 
-  /** Brojač sprečava zastarele odgovore pri brzoj promeni perioda (glavni /analytics). */
-  const leadRangeFetchSeqRef = useRef(0);
-  /** Koliko ne-silent fetch-eva je u toku — sprečava zaglavljen loader (Strict Mode / preklapanje zahteva). */
-  const pendingNonSilentLoadsRef = useRef(0);
+  /** Rastući broj zahteva — ignorisanje zastarelog odgovora za setState (Meta/TikTok). */
+  const analyticsFetchGenRef = useRef(0);
+  /** Prekida prethodni glavni (ne-silent) fetch kad krene novi — manje trka, bez dodatnih „modova“. */
+  const analyticsMainAbortRef = useRef<AbortController | null>(null);
 
   const fetchTodayData = useCallback(async () => {
     const ac = new AbortController();
@@ -454,15 +454,18 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     const rangeUnchanged = () =>
       fromAtStart === from && toAtStart === to && legacyAtStart === legacy;
 
-    let mySeq = 0;
+    let myGen = 0;
     if (!silent) {
-      mySeq = ++leadRangeFetchSeqRef.current;
-      pendingNonSilentLoadsRef.current += 1;
+      myGen = ++analyticsFetchGenRef.current;
       setLoading(true);
     }
     setError(null);
     let primaryOk = false;
     const ac = new AbortController();
+    if (!silent) {
+      analyticsMainAbortRef.current?.abort();
+      analyticsMainAbortRef.current = ac;
+    }
     const abortTimer = globalThis.setTimeout(() => ac.abort(), 90_000);
     try {
       const params = new URLSearchParams();
@@ -480,13 +483,13 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       }
       if (!res.ok) throw new Error(await res.text());
       const json = await res.json();
-      if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+      if (!silent && myGen !== analyticsFetchGenRef.current) return;
       if (silent && !rangeUnchanged()) return;
       setData(json);
       void fetchTodayData();
       primaryOk = true;
     } catch (e) {
-      if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+      if (!silent && myGen !== analyticsFetchGenRef.current) return;
       if (silent && !rangeUnchanged()) return;
       const aborted =
         (typeof DOMException !== "undefined" && e instanceof DOMException && e.name === "AbortError") ||
@@ -500,27 +503,28 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       }
     } finally {
       globalThis.clearTimeout(abortTimer);
-      if (!silent) {
-        pendingNonSilentLoadsRef.current = Math.max(0, pendingNonSilentLoadsRef.current - 1);
-        if (pendingNonSilentLoadsRef.current === 0) {
-          setLoading(false);
+      // Samo „aktuelni“ ne-silent zahtev gasi loader (noviji zahtev je povećao gen).
+      if (!silent && myGen === analyticsFetchGenRef.current) {
+        if (analyticsMainAbortRef.current === ac) {
+          analyticsMainAbortRef.current = null;
         }
+        setLoading(false);
       }
     }
 
     // Meta / TikTok ne smeju da blokiraju glavni loader — inače UI „visi“ ako spoljni API ne odgovori.
     if (!primaryOk) return;
-    if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+    if (!silent && myGen !== analyticsFetchGenRef.current) return;
     if (silent && !rangeUnchanged()) return;
     const mp = new URLSearchParams();
     if (fromAtStart) mp.set("from", fromAtStart);
     if (toAtStart) mp.set("to", toAtStart);
     try {
       const metaRes = await fetch(`/api/admin/meta-ads?${mp}&debug=1`, { credentials: "include" });
-      if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+      if (!silent && myGen !== analyticsFetchGenRef.current) return;
       if (silent && !rangeUnchanged()) return;
       const metaJson = await metaRes.json();
-      if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+      if (!silent && myGen !== analyticsFetchGenRef.current) return;
       if (silent && !rangeUnchanged()) return;
       setMetaAds({
         configured: metaJson.configured !== false,
@@ -539,10 +543,10 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
         redirectToLogin();
         return;
       }
-      if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+      if (!silent && myGen !== analyticsFetchGenRef.current) return;
       if (silent && !rangeUnchanged()) return;
       const ttJson = await ttRes.json();
-      if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+      if (!silent && myGen !== analyticsFetchGenRef.current) return;
       if (silent && !rangeUnchanged()) return;
       setTiktokAds({
         configured: ttJson.configured === true,
@@ -561,6 +565,12 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
 
   const fetchDataRef = useRef(fetchData);
   fetchDataRef.current = fetchData;
+
+  useEffect(() => {
+    return () => {
+      analyticsMainAbortRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     if (!loading) {
