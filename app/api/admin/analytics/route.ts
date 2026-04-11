@@ -188,19 +188,19 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
-  const leadByEmail = new Map<string, { tag: string; ts: number; order: number }>();
-  let orderCounter = 0;
+  /** Izvor istine za ukupno / po izvoru: samo Sheet (jedinstveni email u periodu). */
+  const sheetLeadByEmail = new Map<string, { tag: string; ts: number; order: number }>();
+  let sheetOrderCounter = 0;
 
-  function upsertLeadByEmail(emailKey: string, tag: string, ts: number) {
-    const current = leadByEmail.get(emailKey);
-    const nextOrder = orderCounter++;
+  function upsertSheetLead(emailKey: string, tag: string, ts: number) {
+    const current = sheetLeadByEmail.get(emailKey);
+    const nextOrder = sheetOrderCounter++;
     if (!current) {
-      leadByEmail.set(emailKey, { tag, ts, order: nextOrder });
+      sheetLeadByEmail.set(emailKey, { tag, ts, order: nextOrder });
       return;
     }
-    // Ako isti email dođe više puta, čuvamo noviji ulaz (prepis kampanje po novijem dolasku).
     if (ts > current.ts || (ts === current.ts && nextOrder > current.order)) {
-      leadByEmail.set(emailKey, { tag, ts, order: nextOrder });
+      sheetLeadByEmail.set(emailKey, { tag, ts, order: nextOrder });
     }
   }
 
@@ -268,30 +268,31 @@ export async function GET(req: NextRequest) {
       row.affiliate_code
     );
     const ts = Date.parse(`${rowYmd}T12:00:00.000Z`);
-    upsertLeadByEmail(emailKey, tag, Number.isNaN(ts) ? 0 : ts);
+    upsertSheetLead(emailKey, tag, Number.isNaN(ts) ? 0 : ts);
   }
 
-  // 2) Supabase — već učitano u paraleli sa Sheet-om; merge ispod.
+  // 2) Supabase — samo provera (jedinstveni email u periodu), bez uticaja na total/bySource.
+  const supabaseEmailsInPeriod = new Set<string>();
   for (const lead of listSupabase) {
     const emailKey = (lead.email ?? "").trim().toLowerCase();
-    if (!emailKey) continue;
-    const tag = normalizeSourceTag(
-      lead.source_tag,
-      lead.utm_source ?? null,
-      lead.utm_medium ?? null,
-      lead.utm_campaign ?? null,
-      lead.affiliate_code ?? null
-    );
-    const ts = Date.parse(lead.created_at ?? "");
-    upsertLeadByEmail(emailKey, tag, Number.isNaN(ts) ? 0 : ts);
+    if (emailKey) supabaseEmailsInPeriod.add(emailKey);
+  }
+  const sheetEmails = new Set(sheetLeadByEmail.keys());
+  let verifyEmailsOnlyInSheet = 0;
+  for (const e of sheetEmails) {
+    if (!supabaseEmailsInPeriod.has(e)) verifyEmailsOnlyInSheet += 1;
+  }
+  let verifyEmailsOnlyInSupabase = 0;
+  for (const e of supabaseEmailsInPeriod) {
+    if (!sheetEmails.has(e)) verifyEmailsOnlyInSupabase += 1;
   }
 
   const bySource: Record<string, number> = {};
-  for (const entry of leadByEmail.values()) {
+  for (const entry of sheetLeadByEmail.values()) {
     bySource[entry.tag] = (bySource[entry.tag] ?? 0) + 1;
   }
   const sumBySource = Object.values(bySource).reduce((a, b) => a + b, 0);
-  const total = leadByEmail.size;
+  const total = sheetLeadByEmail.size;
   if (sumBySource !== total) {
     console.warn(`Analytics: sum(bySource)=${sumBySource} !== total=${total}`);
   }
@@ -306,15 +307,21 @@ export async function GET(req: NextRequest) {
     tiktokLeads: bySource["tiktok"] ?? 0,
     direct: bySource["direct"] ?? 0,
     affiliate: bySource["affiliate"] ?? 0,
-    /** Broj redova iz Supabase u istom created_at opsegu (pre spajanja sa Sheet-om). Za poređenje sa Table Editor COUNT. */
+    /** Broj redova iz Supabase u istom created_at opsegu. Provera / poređenje sa Sheet-om. */
     supabaseRowsInPeriod: listSupabase.length,
+    /** Jedinstveni email u Supabase u periodu (provera). */
+    supabaseUniqueEmailsInPeriod: supabaseEmailsInPeriod.size,
+    /** U Sheet jedinstvenom skupu, a nema u Supabase u periodu. */
+    verifyEmailsOnlyInSheet,
+    /** U Supabase u periodu, a nema u Sheet jedinstvenom skupu. */
+    verifyEmailsOnlyInSupabase,
     /** Sheet redovi u periodu (List1 + LM + GW), posle datumskega filtera; jedan red = jedna prijava u tabu. */
     sheetRowsInPeriod: sheetRowsUsed,
     sheetRowsByTab,
     /** Broj Sheet redova po kalendarskom danu (Beograd, kolona A datum). */
     sheetLeadsByDay: Object.fromEntries(Object.entries(sheetLeadsByDay).sort(([a], [b]) => a.localeCompare(b))),
-    /** Jedinstveni email u merged skupu — glavni broj u adminu; Sheet+Supabase deduplikovano. */
-    countingModel: "unique_email_sheet_plus_supabase_belgrade_day_bounds",
+    /** Glavni brojevi = Sheet; Supabase je uporedna provera. */
+    countingModel: "unique_email_sheet_primary_supabase_verify_belgrade_day_bounds",
     supabaseCreatedAtGte: supabaseGteIso,
     supabaseCreatedAtLte: supabaseLteIso,
     /** true ako je dostignut limit stranica (200×1000) — suzi Od–Da. */
@@ -365,7 +372,10 @@ export async function GET(req: NextRequest) {
       supabaseFetchTruncated,
       supabaseCreatedAtGte: supabaseGteIso,
       supabaseCreatedAtLte: supabaseLteIso,
-      mergedUniqueEmails: leadByEmail.size,
+      sheetUniqueEmails: sheetLeadByEmail.size,
+      supabaseUniqueEmails: supabaseEmailsInPeriod.size,
+      verifyEmailsOnlyInSheet,
+      verifyEmailsOnlyInSupabase,
       legacyMode,
       legacyLastInclusiveSheetYmd: legacyCutoffDate
         ? lastInclusiveBelgradeYmdForLegacyCutoff(legacyCutoffDate)
