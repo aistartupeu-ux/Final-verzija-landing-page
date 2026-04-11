@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getLeadsFromSheet } from "@/lib/leads-sheet";
 import { isAdminApiAuthorized } from "@/lib/admin-api-auth";
+import { SOURCE_TAG_LEAD_MAGNET, SOURCE_TAG_LEAD_MAGNET_AFFILIATE } from "@/lib/lead-source-tags";
 import {
+  belgradeYmdUtcInclusiveBounds,
   extractYmdFromSheetDate,
   lastInclusiveBelgradeYmdForLegacyCutoff,
   queryParamToYmd,
@@ -55,11 +57,6 @@ export async function GET(req: NextRequest) {
     to = todayBelgrade;
   }
 
-  let fromDate: Date | null = null;
-  let toDate: Date | null = null;
-  if (from) fromDate = new Date(from);
-  if (to) toDate = new Date(to);
-
   const fromYmd = queryParamToYmd(from);
   const toYmd = queryParamToYmd(to);
 
@@ -84,9 +81,14 @@ export async function GET(req: NextRequest) {
     tag: string | null | undefined,
     utmSource: string | null | undefined,
     utmMedium: string | null | undefined,
-    utmCampaign: string | null | undefined
+    utmCampaign: string | null | undefined,
+    affiliateCode?: string | null | undefined
   ): string {
     const rawTag = (tag ?? "").trim().toLowerCase();
+    if (rawTag === SOURCE_TAG_LEAD_MAGNET || rawTag === SOURCE_TAG_LEAD_MAGNET_AFFILIATE) {
+      return rawTag;
+    }
+    if ((affiliateCode ?? "").toString().trim()) return "affiliate";
     const rawSource = (utmSource ?? "").trim().toLowerCase();
     const rawMedium = (utmMedium ?? "").trim().toLowerCase();
     const rawCampaign = (utmCampaign ?? "").trim().toLowerCase();
@@ -122,22 +124,34 @@ export async function GET(req: NextRequest) {
     sheetRowsUsed += 1;
     const emailKey = (row.email ?? "").trim().toLowerCase();
     if (!emailKey) continue;
-    const tag = normalizeSourceTag(row.source_tag, row.utm_source, row.utm_medium, row.utm_campaign);
+    const tag = normalizeSourceTag(
+      row.source_tag,
+      row.utm_source,
+      row.utm_medium,
+      row.utm_campaign,
+      row.affiliate_code
+    );
     const ts = Date.parse(`${rowYmd}T12:00:00.000Z`);
     upsertLeadByEmail(emailKey, tag, Number.isNaN(ts) ? 0 : ts);
   }
 
   // 2) Supabase — dopuna (leadovi koji nisu u Sheet-u)
+  // Filter created_at po istom kalendarskom danu kao Sheet (Europe/Belgrade), ne po `Date("YYYY-MM-DD")` (UTC ponoć).
   // PostgREST podrazumevano max 1000 redova po zahtevu — mora paginacija.
-  let upperBound: Date | null = null;
-  if (toDate && !isNaN(toDate.getTime())) {
-    const endOfDay = new Date(toDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    upperBound = endOfDay;
+  let supabaseGteIso: string | null = null;
+  let supabaseLteIso: string | null = null;
+  if (fromYmd) {
+    const b = belgradeYmdUtcInclusiveBounds(fromYmd);
+    if (b) supabaseGteIso = b.startIso;
+  }
+  if (toYmd) {
+    const b = belgradeYmdUtcInclusiveBounds(toYmd);
+    if (b) supabaseLteIso = b.endIso;
   }
   if (legacyCutoffDate) {
-    if (!upperBound || upperBound.getTime() > legacyCutoffDate.getTime()) {
-      upperBound = legacyCutoffDate;
+    const leg = legacyCutoffDate.toISOString();
+    if (!supabaseLteIso || supabaseLteIso > leg) {
+      supabaseLteIso = leg;
     }
   }
 
@@ -148,18 +162,21 @@ export async function GET(req: NextRequest) {
     utm_source?: string | null;
     utm_medium?: string | null;
     utm_campaign?: string | null;
+    affiliate_code?: string | null;
     email?: string;
   };
 
   const PAGE = 1000;
   const listSupabase: LeadRow[] = [];
   for (let offset = 0; ; offset += PAGE) {
-    let q = supabase.from("leads").select("id, created_at, source_tag, utm_source, utm_medium, utm_campaign, email");
-    if (fromDate && !isNaN(fromDate.getTime())) {
-      q = q.gte("created_at", fromDate.toISOString());
+    let q = supabase
+      .from("leads")
+      .select("id, created_at, source_tag, utm_source, utm_medium, utm_campaign, affiliate_code, email");
+    if (supabaseGteIso) {
+      q = q.gte("created_at", supabaseGteIso);
     }
-    if (upperBound) {
-      q = q.lte("created_at", upperBound.toISOString());
+    if (supabaseLteIso) {
+      q = q.lte("created_at", supabaseLteIso);
     }
     const { data: batch, error } = await q.order("created_at", { ascending: true }).range(offset, offset + PAGE - 1);
     if (error) {
@@ -173,7 +190,13 @@ export async function GET(req: NextRequest) {
   for (const lead of listSupabase) {
     const emailKey = (lead.email ?? "").trim().toLowerCase();
     if (!emailKey) continue;
-    const tag = normalizeSourceTag(lead.source_tag, lead.utm_source ?? null, lead.utm_medium ?? null, lead.utm_campaign ?? null);
+    const tag = normalizeSourceTag(
+      lead.source_tag,
+      lead.utm_source ?? null,
+      lead.utm_medium ?? null,
+      lead.utm_campaign ?? null,
+      lead.affiliate_code ?? null
+    );
     const ts = Date.parse(lead.created_at ?? "");
     upsertLeadByEmail(emailKey, tag, Number.isNaN(ts) ? 0 : ts);
   }
@@ -198,6 +221,12 @@ export async function GET(req: NextRequest) {
     tiktokLeads: bySource["tiktok"] ?? 0,
     direct: bySource["direct"] ?? 0,
     affiliate: bySource["affiliate"] ?? 0,
+    /** Broj redova iz Supabase u istom created_at opsegu (pre spajanja sa Sheet-om). Za poređenje sa Table Editor COUNT. */
+    supabaseRowsInPeriod: listSupabase.length,
+    /** Jedinstveni email u merged skupu — glavni broj u adminu; Sheet+Supabase deduplikovano. */
+    countingModel: "unique_email_sheet_plus_supabase_belgrade_day_bounds",
+    supabaseCreatedAtGte: supabaseGteIso,
+    supabaseCreatedAtLte: supabaseLteIso,
   };
   if (legacyMode && legacyCutoffDate) {
     payload.legacyCutoffAt = legacyCutoffDate.toISOString();
@@ -226,13 +255,21 @@ export async function GET(req: NextRequest) {
   if (debug) {
     const sheetBySource: Record<string, number> = {};
     for (const row of sheetRows) {
-      const tag = normalizeSourceTag(row.source_tag, row.utm_source, row.utm_medium, row.utm_campaign);
+      const tag = normalizeSourceTag(
+        row.source_tag,
+        row.utm_source,
+        row.utm_medium,
+        row.utm_campaign,
+        row.affiliate_code
+      );
       sheetBySource[tag] = (sheetBySource[tag] ?? 0) + 1;
     }
     payload.debug = {
       sheetRowsTotal: sheetRows.length,
       sheetRowsAfterFilter: sheetRowsUsed,
       supabaseLeadsFetched: listSupabase.length,
+      supabaseCreatedAtGte: supabaseGteIso,
+      supabaseCreatedAtLte: supabaseLteIso,
       mergedUniqueEmails: leadByEmail.size,
       legacyMode,
       legacyLastInclusiveSheetYmd: legacyCutoffDate

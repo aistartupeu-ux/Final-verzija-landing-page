@@ -33,6 +33,11 @@ type AnalyticsData = {
   tiktokLeads: number;
   direct: number;
   affiliate: number;
+  /** Broj redova u Supabase u periodu (created_at, Beograd); Table Editor COUNT za isti opseg. */
+  supabaseRowsInPeriod?: number;
+  countingModel?: string;
+  supabaseCreatedAtGte?: string | null;
+  supabaseCreatedAtLte?: string | null;
   /** Samo kod legacy=1 — leadovi se broje samo do ovog trenutka. */
   legacyCutoffAt?: string;
   secondsUntilMidnight?: number;
@@ -41,6 +46,10 @@ type AnalyticsData = {
     sheetRowsTotal: number;
     sheetBySource: Record<string, number>;
     sheetSample: { date: string; source_tag: string; utm_source: string; utm_medium: string }[];
+    supabaseLeadsFetched?: number;
+    supabaseCreatedAtGte?: string | null;
+    supabaseCreatedAtLte?: string | null;
+    mergedUniqueEmails?: number;
   };
 };
 
@@ -714,6 +723,10 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
                     <h2 className="admin-danas-title">Danas (Beograd · CET)</h2>
                     <div className="admin-danas-num">{todayData.total}</div>
                     <div className="admin-danas-sub">Leadova danas · reset u ponoć</div>
+                    <div className="admin-danas-sub" style={{ marginTop: 8, fontSize: 11, color: "#666", maxWidth: 280 }}>
+                      Jedinstveni email (Sheet + Supabase), dan po Beogradu. Redovi u Supabase:{" "}
+                      {todayData.supabaseRowsInPeriod ?? "—"}
+                    </div>
                   </div>
                   <div className="admin-danas-countdown" style={{ contain: "layout" }}>
                     {legacy ? (
@@ -752,6 +765,9 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
                 <Users size={20} color="#00d4ff" style={{ marginBottom: 8 }} />
                 <div className="admin-stat-num" style={{ color: "#fff" }}>{data.total}</div>
                 <div className="admin-stat-label">Ukupno leadova</div>
+                <div className="admin-stat-label" style={{ marginTop: 10, fontSize: 10, color: "#666", lineHeight: 1.4, maxWidth: 220 }}>
+                  Jedinstveni email · Sheet + Supabase. Supabase redova u periodu: {data.supabaseRowsInPeriod ?? "—"} (nije isto kao COUNT ako ima duplog emaila u Sheet-u).
+                </div>
               </div>
               <div className="admin-stat-card" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(228,64,95,0.25)" }}>
                 <Instagram size={20} color="#E4405F" style={{ marginBottom: 8 }} />
@@ -777,11 +793,21 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
 
             {data.debug && (
               <div style={{ marginBottom: 24, padding: 16, borderRadius: 12, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: "#a78bfa", marginBottom: 12 }}>Debug – Sheet podaci</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: "#a78bfa", marginBottom: 12 }}>Debug – Sheet + Supabase</h3>
                 <div style={{ fontSize: 12, color: "#aaa", marginBottom: 8 }}>
                   Sheet redova: <strong style={{ color: "#fff" }}>{data.debug.sheetRowsTotal}</strong>
                   {" · "}
-                  Po izvoru (pre filtra): {JSON.stringify(data.debug.sheetBySource)}
+                  Supabase učitano: <strong style={{ color: "#fff" }}>{data.debug.supabaseLeadsFetched ?? "—"}</strong>
+                  {" · "}
+                  merged email: <strong style={{ color: "#fff" }}>{data.debug.mergedUniqueEmails ?? data.total}</strong>
+                  {" · "}
+                  created_at gte/lte:{" "}
+                  <span style={{ color: "#ccc" }}>{data.debug.supabaseCreatedAtGte ?? "—"}</span>
+                  {" → "}
+                  <span style={{ color: "#ccc" }}>{data.debug.supabaseCreatedAtLte ?? "—"}</span>
+                </div>
+                <div style={{ fontSize: 12, color: "#aaa", marginBottom: 8 }}>
+                  Po izvoru na Sheet-u (pre filtra): {JSON.stringify(data.debug.sheetBySource)}
                 </div>
                 {data.debug.sheetSample?.length > 0 && (
                   <div style={{ fontSize: 11, color: "#888", fontFamily: "monospace" }}>

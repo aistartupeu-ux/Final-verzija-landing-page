@@ -80,3 +80,39 @@ export function queryParamToYmd(param: string | null): string | null {
   const m = param.trim().match(/^(\d{4}-\d{2}-\d{2})/);
   return m ? m[1] : null;
 }
+
+/**
+ * UTC granice [startIso, endIso] koje odgovaraju celom kalendarskom danu `ymd` u Europe/Belgrade.
+ * Koristi se za Supabase `created_at` filter da se poklopi sa Sheet YMD (ne koristiti `new Date("ymd")` — to je UTC ponoć).
+ */
+export function belgradeYmdUtcInclusiveBounds(ymd: string): { startIso: string; endIso: string } | null {
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const lo = Date.UTC(y, mo - 1, d - 1, 0, 0, 0, 0);
+  const hi = Date.UTC(y, mo - 1, d + 2, 23, 59, 59, 999);
+
+  let firstMinute = -1;
+  for (let t = lo; t <= hi; t += 60_000) {
+    if (belgradeCalendarYmd(new Date(t)) === ymd) {
+      firstMinute = t;
+      break;
+    }
+  }
+  if (firstMinute < 0) return null;
+
+  let start = firstMinute;
+  while (start > 0 && belgradeCalendarYmd(new Date(start - 1)) === ymd) {
+    start -= 1;
+  }
+
+  let end = start;
+  const endCap = start + 30 * 24 * 3600 * 1000;
+  while (end < endCap && belgradeCalendarYmd(new Date(end + 1)) === ymd) {
+    end += 1;
+  }
+
+  return { startIso: new Date(start).toISOString(), endIso: new Date(end).toISOString() };
+}
