@@ -40,8 +40,6 @@ type AnalyticsData = {
   /** Sheet redovi u periodu (List1 + LM + GW), jedan red = jedna prijava u tabu. */
   sheetRowsInPeriod?: number;
   sheetRowsByTab?: { main: number; lm: number; gw: number };
-  /** YYYY-MM-DD (Beograd) → broj Sheet redova tog dana (svi tabovi). */
-  sheetLeadsByDay?: Record<string, number>;
   countingModel?: string;
   supabaseCreatedAtGte?: string | null;
   supabaseCreatedAtLte?: string | null;
@@ -803,10 +801,6 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
                     <h2 className="admin-danas-title">Danas (Beograd · CET)</h2>
                     <div className="admin-danas-num">{todayData.total}</div>
                     <div className="admin-danas-sub">Leadova danas · reset u ponoć</div>
-                    <div className="admin-danas-sub" style={{ marginTop: 8, fontSize: 11, color: "#666", maxWidth: 320 }}>
-                      Jedinstveni email (Sheet + Supabase), dan po Beogradu. Sheet redova (svi tabovi):{" "}
-                      {todayData.sheetRowsInPeriod ?? "—"} · Supabase redova: {todayData.supabaseRowsInPeriod ?? "—"}
-                    </div>
                   </div>
                   <div className="admin-danas-countdown" style={{ contain: "layout" }}>
                     {legacy ? (
@@ -845,17 +839,6 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
                 <Users size={20} color="#00d4ff" style={{ marginBottom: 8 }} />
                 <div className="admin-stat-num" style={{ color: "#fff" }}>{data.total}</div>
                 <div className="admin-stat-label">Ukupno leadova</div>
-                <div className="admin-stat-label" style={{ marginTop: 10, fontSize: 10, color: "#666", lineHeight: 1.4, maxWidth: 240 }}>
-                  Jedinstveni email · Sheet (List1+LM+GW) + Supabase. Sheet redova u periodu:{" "}
-                  <strong style={{ color: "#aaa" }}>{data.sheetRowsInPeriod ?? "—"}</strong>
-                  {data.sheetRowsByTab ? (
-                    <span>
-                      {" "}
-                      (List1 {data.sheetRowsByTab.main} · LM {data.sheetRowsByTab.lm} · GW {data.sheetRowsByTab.gw})
-                    </span>
-                  ) : null}
-                  . Supabase redova: {data.supabaseRowsInPeriod ?? "—"}.
-                </div>
               </div>
               <div className="admin-stat-card" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(228,64,95,0.25)" }}>
                 <Instagram size={20} color="#E4405F" style={{ marginBottom: 8 }} />
@@ -878,43 +861,6 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
                 <div className="admin-stat-label">Direktno · {pct(data.direct)}%</div>
               </div>
             </div>
-
-            {data.sheetLeadsByDay && Object.keys(data.sheetLeadsByDay).length > 0 && (
-              <div
-                style={{
-                  marginBottom: 24,
-                  padding: 16,
-                  borderRadius: 12,
-                  background: "rgba(0,212,255,0.06)",
-                  border: "1px solid rgba(0,212,255,0.2)",
-                }}
-              >
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: "#00d4ff", marginBottom: 10 }}>
-                  Sheet — prijave po danu (Beograd)
-                </h3>
-                <p style={{ fontSize: 11, color: "#777", marginBottom: 12, lineHeight: 1.45 }}>
-                  Zbir redova iz List1, LM i GW za izabrani period (kolona datuma u Sheet-u). Veličina „Ukupno leadova“ i dalje je po jedinstvenom emailu (Sheet + Supabase).
-                </p>
-                <div style={{ overflowX: "auto", maxHeight: 220, overflowY: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead>
-                      <tr style={{ color: "#888", textAlign: "left" }}>
-                        <th style={{ padding: "6px 8px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>Datum</th>
-                        <th style={{ padding: "6px 8px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>Sheet redova</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(data.sheetLeadsByDay).map(([ymd, n]) => (
-                        <tr key={ymd} style={{ color: "#ccc" }}>
-                          <td style={{ padding: "6px 8px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>{ymd}</td>
-                          <td style={{ padding: "6px 8px", borderBottom: "1px solid rgba(255,255,255,0.05)", fontVariantNumeric: "tabular-nums" }}>{n}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
 
             {data.debug && (
               <div style={{ marginBottom: 24, padding: 16, borderRadius: 12, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>

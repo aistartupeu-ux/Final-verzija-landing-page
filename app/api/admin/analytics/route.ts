@@ -293,8 +293,13 @@ export async function GET(req: NextRequest) {
   const supabaseFetchTruncated = supabaseBundle.truncated;
 
   const sheetRowsByTab = { main: 0, lm: 0, gw: 0 };
-  const sheetLeadsByDay: Record<string, number> = {};
 
+  /**
+   * Sheet: broj redova / tab po koloni A (datum u Beogradu). Supabase: redovi po created_at u [gte,lte] za isti Od–Do.
+   * Ukupno leadova = jedinstveni email posle merge-a (Sheet pa Supabase; noviji zapis menja izvor).
+   * Zato sheetRowsInPeriod ≠ supabaseRowsInPeriod ≠ total: različita merila (red vs red), granice dana (A vs UTC),
+   * duplikati emaila u istom izvoru, red u Sheet-u bez odgovarajućeg reda u DB ili obrnuto, kašnjenje append-a u Sheet.
+   */
   let sheetRowsUsed = 0;
   for (const row of sheetRows) {
     const rowYmd = extractYmdFromSheetDate(row.date);
@@ -306,7 +311,6 @@ export async function GET(req: NextRequest) {
     if (tab === "lm") sheetRowsByTab.lm += 1;
     else if (tab === "gw") sheetRowsByTab.gw += 1;
     else sheetRowsByTab.main += 1;
-    sheetLeadsByDay[rowYmd] = (sheetLeadsByDay[rowYmd] ?? 0) + 1;
     const emailKey = (row.email ?? "").trim().toLowerCase();
     if (!emailKey) continue;
     const tag = normalizeSourceTag(
@@ -360,8 +364,6 @@ export async function GET(req: NextRequest) {
     /** Sheet redovi u periodu (List1 + LM + GW), posle datumskega filtera; jedan red = jedna prijava u tabu. */
     sheetRowsInPeriod: sheetRowsUsed,
     sheetRowsByTab,
-    /** Broj Sheet redova po kalendarskom danu (Beograd, kolona A datum). */
-    sheetLeadsByDay: Object.fromEntries(Object.entries(sheetLeadsByDay).sort(([a], [b]) => a.localeCompare(b))),
     /** Jedinstveni email u merged skupu — Sheet + Supabase deduplikovano. */
     countingModel: "unique_email_sheet_plus_supabase_belgrade_day_bounds",
     supabaseCreatedAtGte: supabaseGteIso,
