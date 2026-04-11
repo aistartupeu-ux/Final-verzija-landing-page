@@ -7,12 +7,18 @@
  * 2. Share Sheet sa service account email (Editor)
  * 3. Env: LEADS_SHEET_ID, GOOGLE_SERVICE_ACCOUNT_JSON (ceo JSON kao string)
  * 4. Glavni tab: LEADS_SHEET_NAME (npr. Лист1). Bez env-a koristi se prvi tab koji NIJE lead-magnet tab (LM često prvi u fajlu).
- * 5. Tab LM: samo source_tag lead_magnet (čist LM). lead_magnet_affiliate i ostalo → glavni list (Лист1). GW → appendGiveawayToSheet.
+ * 5. Tab LM: samo source_tag lead_magnet (čist LM). lead_magnet_affiliate i ostalo → glavni list (Лист1).
+ * 6. Kolona I (ref): na Лист1 = pravi affiliate_code kad postoji; na tabu LM uvek „LM“, na tabu GW uvek „GW“ (kampanja kao ref, ne partner kod).
  */
 
 import { google } from "googleapis";
 import { formatBelgradeDateOnly } from "@/lib/time-belgrade";
 import { usesLeadMagnetSheetTab } from "@/lib/lead-source-tags";
+
+/** Ref u koloni I na LM tabu — kampanjski kod, ne affiliate partner. */
+const SHEET_CAMPAIGN_REF_LM = "LM";
+/** Ref u koloni I na GW tabu. */
+const SHEET_CAMPAIGN_REF_GW = "GW";
 
 export type LeadsSourceRow = {
   date: string;
@@ -201,8 +207,8 @@ export async function appendLeadsToSheet(row: LeadsSourceRow): Promise<boolean> 
 
     const sheets = google.sheets({ version: "v4", auth });
     const useLmTab = usesLeadMagnetSheetTab(row.source_tag);
-    // LM tab: bez affiliate kolone — affiliate ide samo u Лист1 (lead_magnet_affiliate).
-    const affiliateCell = useLmTab ? "" : String(row.affiliate_code ?? "");
+    // LM tab: u koloni I kampanjski ref „LM“; List1: pravi affiliate_code kad ga ima.
+    const affiliateCell = useLmTab ? SHEET_CAMPAIGN_REF_LM : String(row.affiliate_code ?? "");
     const values = [
       [
         row.date,
@@ -263,6 +269,7 @@ export async function appendGiveawayToSheet(row: GiveawaySheetRow): Promise<bool
     const sheets = google.sheets({ version: "v4", auth });
 
     const sheetName = process.env.GIVEAWAY_SHEET_NAME || "GW";
+    // Kolona I = kampanjski ref „GW“ (isto kao „LM“ na lead-magnet tabu).
     const values = [[
       row.date,
       row.email,
@@ -272,7 +279,7 @@ export async function appendGiveawayToSheet(row: GiveawaySheetRow): Promise<bool
       row.utm_source,
       row.utm_medium,
       row.utm_campaign,
-      row.affiliate_code,
+      SHEET_CAMPAIGN_REF_GW,
       row.status,
     ]];
     const range = `'${sheetName}'!A:J`;
