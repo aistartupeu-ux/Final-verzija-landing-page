@@ -62,7 +62,10 @@ export function lastInclusiveBelgradeYmdForLegacyCutoff(cutoff: Date): string {
   return ymd;
 }
 
-/** Sheet red (samo YYYY-MM-DD): da li pada u legacy opseg do preseka. */
+/**
+ * Sheet red (samo YYYY-MM-DD): da li pada u legacy opseg do preseka.
+ * Ne pozivati unutar velike petlje — `lastInclusiveBelgradeYmdForLegacyCutoff` zove Intl; izračunaj `last` jednom pa poredi `rowYmd <= last`.
+ */
 export function sheetRowYmdAllowedForLegacy(rowYmd: string, cutoff: Date): boolean {
   const last = lastInclusiveBelgradeYmdForLegacyCutoff(cutoff);
   return rowYmd <= last;

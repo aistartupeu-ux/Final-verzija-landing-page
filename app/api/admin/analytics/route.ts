@@ -8,7 +8,6 @@ import {
   extractYmdFromSheetDate,
   lastInclusiveBelgradeYmdForLegacyCutoff,
   queryParamToYmd,
-  sheetRowYmdAllowedForLegacy,
   sheetRowYmdInPeriod,
 } from "@/lib/analytics-legacy";
 
@@ -25,6 +24,10 @@ type AdminAnalyticsLeadRow = {
 
 const ADMIN_ANALYTICS_PAGE = 1000;
 const ADMIN_ANALYTICS_MAX_SUPABASE_PAGES = 200;
+const ADMIN_ANALYTICS_SUPABASE_PARALLEL_PAGES = 5;
+
+const REF_LM_LC = SHEET_CAMPAIGN_REF_LM.toLowerCase();
+const REF_GW_LC = SHEET_CAMPAIGN_REF_GW.toLowerCase();
 
 /** PostgREST vraća grešku ako kolona nije u šemi (npr. migracija nije primenjena u prod). */
 const ADMIN_ANALYTICS_LEADS_SELECT_FALLBACKS = [
@@ -33,6 +36,31 @@ const ADMIN_ANALYTICS_LEADS_SELECT_FALLBACKS = [
   "id, created_at, source_tag, utm_source, utm_campaign, email",
   "id, created_at, source_tag, email",
 ] as const;
+
+async function fetchAdminLeadsPage(
+  supabase: SupabaseClient,
+  selectList: string,
+  supabaseGteIso: string | null,
+  supabaseLteIso: string | null,
+  pageIndex: number
+): Promise<{ rows: AdminAnalyticsLeadRow[]; error: { code?: string; message: string } | null }> {
+  const offset = pageIndex * ADMIN_ANALYTICS_PAGE;
+  let q = supabase.from("leads").select(selectList);
+  if (supabaseGteIso) {
+    q = q.gte("created_at", supabaseGteIso);
+  }
+  if (supabaseLteIso) {
+    q = q.lte("created_at", supabaseLteIso);
+  }
+  const { data: batch, error } = await q
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .range(offset, offset + ADMIN_ANALYTICS_PAGE - 1);
+  if (error) {
+    return { rows: [], error: { code: error.code, message: error.message } };
+  }
+  return { rows: (batch ?? []) as unknown as AdminAnalyticsLeadRow[], error: null };
+}
 
 async function fetchPaginatedSupabaseLeadsForAdmin(
   supabase: SupabaseClient,
@@ -43,34 +71,48 @@ async function fetchPaginatedSupabaseLeadsForAdmin(
     const listSupabase: AdminAnalyticsLeadRow[] = [];
     let failed = false;
     let truncated = false;
-    for (let page = 0; page < ADMIN_ANALYTICS_MAX_SUPABASE_PAGES; page++) {
-      const offset = page * ADMIN_ANALYTICS_PAGE;
-      let q = supabase.from("leads").select(selectList);
-      if (supabaseGteIso) {
-        q = q.gte("created_at", supabaseGteIso);
+    let nextPage = 0;
+
+    while (nextPage < ADMIN_ANALYTICS_MAX_SUPABASE_PAGES) {
+      const batchSize = Math.min(
+        ADMIN_ANALYTICS_SUPABASE_PARALLEL_PAGES,
+        ADMIN_ANALYTICS_MAX_SUPABASE_PAGES - nextPage
+      );
+      const pageIndexes = Array.from({ length: batchSize }, (_, i) => nextPage + i);
+      const results = await Promise.all(
+        pageIndexes.map((p) =>
+          fetchAdminLeadsPage(supabase, selectList, supabaseGteIso, supabaseLteIso, p)
+        )
+      );
+
+      let stop = false;
+      for (let j = 0; j < results.length; j++) {
+        const { rows, error } = results[j];
+        if (error) {
+          console.error("admin analytics leads:", selectList, error.code ?? "", error.message);
+          failed = true;
+          stop = true;
+          break;
+        }
+        listSupabase.push(...rows);
+        const pIdx = pageIndexes[j];
+        if (rows.length < ADMIN_ANALYTICS_PAGE) {
+          stop = true;
+          break;
+        }
+        if (pIdx === ADMIN_ANALYTICS_MAX_SUPABASE_PAGES - 1) {
+          truncated = true;
+          console.warn(
+            `admin analytics: Supabase pagination cap (${ADMIN_ANALYTICS_MAX_SUPABASE_PAGES * ADMIN_ANALYTICS_PAGE} redova); suzi Od–Da u adminu.`
+          );
+          stop = true;
+          break;
+        }
       }
-      if (supabaseLteIso) {
-        q = q.lte("created_at", supabaseLteIso);
-      }
-      const { data: batch, error } = await q
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true })
-        .range(offset, offset + ADMIN_ANALYTICS_PAGE - 1);
-      if (error) {
-        console.error("admin analytics leads:", selectList, error.code ?? "", error.message);
-        failed = true;
-        break;
-      }
-      const rows = (batch ?? []) as unknown as AdminAnalyticsLeadRow[];
-      listSupabase.push(...rows);
-      if (rows.length < ADMIN_ANALYTICS_PAGE) break;
-      if (page === ADMIN_ANALYTICS_MAX_SUPABASE_PAGES - 1) {
-        truncated = true;
-        console.warn(
-          `admin analytics: Supabase pagination cap (${ADMIN_ANALYTICS_MAX_SUPABASE_PAGES * ADMIN_ANALYTICS_PAGE} redova); suzi Od–Da u adminu.`
-        );
-      }
+      if (failed || stop) break;
+      nextPage += batchSize;
     }
+
     if (!failed) return { rows: listSupabase, truncated };
   }
   return { rows: [], truncated: false };
@@ -90,7 +132,7 @@ function normalizeSourceTag(
   const affTrim = (affiliateCode ?? "").toString().trim();
   if (affTrim) {
     const al = affTrim.toLowerCase();
-    if (al !== SHEET_CAMPAIGN_REF_LM.toLowerCase() && al !== SHEET_CAMPAIGN_REF_GW.toLowerCase()) {
+    if (al !== REF_LM_LC && al !== REF_GW_LC) {
       return "affiliate";
     }
   }
@@ -223,6 +265,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  /** Jednom po zahtevu — ne zvati lastInclusiveBelgradeYmdForLegacyCutoff u petlji po redovima (Intl × hiljade). */
+  const legacyLastInclusiveSheetYmd = legacyCutoffDate
+    ? lastInclusiveBelgradeYmdForLegacyCutoff(legacyCutoffDate)
+    : null;
+
   let sheetFetchMs = 0;
   let supabaseFetchMs = 0;
   const [sheetRows, supabaseBundle] = await Promise.all([
@@ -251,7 +298,7 @@ export async function GET(req: NextRequest) {
     const rowYmd = extractYmdFromSheetDate(row.date);
     if (!rowYmd) continue;
     if (!sheetRowYmdInPeriod(rowYmd, fromYmd, toYmd)) continue;
-    if (legacyCutoffDate && !sheetRowYmdAllowedForLegacy(rowYmd, legacyCutoffDate)) continue;
+    if (legacyLastInclusiveSheetYmd !== null && rowYmd > legacyLastInclusiveSheetYmd) continue;
     sheetRowsUsed += 1;
     const tab = row.sheetTab ?? "main";
     if (tab === "lm") sheetRowsByTab.lm += 1;
@@ -327,9 +374,9 @@ export async function GET(req: NextRequest) {
     /** true ako je dostignut limit stranica (200×1000) — suzi Od–Da. */
     supabaseFetchTruncated,
   };
-  if (legacyMode && legacyCutoffDate) {
+  if (legacyMode && legacyCutoffDate && legacyLastInclusiveSheetYmd !== null) {
     payload.legacyCutoffAt = legacyCutoffDate.toISOString();
-    payload.legacyLastInclusiveSheetYmd = lastInclusiveBelgradeYmdForLegacyCutoff(legacyCutoffDate);
+    payload.legacyLastInclusiveSheetYmd = legacyLastInclusiveSheetYmd;
   }
 
   if (todayOnly) {
@@ -377,9 +424,7 @@ export async function GET(req: NextRequest) {
       verifyEmailsOnlyInSheet,
       verifyEmailsOnlyInSupabase,
       legacyMode,
-      legacyLastInclusiveSheetYmd: legacyCutoffDate
-        ? lastInclusiveBelgradeYmdForLegacyCutoff(legacyCutoffDate)
-        : null,
+      legacyLastInclusiveSheetYmd: legacyLastInclusiveSheetYmd,
       sheetBySource,
       sheetSample: sheetRows.slice(0, 5).map((r) => ({
         date: r.date,
