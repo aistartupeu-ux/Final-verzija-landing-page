@@ -187,8 +187,6 @@ type GoogleTrafficPayload = {
   };
 };
 
-/** 0 = odmah prvi fetch (admin je već zaštićen sesijom). */
-const ADMIN_LEADS_INITIAL_DELAY_MS = 0;
 /** Klijentski timeout — kraći da UI brzo prikaže grešku ako edge/server zapne. */
 const ADMIN_PRIMARY_FETCH_TIMEOUT_MS = 48_000;
 
@@ -343,7 +341,6 @@ function TrafficVsLeadsChart({ points }: { points: TrafficPoint[] }) {
 export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [waitingInitialDelay, setWaitingInitialDelay] = useState(false);
   const [loadSeconds, setLoadSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [from, setFrom] = useState("");
@@ -417,6 +414,10 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     setSelectedRange("custom");
   }, []);
 
+  /** Google traffic tek posle prvog /analytics odgovora; brojač sprečava zastarele odgovore pri brzoj promeni perioda. */
+  const allowGoogleAfterPrimaryLoadsRef = useRef(false);
+  const leadRangeFetchSeqRef = useRef(0);
+
   const fetchTodayData = useCallback(async () => {
     try {
       const params = new URLSearchParams();
@@ -437,7 +438,16 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   }, [legacy]);
 
   const fetchData = useCallback(async (silent = false, withDebug = false) => {
+    const fromAtStart = from;
+    const toAtStart = to;
+    const legacyAtStart = legacy;
+
+    const rangeUnchanged = () =>
+      fromAtStart === from && toAtStart === to && legacyAtStart === legacy;
+
+    let mySeq = 0;
     if (!silent) {
+      mySeq = ++leadRangeFetchSeqRef.current;
       setLoading(true);
       allowGoogleAfterPrimaryLoadsRef.current = false;
     }
@@ -445,10 +455,10 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     let primaryOk = false;
     try {
       const params = new URLSearchParams();
-      if (from) params.set("from", from);
-      if (to) params.set("to", to);
+      if (fromAtStart) params.set("from", fromAtStart);
+      if (toAtStart) params.set("to", toAtStart);
       if (withDebug) params.set("debug", "1");
-      if (legacy) params.set("legacy", "1");
+      if (legacyAtStart) params.set("legacy", "1");
       const controller = new AbortController();
       const tid = setTimeout(() => controller.abort(), ADMIN_PRIMARY_FETCH_TIMEOUT_MS);
       let res: Response;
@@ -466,10 +476,14 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       }
       if (!res.ok) throw new Error(await res.text());
       const json = await res.json();
+      if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+      if (silent && !rangeUnchanged()) return;
       setData(json);
       void fetchTodayData();
       primaryOk = true;
     } catch (e) {
+      if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+      if (silent && !rangeUnchanged()) return;
       if (isAbortError(e)) {
         setError(
           "Zahtev za analitiku je predugo trajao (timeout). Suzi period datuma ili proveri Vercel log / limit funkcije."
@@ -478,7 +492,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
         setError(e instanceof Error ? e.message : "Greška pri učitavanju.");
       }
     } finally {
-      if (!silent) {
+      if (!silent && mySeq === leadRangeFetchSeqRef.current) {
         setLoading(false);
         allowGoogleAfterPrimaryLoadsRef.current = true;
       }
@@ -486,12 +500,18 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
 
     // Meta / TikTok ne smeju da blokiraju glavni loader — inače UI „visi“ ako spoljni API ne odgovori.
     if (!primaryOk) return;
+    if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+    if (silent && !rangeUnchanged()) return;
     const mp = new URLSearchParams();
-    if (from) mp.set("from", from);
-    if (to) mp.set("to", to);
+    if (fromAtStart) mp.set("from", fromAtStart);
+    if (toAtStart) mp.set("to", toAtStart);
     try {
       const metaRes = await fetch(`/api/admin/meta-ads?${mp}&debug=1`, { credentials: "include" });
+      if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+      if (silent && !rangeUnchanged()) return;
       const metaJson = await metaRes.json();
+      if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+      if (silent && !rangeUnchanged()) return;
       setMetaAds({
         configured: metaJson.configured !== false,
         instagram: metaJson.instagram ?? { spend: 0, leads: 0, cpl: null },
@@ -509,7 +529,11 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
         redirectToLogin();
         return;
       }
+      if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+      if (silent && !rangeUnchanged()) return;
       const ttJson = await ttRes.json();
+      if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
+      if (silent && !rangeUnchanged()) return;
       setTiktokAds({
         configured: ttJson.configured === true,
         spend: Number(ttJson.spend) || 0,
@@ -529,8 +553,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   fetchDataRef.current = fetchData;
 
   useEffect(() => {
-    const blocking = loading || waitingInitialDelay;
-    if (!blocking) {
+    if (!loading) {
       setLoadSeconds(0);
       return;
     }
@@ -540,7 +563,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       setLoadSeconds(Math.floor((Date.now() - t0) / 1000));
     }, 1000);
     return () => clearInterval(id);
-  }, [loading, waitingInitialDelay]);
+  }, [loading]);
 
   const fetchGoogleTraffic = useCallback(async (customFrom?: string, customTo?: string) => {
     const fromValue = customFrom ?? graphFrom;
@@ -575,47 +598,10 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     redirectToLogin();
   };
 
-  const isFirstLoadPassRef = useRef(true);
-  const lastFetchedRangeRef = useRef<string | null>(null);
-  const firstLoadTimerForKeyRef = useRef<string | null>(null);
-  /** Google traffic + konverzije tek posle glavnog /analytics odgovora — manje paralelnog pritiska na Supabase. */
-  const allowGoogleAfterPrimaryLoadsRef = useRef(false);
-
-  // Prvo učitavanje: kratka pauza (layout). Promena datuma posle toga: odmah.
-  // lastFetchedRange sprečava ponovni fetch samo zbog promene reference na fetchData.
+  // Uvek fetch pri promeni perioda (bez lastFetchedRange — izbegava preskakanje i trke).
   useEffect(() => {
     if (!from || !to) return;
-    const key = `${legacy ? 1 : 0}|${from}|${to}`;
-
-    if (isFirstLoadPassRef.current) {
-      if (firstLoadTimerForKeyRef.current === key) return;
-      firstLoadTimerForKeyRef.current = key;
-
-      if (ADMIN_LEADS_INITIAL_DELAY_MS <= 0) {
-        isFirstLoadPassRef.current = false;
-        lastFetchedRangeRef.current = key;
-        void fetchDataRef.current();
-        return;
-      }
-
-      setWaitingInitialDelay(true);
-      const t = setTimeout(() => {
-        isFirstLoadPassRef.current = false;
-        setWaitingInitialDelay(false);
-        lastFetchedRangeRef.current = key;
-        void fetchDataRef.current();
-      }, ADMIN_LEADS_INITIAL_DELAY_MS);
-      return () => {
-        clearTimeout(t);
-        setWaitingInitialDelay(false);
-        firstLoadTimerForKeyRef.current = null;
-      };
-    }
-
-    if (lastFetchedRangeRef.current === key) return;
-    lastFetchedRangeRef.current = key;
     void fetchDataRef.current();
-    // fetchDataRef uvek pokazuje najnoviji fetch; ponovno pokretanje samo kad se promene from/to/legacy.
   }, [from, to, legacy]);
 
   const lastFetchedGraphRangeRef = useRef<string | null>(null);
@@ -738,10 +724,10 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
               </span>
             </div>
             <div className="admin-buttons-row">
-              <button type="button" onClick={handleRefresh} disabled={loading || waitingInitialDelay} className="admin-btn admin-btn-refresh">
-                <RefreshCw size={14} style={{ opacity: loading || waitingInitialDelay ? 0.5 : 1 }} /> Osveži
+              <button type="button" onClick={handleRefresh} disabled={loading} className="admin-btn admin-btn-refresh">
+                <RefreshCw size={14} style={{ opacity: loading ? 0.5 : 1 }} /> Osveži
               </button>
-              <button type="button" onClick={() => fetchData(false, true)} disabled={loading || waitingInitialDelay} className="admin-btn admin-btn-debug">
+              <button type="button" onClick={() => fetchData(false, true)} disabled={loading} className="admin-btn admin-btn-debug">
                 Debug
               </button>
               <button type="button" onClick={handleLogout} className="admin-btn admin-btn-logout">
@@ -757,7 +743,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
           </div>
         )}
 
-        {loading || waitingInitialDelay ? (
+        {loading ? (
           <div
             style={{
               display: "flex",
@@ -773,14 +759,8 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
           >
             <Loader2 size={32} color="#00d4ff" style={{ animation: "spin 1s linear infinite", willChange: "transform" }} />
             <span style={{ maxWidth: 380, lineHeight: 1.55 }}>
-              {waitingInitialDelay && !loading ? (
-                <>Kratka pauza pre prvog učitavanja (manje opterećenje), zatim ceo izveštaj — Sheet i baza bez skraćivanja.</>
-              ) : loading ? (
-                <>
-                  Preuzimanje analitike (Sheet + Supabase)
-                  {loadSeconds > 0 ? ` — ${loadSeconds}s` : ""}. Veliki period može dugo da traje; suzi datume ako možeš. Ako pređe ~48s, pojaviće se timeout poruka (Vercel limit).
-                </>
-              ) : null}
+              Preuzimanje analitike (Sheet + Supabase)
+              {loadSeconds > 0 ? ` — ${loadSeconds}s` : ""}. Veliki period može dugo da traje; suzi datume ako možeš. Ako pređe ~48s, pojaviće se timeout poruka (Vercel limit).
             </span>
           </div>
         ) : data ? (
