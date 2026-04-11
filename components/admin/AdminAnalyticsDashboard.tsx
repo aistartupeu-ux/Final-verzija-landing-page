@@ -380,7 +380,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   const [liveMode, setLiveMode] = useState<"off" | "30s" | "90s" | "live_today">("30s");
 
   useEffect(() => {
-    if (globalThis.window === undefined) return;
+    if (typeof window === "undefined") return;
     const todayYmd = getBelgradeTodayYmd();
     if (legacy) {
       // Stari prikaz: ceo opseg do preseka — ne samo tekući mesec (inače „prethodni” meseci nestanu).
@@ -417,6 +417,8 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
 
   /** Brojač sprečava zastarele odgovore pri brzoj promeni perioda (glavni /analytics). */
   const leadRangeFetchSeqRef = useRef(0);
+  /** Koliko ne-silent fetch-eva je u toku — sprečava zaglavljen loader (Strict Mode / preklapanje zahteva). */
+  const pendingNonSilentLoadsRef = useRef(0);
 
   const fetchTodayData = useCallback(async () => {
     const ac = new AbortController();
@@ -455,6 +457,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     let mySeq = 0;
     if (!silent) {
       mySeq = ++leadRangeFetchSeqRef.current;
+      pendingNonSilentLoadsRef.current += 1;
       setLoading(true);
     }
     setError(null);
@@ -497,8 +500,11 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       }
     } finally {
       globalThis.clearTimeout(abortTimer);
-      if (!silent && mySeq === leadRangeFetchSeqRef.current) {
-        setLoading(false);
+      if (!silent) {
+        pendingNonSilentLoadsRef.current = Math.max(0, pendingNonSilentLoadsRef.current - 1);
+        if (pendingNonSilentLoadsRef.current === 0) {
+          setLoading(false);
+        }
       }
     }
 
