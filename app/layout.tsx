@@ -6,6 +6,17 @@ import LandingAttribution from "@/components/layout/LandingAttribution";
 import AffiliateTracker from "@/components/AffiliateTracker";
 const inter = Inter({ subsets: ["latin", "latin-ext"], variable: "--font-inter" });
 
+function supabaseOriginForPreconnect(): string | null {
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw).origin;
+  } catch {
+    console.error("Root layout: invalid NEXT_PUBLIC_SUPABASE_URL, skipping preconnect");
+    return null;
+  }
+}
+
 export const metadata: Metadata = {
   title: "AI Hype Academy | Izgradi AI karijeru",
   description: "Kompletan sistem za kreiranje AI influensera i filmskih videa za monetizaciju. Praktičan kurs za potpune početnike.",
@@ -40,8 +51,7 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseOrigin = supabaseUrl ? new URL(supabaseUrl).origin : null;
+  const supabaseOrigin = supabaseOriginForPreconnect();
 
   return (
     <html lang="sr">

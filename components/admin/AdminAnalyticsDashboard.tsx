@@ -517,6 +517,10 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     if (toAtStart) mp.set("to", toAtStart);
     try {
       const metaRes = await fetch(`/api/admin/meta-ads?${mp}&debug=1`, { credentials: "include" });
+      if (metaRes.status === 401) {
+        redirectToLogin();
+        return;
+      }
       if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
       if (silent && !rangeUnchanged()) return;
       const metaJson = await metaRes.json();
