@@ -248,9 +248,11 @@ export async function POST(req: NextRequest) {
       utm_medium: utm_medium ?? null,
       utm_campaign: utm_campaign ?? null,
       source_tag: sourceTag,
-      ...(process.env.SUPABASE_DISABLE_SUBMITTED_AT_BELGRADE === "1"
-        ? {}
-        : { submitted_at_belgrade: formatBelgradeDateTime() }),
+      // submitted_at_belgrade samo ako kolona postoji u Supabase (ENABLE=1). Inače insert pada sa PGRST204 i Sheet se ne pozove.
+      ...(process.env.SUPABASE_ENABLE_SUBMITTED_AT_BELGRADE === "1" &&
+      process.env.SUPABASE_DISABLE_SUBMITTED_AT_BELGRADE !== "1"
+        ? { submitted_at_belgrade: formatBelgradeDateTime() }
+        : {}),
     };
 
     const { error } = await supabase.from("leads").insert(leadInsert);
@@ -332,11 +334,13 @@ export async function POST(req: NextRequest) {
       affiliate_code: affiliateCode ?? "",
     };
     // Na Vercel-u moramo await — inače funkcija se ugasi pre nego Sheet upis stigne.
+    let sheetAppendOk: boolean | undefined;
     if (shouldWriteLeadsSource) {
       try {
-        await appendLeadsToSheet(row);
+        sheetAppendOk = await appendLeadsToSheet(row);
       } catch (e) {
         console.error("Leads Sheet append error:", e);
+        sheetAppendOk = false;
       }
     }
 
@@ -383,7 +387,10 @@ export async function POST(req: NextRequest) {
       path: "/",
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      ...(typeof sheetAppendOk === "boolean" ? { sheet_append_ok: sheetAppendOk } : {}),
+    });
   } catch (err) {
     console.error("Lead API error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
