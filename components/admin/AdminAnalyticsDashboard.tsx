@@ -187,7 +187,8 @@ type GoogleTrafficPayload = {
   };
 };
 
-const ADMIN_LEADS_INITIAL_DELAY_MS = 400;
+/** Kratka pauša pre prvog fetch-a — smanjuje burst na server; kompletan Sheet + Supabase i dalje bez sečenja. */
+const ADMIN_LEADS_INITIAL_DELAY_MS = 1200;
 const BELGRADE_YMD = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Europe/Belgrade",
   year: "numeric",
@@ -430,18 +431,13 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     if (!silent) setLoading(true);
     setError(null);
     let primaryOk = false;
-    const ctrl = new AbortController();
-    const tid = window.setTimeout(() => ctrl.abort(), 58_000);
     try {
       const params = new URLSearchParams();
       if (from) params.set("from", from);
       if (to) params.set("to", to);
       if (withDebug) params.set("debug", "1");
       if (legacy) params.set("legacy", "1");
-      const res = await fetch(`/api/admin/analytics?${params}`, {
-        credentials: "include",
-        signal: ctrl.signal,
-      });
+      const res = await fetch(`/api/admin/analytics?${params}`, { credentials: "include" });
       if (res.status === 401) {
         redirectToLogin();
         return;
@@ -452,16 +448,8 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       void fetchTodayData();
       primaryOk = true;
     } catch (e) {
-      const aborted = e instanceof DOMException && e.name === "AbortError";
-      setError(
-        aborted
-          ? "Timeout: analitika predugo ne odgovara (često Google Sheet ili mreža). Pokušaj Osveži ili proveri Vercel logove."
-          : e instanceof Error
-            ? e.message
-            : "Greška pri učitavanju."
-      );
+      setError(e instanceof Error ? e.message : "Greška pri učitavanju.");
     } finally {
-      window.clearTimeout(tid);
       if (!silent) setLoading(false);
     }
 
@@ -725,8 +713,8 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
           >
             <Loader2 size={32} color="#00d4ff" style={{ animation: "spin 1s linear infinite", willChange: "transform" }} />
             {waitingInitialDelay && !loading ? (
-              <span style={{ maxWidth: 320, lineHeight: 1.5 }}>
-                Kratak delay pre učitavanja leadova (manje opterećenje servera)…
+              <span style={{ maxWidth: 340, lineHeight: 1.5 }}>
+                Kratka pauza pre prvog učitavanja (manje opterećenje), zatim ceo izveštaj — Sheet i baza bez skraćivanja.
               </span>
             ) : null}
           </div>
