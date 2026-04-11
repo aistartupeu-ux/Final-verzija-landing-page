@@ -120,16 +120,17 @@ export async function GET(req: NextRequest) {
     }
 
     /**
-     * Lead brojevi iz Insights `actions` — strogi tipovi (bez širokog includes("lead"))
-     * da ne uhvatimo npr. nepovezane action_type stringove. Po jednom redu obično Meta
-     * šalje više lead-related tipova koji mogu predstavljati iste događaje — uzimamo MAX,
-     * ne SUM, da smanjimo duplo brojanje.
+     * Lead brojevi iz Insights `actions` — tipovi koji odgovaraju „Results“ u Ads Manager-u
+     * za kampanje na lead / custom conversion (npr. „Website Lead“, „Giveaway“).
+     * Po jednom redu Meta često šalje više srodnih action_type vrednosti — uzimamo MAX, ne SUM.
      */
     function isMetaLeadActionType(actionType: string): boolean {
       const t = actionType.toLowerCase();
       if (t === "lead") return true;
       if (t.startsWith("onsite_conversion.lead")) return true;
       if (t.startsWith("offsite_conversion.fb_pixel_lead")) return true;
+      /** Custom konverzije u Events Manageru (npr. giveaway, imenovani pixel događaji). */
+      if (t.startsWith("offsite_conversion.custom")) return true;
       if (t.startsWith("leadgen")) return true;
       if (t === "onsite_conversion.messaging_user_lead") return true;
       return false;
@@ -157,7 +158,11 @@ export async function GET(req: NextRequest) {
     }
 
     let data = json.data ?? [];
-    if (!campaignId && activeCampaignIds.size > 0) {
+    /** Podrazumevano sve kampanje (kao Ads Manager za period), da brojevi ne odstaju od UI. */
+    const restrictToActiveCampaigns =
+      process.env.META_ADS_INSIGHTS_ACTIVE_CAMPAIGNS_ONLY === "1" ||
+      process.env.META_ADS_INSIGHTS_ACTIVE_CAMPAIGNS_ONLY?.toLowerCase() === "true";
+    if (!campaignId && restrictToActiveCampaigns && activeCampaignIds.size > 0) {
       data = data.filter((row: { campaign_id?: string }) => {
         const cid = row.campaign_id;
         return cid && activeCampaignIds.has(cid);
@@ -261,6 +266,14 @@ export async function GET(req: NextRequest) {
         campaignFilter: campaignName ?? null,
         campaignId: campaignId ?? null,
         campaignsInResponse: (payload.campaigns as CampaignCplRow[]).length,
+        restrictToActiveCampaigns,
+        insightsNotes: [
+          "Meta „Results“ = conversion događaji (uključujući custom); admin sada učitava i offsite_conversion.custom.*.",
+          "Supabase/Sheet ≈ jedinstveni email po periodu; Meta može brojati više (ponovi, view-through, drugačiji atribucioni model).",
+          restrictToActiveCampaigns
+            ? "META_ADS_INSIGHTS_ACTIVE_CAMPAIGNS_ONLY=1: insights su filtrirani na aktivne kampanje."
+            : "Insights uključuju i ugasene kampanje u datumu (kao podrazumevani Ads Manager za nalog).",
+        ],
       };
     }
     return NextResponse.json(payload);

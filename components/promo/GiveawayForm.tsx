@@ -49,7 +49,7 @@ export default function GiveawayForm({ accent = "cyan" }: { accent?: GiveawayAcc
     if (step !== "done" || didRedirect || !pendingEventId) return;
     const t = window.setTimeout(() => {
       setDidRedirect(true);
-      router.push("/thank-yougw");
+      router.push(`/thank-yougw?eid=${encodeURIComponent(pendingEventId)}`);
     }, 1000);
     return () => window.clearTimeout(t);
   }, [didRedirect, pendingEventId, router, step]);

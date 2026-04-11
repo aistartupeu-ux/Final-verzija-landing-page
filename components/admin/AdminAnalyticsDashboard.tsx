@@ -360,6 +360,8 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       campaignFilter?: string | null;
       campaignId?: string | null;
       campaignsInResponse?: number;
+      restrictToActiveCampaigns?: boolean;
+      insightsNotes?: string[];
     };
   } | null>(null);
   const [tiktokAds, setTiktokAds] = useState<{
@@ -691,11 +693,16 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   const tiktokCplFromReport = tiktokApiOk ? tiktokAds!.cpl : null;
   const igLeads = data?.bySource?.instagram ?? 0;
   const fbLeads = data?.bySource?.facebook ?? 0;
+  const metaIgLeads = metaAds?.instagram.leads ?? 0;
+  const metaFbLeads = metaAds?.facebook.leads ?? 0;
+  /** CPL iz Meta cost_per_action ili potrošnja ÷ Meta insights leadovi (ne mešati sa brojem sa sajta). */
   const igCpl = metaAds
-    ? (metaAds.instagram.cpl ?? (metaAds.instagram.spend > 0 && igLeads > 0 ? metaAds.instagram.spend / igLeads : null))
+    ? (metaAds.instagram.cpl ??
+        (metaAds.instagram.spend > 0 && metaIgLeads > 0 ? metaAds.instagram.spend / metaIgLeads : null))
     : null;
   const fbCpl = metaAds
-    ? (metaAds.facebook.cpl ?? (metaAds.facebook.spend > 0 && fbLeads > 0 ? metaAds.facebook.spend / fbLeads : null))
+    ? (metaAds.facebook.cpl ??
+        (metaAds.facebook.spend > 0 && metaFbLeads > 0 ? metaAds.facebook.spend / metaFbLeads : null))
     : null;
   const pct = useCallback((n: number) => totalLeads > 0 ? Math.round((n / totalLeads) * 100) : 0, [totalLeads]);
   const sortedSources = useMemo(() => {
@@ -1104,24 +1111,33 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
             <div style={{ marginBottom: 28 }}>
               <h2 style={{ fontSize: "clamp(16px, 4vw, 18px)", fontWeight: 700, color: "#fff", marginBottom: 14 }}>Cost per Lead (CPL)</h2>
               <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
-                Meta (kartice ispod): potrošnja iz Ads API, CPL = potrošnja ÷ leadovi <strong style={{ color: "#aaa" }}>sa sajta</strong> (ukupno po
-                mreži). <strong style={{ color: "#aaa" }}>Po kampanjama</strong>: CPL koristi lead brojeve koje Meta prijavi u insights-u (po kampanji
-                i platformi). TikTok: automatski preko Marketing API ako su podešeni token i advertiser ID; inače ručni unos.
+                Meta: potrošnja i <strong style={{ color: "#aaa" }}>leadovi iz Ads Insights</strong> (uključujući custom konverzije kao u Ads Manager-u).
+                Pored toga prikazujemo <strong style={{ color: "#aaa" }}>leadove sa sajta</strong> (atribucija po UTM/source_tag u našoj analitici) —
+                Meta broji događaje, mi jedinstvene emailove; giveaway ide i u posebnu tabelu/Sheet tab. TikTok: Marketing API ako su tokeni podešeni.
               </p>
               {metaAds?.error && (
                 <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444", fontSize: 12 }}>
                   Meta API: {metaAds.error}
                 </div>
               )}
-              {metaAds?._debug && (metaAds.instagram.spend === 0 && metaAds.facebook.spend === 0 || metaAds._debug.campaignFilter || (metaAds._debug.activeCampaigns ?? 0) > 0) && (
+              {metaAds?._debug && (
                 <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)", color: "#a78bfa", fontSize: 12 }}>
                   {metaAds._debug.campaignFilter ? (
                     <span>Kampanja: {metaAds._debug.campaignFilter}{metaAds._debug.campaignId ? ` ✓` : " — nije pronađena"}</span>
+                  ) : metaAds._debug.restrictToActiveCampaigns ? (
+                    <span>Samo aktivne kampanje ({metaAds._debug.activeCampaigns ?? 0}) — META_ADS_INSIGHTS_ACTIVE_CAMPAIGNS_ONLY=1</span>
                   ) : (
-                    <span>Samo aktivne kampanje ({metaAds._debug.activeCampaigns ?? 0})</span>
+                    <span>Insights: sve kampanje u datumu (aktivne + ugasene), kao tipičan izbor u Ads Manager-u.</span>
                   )}
                   {metaAds._debug.dataRows === 0 && (
                     <span> — Nema potrošnje u ovom periodu.</span>
+                  )}
+                  {metaAds._debug.insightsNotes && metaAds._debug.insightsNotes.length > 0 && (
+                    <ul style={{ margin: "10px 0 0", paddingLeft: 18, color: "#94a3b8", lineHeight: 1.45 }}>
+                      {metaAds._debug.insightsNotes.map((n, i) => (
+                        <li key={i}>{n}</li>
+                      ))}
+                    </ul>
                   )}
                 </div>
               )}
@@ -1134,7 +1150,8 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
                         {igCpl != null ? "€" + igCpl.toFixed(2) : "—"}
                       </div>
                       <div style={{ fontSize: 12, color: "#555" }}>
-                        €{metaAds.instagram.spend.toFixed(2)} potrošeno · {data.bySource.instagram ?? 0} leadova sa sajta
+                        €{metaAds.instagram.spend.toFixed(2)} potrošeno · Meta (insights): {metaAds.instagram.leads} · Sajt
+                        (IG tag): {igLeads}
                       </div>
                     </>
                   ) : (
@@ -1149,7 +1166,8 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
                         {fbCpl != null ? "€" + fbCpl.toFixed(2) : "—"}
                       </div>
                       <div style={{ fontSize: 12, color: "#555" }}>
-                        €{metaAds.facebook.spend.toFixed(2)} potrošeno · {data.bySource.facebook ?? 0} leadova sa sajta
+                        €{metaAds.facebook.spend.toFixed(2)} potrošeno · Meta (insights): {metaAds.facebook.leads} · Sajt
+                        (FB tag): {fbLeads}
                       </div>
                     </>
                   ) : (
