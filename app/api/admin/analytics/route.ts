@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getLeadsFromSheet, SHEET_CAMPAIGN_REF_GW, SHEET_CAMPAIGN_REF_LM } from "@/lib/leads-sheet";
 import { isAdminApiAuthorized } from "@/lib/admin-api-auth";
 import { SOURCE_TAG_LEAD_MAGNET, SOURCE_TAG_LEAD_MAGNET_AFFILIATE } from "@/lib/lead-source-tags";
@@ -12,7 +12,111 @@ import {
   sheetRowYmdInPeriod,
 } from "@/lib/analytics-legacy";
 
-/** Produženo trajanje na Vercel-u — Sheet + Supabase mogu dugo da traju na velikim tabelama. */
+type AdminAnalyticsLeadRow = {
+  id: string;
+  created_at: string;
+  source_tag: string | null;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  affiliate_code?: string | null;
+  email?: string;
+};
+
+const ADMIN_ANALYTICS_PAGE = 1000;
+const ADMIN_ANALYTICS_MAX_SUPABASE_PAGES = 200;
+
+/** PostgREST vraća grešku ako kolona nije u šemi (npr. migracija nije primenjena u prod). */
+const ADMIN_ANALYTICS_LEADS_SELECT_FALLBACKS = [
+  "id, created_at, source_tag, utm_source, utm_medium, utm_campaign, affiliate_code, email",
+  "id, created_at, source_tag, utm_source, utm_medium, utm_campaign, email",
+  "id, created_at, source_tag, utm_source, utm_campaign, email",
+  "id, created_at, source_tag, email",
+] as const;
+
+async function fetchPaginatedSupabaseLeadsForAdmin(
+  supabase: SupabaseClient,
+  supabaseGteIso: string | null,
+  supabaseLteIso: string | null
+): Promise<{ rows: AdminAnalyticsLeadRow[]; truncated: boolean }> {
+  for (const selectList of ADMIN_ANALYTICS_LEADS_SELECT_FALLBACKS) {
+    const listSupabase: AdminAnalyticsLeadRow[] = [];
+    let failed = false;
+    let truncated = false;
+    for (let page = 0; page < ADMIN_ANALYTICS_MAX_SUPABASE_PAGES; page++) {
+      const offset = page * ADMIN_ANALYTICS_PAGE;
+      let q = supabase.from("leads").select(selectList);
+      if (supabaseGteIso) {
+        q = q.gte("created_at", supabaseGteIso);
+      }
+      if (supabaseLteIso) {
+        q = q.lte("created_at", supabaseLteIso);
+      }
+      const { data: batch, error } = await q
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(offset, offset + ADMIN_ANALYTICS_PAGE - 1);
+      if (error) {
+        console.error("admin analytics leads:", selectList, error.code ?? "", error.message);
+        failed = true;
+        break;
+      }
+      const rows = (batch ?? []) as unknown as AdminAnalyticsLeadRow[];
+      listSupabase.push(...rows);
+      if (rows.length < ADMIN_ANALYTICS_PAGE) break;
+      if (page === ADMIN_ANALYTICS_MAX_SUPABASE_PAGES - 1) {
+        truncated = true;
+        console.warn(
+          `admin analytics: Supabase pagination cap (${ADMIN_ANALYTICS_MAX_SUPABASE_PAGES * ADMIN_ANALYTICS_PAGE} redova); suzi Od–Da u adminu.`
+        );
+      }
+    }
+    if (!failed) return { rows: listSupabase, truncated };
+  }
+  return { rows: [], truncated: false };
+}
+
+function normalizeSourceTag(
+  tag: string | null | undefined,
+  utmSource: string | null | undefined,
+  utmMedium: string | null | undefined,
+  utmCampaign: string | null | undefined,
+  affiliateCode?: string | null | undefined
+): string {
+  const rawTag = (tag ?? "").trim().toLowerCase();
+  if (rawTag === SOURCE_TAG_LEAD_MAGNET || rawTag === SOURCE_TAG_LEAD_MAGNET_AFFILIATE) {
+    return rawTag;
+  }
+  const affTrim = (affiliateCode ?? "").toString().trim();
+  if (affTrim) {
+    const al = affTrim.toLowerCase();
+    if (al !== SHEET_CAMPAIGN_REF_LM.toLowerCase() && al !== SHEET_CAMPAIGN_REF_GW.toLowerCase()) {
+      return "affiliate";
+    }
+  }
+  const rawSource = (utmSource ?? "").trim().toLowerCase();
+  const rawMedium = (utmMedium ?? "").trim().toLowerCase();
+  const rawCampaign = (utmCampaign ?? "").trim().toLowerCase();
+  const probe = `${rawTag} ${rawSource} ${rawMedium} ${rawCampaign}`;
+
+  if (probe.includes("tiktok") || rawSource === "tt" || rawMedium === "tt") return "tiktok";
+  if (probe.includes("instagram") || probe.includes("insta") || rawTag === "ig" || rawSource === "ig" || rawMedium === "ig")
+    return "instagram";
+  if (
+    probe.includes("facebook") ||
+    rawTag === "fb" ||
+    rawSource === "fb" ||
+    rawMedium === "fb" ||
+    probe.includes("fb_") ||
+    rawSource.includes("facebook")
+  )
+    return "facebook";
+  if (rawTag === "affiliate") return "affiliate";
+  if (!rawTag || rawTag === "meta" || rawTag === "direct") return "direct";
+  return rawTag;
+}
+
+/** Vercel Hobby često max ~10–60s; Pro može više. Paginacija je ograničena da ne prekorači funkciju. */
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
@@ -40,7 +144,7 @@ export async function GET(req: NextRequest) {
       );
     }
     legacyCutoffDate = new Date(raw);
-    if (isNaN(legacyCutoffDate.getTime())) {
+    if (Number.isNaN(legacyCutoffDate.getTime())) {
       return NextResponse.json({ error: "Invalid ADMIN_ANALYTICS_LEGACY_CUTOFF_ISO" }, { status: 400 });
     }
   }
@@ -100,47 +204,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  function normalizeSourceTag(
-    tag: string | null | undefined,
-    utmSource: string | null | undefined,
-    utmMedium: string | null | undefined,
-    utmCampaign: string | null | undefined,
-    affiliateCode?: string | null | undefined
-  ): string {
-    const rawTag = (tag ?? "").trim().toLowerCase();
-    if (rawTag === SOURCE_TAG_LEAD_MAGNET || rawTag === SOURCE_TAG_LEAD_MAGNET_AFFILIATE) {
-      return rawTag;
-    }
-    const affTrim = (affiliateCode ?? "").toString().trim();
-    if (affTrim) {
-      const al = affTrim.toLowerCase();
-      if (al !== SHEET_CAMPAIGN_REF_LM.toLowerCase() && al !== SHEET_CAMPAIGN_REF_GW.toLowerCase()) {
-        return "affiliate";
-      }
-    }
-    const rawSource = (utmSource ?? "").trim().toLowerCase();
-    const rawMedium = (utmMedium ?? "").trim().toLowerCase();
-    const rawCampaign = (utmCampaign ?? "").trim().toLowerCase();
-    const probe = `${rawTag} ${rawSource} ${rawMedium} ${rawCampaign}`;
-
-    // Prvo platforma — affiliate+tiktok ide u TikTok, affiliate+ig u Instagram
-    if (probe.includes("tiktok") || rawSource === "tt" || rawMedium === "tt") return "tiktok";
-    if (probe.includes("instagram") || probe.includes("insta") || rawTag === "ig" || rawSource === "ig" || rawMedium === "ig")
-      return "instagram";
-    if (
-      probe.includes("facebook") ||
-      rawTag === "fb" ||
-      rawSource === "fb" ||
-      rawMedium === "fb" ||
-      probe.includes("fb_") ||
-      rawSource.includes("facebook")
-    )
-      return "facebook";
-    if (rawTag === "affiliate") return "affiliate";
-    if (!rawTag || rawTag === "meta" || rawTag === "direct") return "direct";
-    return rawTag;
-  }
-
   // 1) Sheet + Supabase u paraleli (ranije sekvencijalno — duplo čekanje na wall-clock).
   // Datum: YYYY-MM-DD u Beogradu + period Od–Do + legacy presek (ne mešati sa Date() u lokalnom TZ servera).
   let supabaseGteIso: string | null = null;
@@ -160,55 +223,25 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  type LeadRow = {
-    id: string;
-    created_at: string;
-    source_tag: string | null;
-    utm_source?: string | null;
-    utm_medium?: string | null;
-    utm_campaign?: string | null;
-    affiliate_code?: string | null;
-    email?: string;
-  };
+  let sheetFetchMs = 0;
+  let supabaseFetchMs = 0;
+  const [sheetRows, supabaseBundle] = await Promise.all([
+    (async () => {
+      const t = Date.now();
+      const r = await getLeadsFromSheet();
+      sheetFetchMs = Date.now() - t;
+      return r;
+    })(),
+    (async () => {
+      const t = Date.now();
+      const r = await fetchPaginatedSupabaseLeadsForAdmin(supabase, supabaseGteIso, supabaseLteIso);
+      supabaseFetchMs = Date.now() - t;
+      return r;
+    })(),
+  ]);
 
-  const PAGE = 1000;
-
-  /** PostgREST vraća grešku ako kolona nije u šemi (npr. migracija nije primenjena u prod). */
-  const LEADS_SELECT_FALLBACKS = [
-    "id, created_at, source_tag, utm_source, utm_medium, utm_campaign, affiliate_code, email",
-    "id, created_at, source_tag, utm_source, utm_medium, utm_campaign, email",
-    "id, created_at, source_tag, utm_source, utm_campaign, email",
-    "id, created_at, source_tag, email",
-  ] as const;
-
-  async function fetchAllSupabaseLeadRows(): Promise<LeadRow[]> {
-    for (const selectList of LEADS_SELECT_FALLBACKS) {
-      const listSupabase: LeadRow[] = [];
-      let failed = false;
-      for (let offset = 0; ; offset += PAGE) {
-        let q = supabase.from("leads").select(selectList);
-        if (supabaseGteIso) {
-          q = q.gte("created_at", supabaseGteIso);
-        }
-        if (supabaseLteIso) {
-          q = q.lte("created_at", supabaseLteIso);
-        }
-        const { data: batch, error } = await q.order("created_at", { ascending: true }).range(offset, offset + PAGE - 1);
-        if (error) {
-          console.error("admin analytics leads:", selectList, error.code ?? "", error.message);
-          failed = true;
-          break;
-        }
-        const rows = (batch ?? []) as unknown as LeadRow[];
-        listSupabase.push(...rows);
-        if (rows.length < PAGE) break;
-      }
-      if (!failed) return listSupabase;
-    }
-    return [];
-  }
-
-  const [sheetRows, listSupabase] = await Promise.all([getLeadsFromSheet(), fetchAllSupabaseLeadRows()]);
+  const listSupabase = supabaseBundle.rows;
+  const supabaseFetchTruncated = supabaseBundle.truncated;
 
   const sheetRowsByTab = { main: 0, lm: 0, gw: 0 };
   const sheetLeadsByDay: Record<string, number> = {};
@@ -284,6 +317,8 @@ export async function GET(req: NextRequest) {
     countingModel: "unique_email_sheet_plus_supabase_belgrade_day_bounds",
     supabaseCreatedAtGte: supabaseGteIso,
     supabaseCreatedAtLte: supabaseLteIso,
+    /** true ako je dostignut limit stranica (200×1000) — suzi Od–Da. */
+    supabaseFetchTruncated,
   };
   if (legacyMode && legacyCutoffDate) {
     payload.legacyCutoffAt = legacyCutoffDate.toISOString();
@@ -302,9 +337,9 @@ export async function GET(req: NextRequest) {
       hour12: false,
     }).formatToParts(new Date());
     const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "0";
-    const h = parseInt(get("hour"), 10);
-    const m = parseInt(get("minute"), 10);
-    const s = parseInt(get("second"), 10);
+    const h = Number.parseInt(get("hour"), 10);
+    const m = Number.parseInt(get("minute"), 10);
+    const s = Number.parseInt(get("second"), 10);
     payload.secondsUntilMidnight = 24 * 3600 - h * 3600 - m * 60 - s;
     payload.belgradeTime = `${get("hour")}:${get("minute")}:${get("second")} (Beograd)`;
   }
@@ -322,9 +357,12 @@ export async function GET(req: NextRequest) {
       sheetBySource[tag] = (sheetBySource[tag] ?? 0) + 1;
     }
     payload.debug = {
+      sheetFetchMs,
+      supabaseFetchMs,
       sheetRowsTotal: sheetRows.length,
       sheetRowsAfterFilter: sheetRowsUsed,
       supabaseLeadsFetched: listSupabase.length,
+      supabaseFetchTruncated,
       supabaseCreatedAtGte: supabaseGteIso,
       supabaseCreatedAtLte: supabaseLteIso,
       mergedUniqueEmails: leadByEmail.size,

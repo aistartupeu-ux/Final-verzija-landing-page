@@ -35,6 +35,8 @@ type AnalyticsData = {
   affiliate: number;
   /** Broj redova u Supabase u periodu (created_at, Beograd); Table Editor COUNT za isti opseg. */
   supabaseRowsInPeriod?: number;
+  /** true ako API nije mogao da učita sve redove (limit 200k) — suzi period. */
+  supabaseFetchTruncated?: boolean;
   /** Sheet redovi u periodu (List1 + LM + GW), jedan red = jedna prijava u tabu. */
   sheetRowsInPeriod?: number;
   sheetRowsByTab?: { main: number; lm: number; gw: number };
@@ -48,6 +50,8 @@ type AnalyticsData = {
   secondsUntilMidnight?: number;
   belgradeTime?: string;
   debug?: {
+    sheetFetchMs?: number;
+    supabaseFetchMs?: number;
     sheetRowsTotal: number;
     sheetBySource: Record<string, number>;
     sheetSample: { date: string; sheetTab?: string; source_tag: string; utm_source: string; utm_medium: string }[];
@@ -152,7 +156,7 @@ function LegacyDanasClock({ onMidnight }: { onMidnight: () => void }) {
 }
 
 function redirectToLogin() {
-  window.location.href = "/admin/login";
+  globalThis.location.href = "/admin/login";
 }
 
 type TikTokCampaignCpl = {
@@ -376,7 +380,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   const [liveMode, setLiveMode] = useState<"off" | "30s" | "90s" | "live_today">("30s");
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (globalThis.window === undefined) return;
     const todayYmd = getBelgradeTodayYmd();
     if (legacy) {
       // Stari prikaz: ceo opseg do preseka — ne samo tekući mesec (inače „prethodni” meseci nestanu).
@@ -415,11 +419,16 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   const leadRangeFetchSeqRef = useRef(0);
 
   const fetchTodayData = useCallback(async () => {
+    const ac = new AbortController();
+    const to = globalThis.setTimeout(() => ac.abort(), 55_000);
     try {
       const params = new URLSearchParams();
       params.set("today", "1");
       if (legacy) params.set("legacy", "1");
-      const res = await fetch(`/api/admin/analytics?${params}`, { credentials: "include" });
+      const res = await fetch(`/api/admin/analytics?${params}`, {
+        credentials: "include",
+        signal: ac.signal,
+      });
       if (res.status === 401) {
         redirectToLogin();
         return;
@@ -429,7 +438,9 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
         setTodayData(json);
       }
     } catch {
-      // opciono
+      // timeout / mreža — ostavi staru karticu „Danas“
+    } finally {
+      globalThis.clearTimeout(to);
     }
   }, [legacy]);
 
@@ -448,13 +459,18 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     }
     setError(null);
     let primaryOk = false;
+    const ac = new AbortController();
+    const abortTimer = globalThis.setTimeout(() => ac.abort(), 90_000);
     try {
       const params = new URLSearchParams();
       if (fromAtStart) params.set("from", fromAtStart);
       if (toAtStart) params.set("to", toAtStart);
       if (withDebug) params.set("debug", "1");
       if (legacyAtStart) params.set("legacy", "1");
-      const res = await fetch(`/api/admin/analytics?${params}`, { credentials: "include" });
+      const res = await fetch(`/api/admin/analytics?${params}`, {
+        credentials: "include",
+        signal: ac.signal,
+      });
       if (res.status === 401) {
         redirectToLogin();
         return;
@@ -469,8 +485,18 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     } catch (e) {
       if (!silent && mySeq !== leadRangeFetchSeqRef.current) return;
       if (silent && !rangeUnchanged()) return;
-      setError(e instanceof Error ? e.message : "Greška pri učitavanju.");
+      const aborted =
+        (typeof DOMException !== "undefined" && e instanceof DOMException && e.name === "AbortError") ||
+        (e instanceof Error && e.name === "AbortError");
+      if (aborted) {
+        setError(
+          "Zahtev je predugo trajao (90s) ili je prekinut. Širok period (npr. od 2020) vuče desetine hiljada redova iz baze — suzi datume Od–Do ili probaj ponovo."
+        );
+      } else {
+        setError(e instanceof Error ? e.message : "Greška pri učitavanju.");
+      }
     } finally {
+      globalThis.clearTimeout(abortTimer);
       if (!silent && mySeq === leadRangeFetchSeqRef.current) {
         setLoading(false);
       }
@@ -642,7 +668,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     void fetchTodayData();
   }, [fetchTodayData]);
 
-  const tiktokSpendNum = parseFloat(tiktokSpend.replace(",", ".")) || 0;
+  const tiktokSpendNum = Number.parseFloat(tiktokSpend.replace(",", ".")) || 0;
   const totalLeads = data?.total ?? 0;
   const tiktokApiOk = Boolean(
     tiktokAds && tiktokAds.configured === true && !tiktokAds.error
@@ -743,6 +769,23 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
           </div>
         ) : data ? (
           <>
+            {data.supabaseFetchTruncated && (
+              <div
+                style={{
+                  padding: 12,
+                  borderRadius: 12,
+                  marginBottom: 16,
+                  background: "rgba(234,179,8,0.12)",
+                  border: "1px solid rgba(234,179,8,0.35)",
+                  color: "#fbbf24",
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}
+              >
+                Supabase je u ovom zahtevu učitan do ~200&nbsp;000 redova za izabrani period. Ukupni brojevi mogu biti
+                nepotpuni — suzi opseg datuma <strong>Od–Do</strong> (npr. poslednjih 90 dana) ili koristi kraći period.
+              </div>
+            )}
             {todayData && (
               <div className="admin-danas-card">
                 <div className="admin-danas-row">
@@ -867,6 +910,12 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
               <div style={{ marginBottom: 24, padding: 16, borderRadius: 12, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)" }}>
                 <h3 style={{ fontSize: 14, fontWeight: 700, color: "#a78bfa", marginBottom: 12 }}>Debug – Sheet + Supabase</h3>
                 <div style={{ fontSize: 12, color: "#aaa", marginBottom: 8 }}>
+                  {(data.debug.sheetFetchMs != null || data.debug.supabaseFetchMs != null) && (
+                    <span style={{ display: "block", marginBottom: 6, color: "#94a3b8" }}>
+                      Vreme učitavanja (paralelno): Sheet ~{data.debug.sheetFetchMs ?? "—"} ms · Supabase ~
+                      {data.debug.supabaseFetchMs ?? "—"} ms
+                    </span>
+                  )}
                   Sheet redova: <strong style={{ color: "#fff" }}>{data.debug.sheetRowsTotal}</strong>
                   {" · "}
                   Supabase učitano: <strong style={{ color: "#fff" }}>{data.debug.supabaseLeadsFetched ?? "—"}</strong>

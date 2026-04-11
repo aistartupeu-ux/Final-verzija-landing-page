@@ -62,23 +62,24 @@ function looksLikeEmail(s: string): boolean {
 function looksLikeDate(s: string): boolean {
   const v = String(s).trim();
   if (DATE_RE.test(v)) return true;
-  // DD.MM.YYYY ili DD-MM-YYYY
-  const dmy = v.match(DATE_DMY);
-  if (dmy) return true;
-  return false;
+  return DATE_DMY.exec(v) !== null;
 }
 
 /** Parsira datum iz različitih formata u YYYY-MM-DD. */
 function parseDateToIso(s: string): string {
   const v = String(s).trim();
   if (DATE_RE.test(v)) return v.slice(0, 10);
-  const dmy = v.match(DATE_DMY);
+  const dmy = DATE_DMY.exec(v);
   if (dmy) {
-    const [, d, m, y] = dmy;
-    return `${y}-${m!.padStart(2, "0")}-${d!.padStart(2, "0")}`;
+    const d = dmy[1];
+    const m = dmy[2];
+    const y = dmy[3];
+    if (d !== undefined && m !== undefined && y !== undefined) {
+      return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    }
   }
   const parsed = new Date(v);
-  if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
   return v;
 }
 
@@ -107,14 +108,14 @@ function parseRow(cells: string[]): LeadsSourceRow | null {
   let date = "";
   let phone = "";
 
-  for (let i = 0; i < cells.length; i++) {
-    const v = String(cells[i] ?? "").trim();
+  for (const rawCell of cells) {
+    const v = String(rawCell ?? "").trim();
     if (!v) continue;
     if (looksLikeEmail(v) && !email) {
       email = v;
     } else if (looksLikeDate(v) && !date) {
       date = parseDateToIso(v);
-    } else if (/^\d{9,15}$/.test(v.replace(/\D/g, "")) && !phone) {
+    } else if (/^\d{9,15}$/.test(v.replaceAll(/\D/g, "")) && !phone) {
       phone = v;
     }
   }
@@ -139,7 +140,6 @@ function parseRow(cells: string[]): LeadsSourceRow | null {
     affiliate_code = String(cells[8] ?? "").trim();
   } else if (n >= 8) {
     utm_source = String(cells[5] ?? "").trim();
-    utm_medium = "";
     utm_campaign = String(cells[6] ?? "").trim();
     affiliate_code = String(cells[7] ?? "").trim();
   } else if (n >= 6) {
@@ -305,7 +305,7 @@ export async function appendGiveawayToSheet(row: GiveawaySheetRow): Promise<bool
 }
 
 function quoteSheetRangeTab(tabTitle: string): string {
-  return `'${String(tabTitle).replace(/'/g, "''")}'`;
+  return `'${String(tabTitle).replaceAll("'", "''")}'`;
 }
 
 function sheetTitleSet(titles: string[]): Set<string> {
@@ -316,7 +316,17 @@ function hasSheetTitle(titles: string[], name: string): boolean {
   return sheetTitleSet(titles).has(name.trim().toLowerCase());
 }
 
-/** Čita sve leadove iz Sheet-a: glavni tab (Лист1) + LM + GW u istom dokumentu; opciono GW iz GIVEAWAY_SHEET_ID. */
+function pushParsedRows(out: LeadsSourceRow[], rows: string[][], origin: LeadsSheetTabOrigin): void {
+  for (const r of rows) {
+    const parsed = parseRow(r);
+    if (parsed) out.push({ ...parsed, sheetTab: origin });
+  }
+}
+
+/**
+ * Čita sve leadove iz Sheet-a: glavni tab (Лист1) + LM + GW u istom dokumentu; opciono GW iz GIVEAWAY_SHEET_ID.
+ * Jedan `batchGet` za sve tabove glavnog dokumenta (umesto 3× values.get) + paralelno čitanje spoljnog GW dokumenta.
+ */
 export async function getLeadsFromSheet(): Promise<LeadsSourceRow[]> {
   const sheetId = process.env.LEADS_SHEET_ID;
   const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -334,50 +344,88 @@ export async function getLeadsFromSheet(): Promise<LeadsSourceRow[]> {
     });
 
     const sheets = google.sheets({ version: "v4", auth });
-    const titles = await getSpreadsheetTabTitles(sheets, sheetId);
-    const mainName = resolveMainLeadsSheetTabName(titles, process.env.LEADS_SHEET_NAME);
-    const lmName = leadMagnetSheetTabName();
+    const giveawayDocId = process.env.GIVEAWAY_SHEET_ID?.trim();
     const gwName = process.env.GIVEAWAY_SHEET_NAME?.trim() || "GW";
 
-    const result: LeadsSourceRow[] = [];
-    const ingestedLower = new Set<string>();
+    const [titles, extTitles] = await Promise.all([
+      getSpreadsheetTabTitles(sheets, sheetId),
+      giveawayDocId && giveawayDocId !== sheetId
+        ? getSpreadsheetTabTitles(sheets, giveawayDocId)
+        : Promise.resolve([] as string[]),
+    ]);
 
-    async function ingestTab(spreadsheetId: string, tabTitle: string, origin: LeadsSheetTabOrigin) {
-      const key = tabTitle.trim().toLowerCase();
-      if (!key || ingestedLower.has(`${spreadsheetId}:${key}`)) return;
-      const tabTitles =
-        spreadsheetId === sheetId ? titles : await getSpreadsheetTabTitles(sheets, spreadsheetId);
-      if (!hasSheetTitle(tabTitles, tabTitle)) return;
-      ingestedLower.add(`${spreadsheetId}:${key}`);
-      try {
-        const range = `${quoteSheetRangeTab(tabTitle)}!A2:Z`;
-        const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
-        const rows = (res.data.values ?? []) as string[][];
-        for (const r of rows) {
-          const parsed = parseRow(r);
-          if (parsed) result.push({ ...parsed, sheetTab: origin });
-        }
-      } catch (e) {
-        const err = e as { message?: string };
-        console.warn(`getLeadsFromSheet tab "${tabTitle}" (${spreadsheetId}):`, err?.message ?? e);
-      }
-    }
+    const mainName = resolveMainLeadsSheetTabName(titles, process.env.LEADS_SHEET_NAME);
+    const lmName = leadMagnetSheetTabName();
 
-    await ingestTab(sheetId, mainName, "main");
-    if (mainName.trim().toLowerCase() !== lmName.trim().toLowerCase()) {
-      await ingestTab(sheetId, lmName, "lm");
+    type TabSlice = { title: string; origin: LeadsSheetTabOrigin };
+    const tabs: TabSlice[] = [{ title: mainName, origin: "main" }];
+    if (mainName.trim().toLowerCase() !== lmName.trim().toLowerCase() && hasSheetTitle(titles, lmName)) {
+      tabs.push({ title: lmName, origin: "lm" });
     }
     if (
       gwName.trim().toLowerCase() !== mainName.trim().toLowerCase() &&
-      gwName.trim().toLowerCase() !== lmName.trim().toLowerCase()
+      gwName.trim().toLowerCase() !== lmName.trim().toLowerCase() &&
+      hasSheetTitle(titles, gwName)
     ) {
-      await ingestTab(sheetId, gwName, "gw");
+      tabs.push({ title: gwName, origin: "gw" });
     }
 
-    const giveawayDocId = process.env.GIVEAWAY_SHEET_ID?.trim();
-    if (giveawayDocId && giveawayDocId !== sheetId) {
-      await ingestTab(giveawayDocId, gwName, "gw");
+    const ranges = tabs.map((t) => `${quoteSheetRangeTab(t.title)}!A2:Z`);
+
+    const extGwPromise =
+      giveawayDocId && giveawayDocId !== sheetId && hasSheetTitle(extTitles, gwName)
+        ? sheets.spreadsheets.values
+            .get({
+              spreadsheetId: giveawayDocId,
+              range: `${quoteSheetRangeTab(gwName)}!A2:Z`,
+            })
+            .then((r) => (r.data.values ?? []) as string[][])
+            .catch((e: unknown) => {
+              const msg = e instanceof Error ? e.message : String(e);
+              console.warn(`getLeadsFromSheet external GW (${giveawayDocId}):`, msg);
+              return [] as string[][];
+            })
+        : Promise.resolve([] as string[][]);
+
+    const [batchRes, extGwRows] = await Promise.all([
+      (async () => {
+        if (ranges.length === 0) return { data: { valueRanges: [] as { values?: string[][] }[] } };
+        try {
+          const res = await sheets.spreadsheets.values.batchGet({
+            spreadsheetId: sheetId,
+            ranges,
+          });
+          const vr = res.data.valueRanges ?? [];
+          if (vr.length === ranges.length) return res;
+          console.warn("getLeadsFromSheet batchGet: length mismatch, falling back to parallel get");
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.warn("getLeadsFromSheet batchGet:", msg);
+        }
+        const perTab = await Promise.all(
+          tabs.map((t) =>
+            sheets.spreadsheets.values
+              .get({
+                spreadsheetId: sheetId,
+                range: `${quoteSheetRangeTab(t.title)}!A2:Z`,
+              })
+              .then((r) => ({ values: r.data.values ?? [] }))
+              .catch(() => ({ values: [] as string[][] }))
+          )
+        );
+        return { data: { valueRanges: perTab } };
+      })(),
+      extGwPromise,
+    ]);
+
+    const result: LeadsSourceRow[] = [];
+    const valueRanges = batchRes.data.valueRanges ?? [];
+    for (let i = 0; i < tabs.length; i++) {
+      const origin = tabs[i].origin;
+      const rows = (valueRanges[i]?.values ?? []) as string[][];
+      pushParsedRows(result, rows, origin);
     }
+    pushParsedRows(result, extGwRows, "gw");
 
     return result;
   } catch (e) {
@@ -442,7 +490,7 @@ async function updateLeadsSheetPhoneInTab(
     });
   }
 
-  const headerEmailIdx = headers.findIndex((h) => h === "email");
+  const headerEmailIdx = headers.indexOf("email");
   const emailIdx = headerEmailIdx >= 0 ? headerEmailIdx : 1;
   let sheetRow = -1;
   for (let i = 0; i < rows.length; i++) {
