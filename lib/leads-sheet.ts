@@ -168,6 +168,18 @@ async function getSpreadsheetTabTitles(sheets: SheetsClient, spreadsheetId: stri
     .filter(Boolean);
 }
 
+function isTransientSheetAppendError(e: unknown): boolean {
+  const err = e as { response?: { status?: number }; code?: string | number; message?: string };
+  const s = err.response?.status;
+  if (s === 429 || s === 500 || s === 502 || s === 503) return true;
+  if (typeof s === "number" && s >= 400 && s < 500) return false;
+  const code = String(err.code ?? "");
+  if (code === "ECONNRESET" || code === "ETIMEDOUT" || code === "ECONNABORTED") return true;
+  const msg = String(err.message ?? "");
+  if (/socket|TLS|timed out|fetch failed|NetworkError/i.test(msg)) return true;
+  return false;
+}
+
 async function appendValuesWithRetry(
   sheets: SheetsClient,
   spreadsheetId: string,
@@ -190,6 +202,7 @@ async function appendValuesWithRetry(
       return;
     } catch (e) {
       last = e;
+      if (!isTransientSheetAppendError(e) || i === backoffMs.length - 1) break;
     }
   }
   throw last;
