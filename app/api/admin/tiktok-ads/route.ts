@@ -27,6 +27,8 @@ function leadsFromMetrics(m: Record<string, unknown>): number {
   if (sl > 0) return Math.round(sl);
   const form = num(m.form);
   if (form > 0) return Math.round(form);
+  const reg = num(m.registration);
+  if (reg > 0) return Math.round(reg);
   if (process.env.TIKTOK_REPORT_CONVERSION_AS_LEAD === "1") {
     const conv = num(m.conversion);
     if (conv > 0) return Math.round(conv);
@@ -182,9 +184,11 @@ export async function GET(req: NextRequest) {
       "campaign_name",
       "spend",
       "sales_lead",
+      "form",
       "conversion",
       "cost_per_conversion",
     ]),
+    JSON.stringify(["campaign_name", "spend", "sales_lead", "form", "cost_per_conversion"]),
     JSON.stringify(["campaign_name", "spend", "sales_lead", "cost_per_conversion"]),
     JSON.stringify(["spend", "conversion"]),
   ];
@@ -235,8 +239,12 @@ export async function GET(req: NextRequest) {
   }
 
   const enabledIds = await fetchEnabledCampaignIds(accessToken, advertiserId);
+  const restrictToActiveCampaigns =
+    process.env.TIKTOK_ADS_INSIGHTS_ACTIVE_CAMPAIGNS_ONLY === "1" ||
+    process.env.TIKTOK_ADS_INSIGHTS_ACTIVE_CAMPAIGNS_ONLY?.toLowerCase() === "true";
   let rows = allRows;
-  if (enabledIds && enabledIds.size > 0) {
+  /** Podrazumevano sve kampanje u datumu (usklađeno sa Meta admin ispravkom); opciono samo ENABLE. */
+  if (restrictToActiveCampaigns && enabledIds && enabledIds.size > 0) {
     rows = allRows.filter((r) => enabledIds.has(r.campaignId));
   }
 
@@ -279,7 +287,15 @@ export async function GET(req: NextRequest) {
     payload._debug = {
       campaigns: campaigns.length,
       rowsParsed: allRows.length,
-      filteredToEnabled: enabledIds != null && enabledIds.size > 0,
+      filteredToEnabled: restrictToActiveCampaigns && enabledIds != null && enabledIds.size > 0,
+      restrictToActiveCampaigns,
+      insightsNotes: [
+        "Lead broj iz izveštaja: redosled sales_lead → form → registration; opciono conversion ako je TIKTOK_REPORT_CONVERSION_AS_LEAD=1.",
+        restrictToActiveCampaigns
+          ? "TIKTOK_ADS_INSIGHTS_ACTIVE_CAMPAIGNS_ONLY=1: uključene su samo kampanje sa statusom ENABLE."
+          : "Uključene su sve kampanje u izabranom datumu (i pauzirane), radi poređenja sa TikTok Ads Manager-om.",
+        "Sajt (admin analitika): tiktokLeads = source_tag/UTM atribucija u Supabase+Sheet, ne isto što TikTok Ads broji kao konverzije.",
+      ],
     };
   }
 

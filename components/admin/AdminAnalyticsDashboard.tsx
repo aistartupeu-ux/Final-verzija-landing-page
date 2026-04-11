@@ -373,6 +373,13 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     error?: string;
     startDate?: string;
     endDate?: string;
+    _debug?: {
+      campaigns?: number;
+      rowsParsed?: number;
+      filteredToEnabled?: boolean;
+      restrictToActiveCampaigns?: boolean;
+      insightsNotes?: string[];
+    };
   } | null>(null);
   const [tiktokSpend, setTiktokSpend] = useState("");
   const [todayData, setTodayData] = useState<AnalyticsData | null>(null);
@@ -559,6 +566,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
         error: typeof ttJson.error === "string" ? ttJson.error : undefined,
         startDate: typeof ttJson.startDate === "string" ? ttJson.startDate : undefined,
         endDate: typeof ttJson.endDate === "string" ? ttJson.endDate : undefined,
+        _debug: ttJson._debug && typeof ttJson._debug === "object" ? ttJson._debug : undefined,
       });
     } catch {
       setTiktokAds(null);
@@ -1178,6 +1186,27 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#00f2ea", marginBottom: 12 }}>TikTok</div>
                   {tiktokAds?.error && (
                     <div style={{ marginBottom: 12, fontSize: 12, color: "#f87171" }}>API: {tiktokAds.error}</div>
+                  )}
+                  {tiktokAds?._debug?.insightsNotes && tiktokAds._debug.insightsNotes.length > 0 && (
+                    <div
+                      style={{
+                        marginBottom: 12,
+                        padding: 10,
+                        borderRadius: 8,
+                        background: "rgba(139,92,246,0.08)",
+                        border: "1px solid rgba(139,92,246,0.25)",
+                        color: "#94a3b8",
+                        fontSize: 11,
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      <div style={{ color: "#a78bfa", fontWeight: 600, marginBottom: 6 }}>TikTok Ads (napomene)</div>
+                      <ul style={{ margin: 0, paddingLeft: 16 }}>
+                        {tiktokAds._debug.insightsNotes.map((n, i) => (
+                          <li key={i}>{n}</li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                   {tiktokApiOk ? (
                     <>
