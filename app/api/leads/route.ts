@@ -222,13 +222,17 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      cookieStore.set("special_access", "1", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24,
-        path: "/",
-      });
+      try {
+        cookieStore.set("special_access", "1", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: 60 * 60 * 24,
+          path: "/",
+        });
+      } catch (e) {
+        console.error("special_access cookie error (duplicate):", e);
+      }
       return NextResponse.json({
         success: true,
         duplicate: true,
@@ -378,14 +382,18 @@ export async function POST(req: NextRequest) {
 
     // Welcome email šalje samo HighLevel preko webhook-a – Resend isključen da ne bi bilo duplo
 
-    // Cookie za pristup special offer stranici
-    cookieStore.set("special_access", "1", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24,
-      path: "/",
-    });
+    // Cookie za pristup special offer stranici (ne blokiraj lead ako setovanje pukne — npr. ne-browser POST).
+    try {
+      cookieStore.set("special_access", "1", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24,
+        path: "/",
+      });
+    } catch (e) {
+      console.error("special_access cookie error:", e);
+    }
 
     return NextResponse.json({
       success: true,
