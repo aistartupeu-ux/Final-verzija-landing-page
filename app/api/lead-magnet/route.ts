@@ -57,7 +57,10 @@ export async function POST(req: NextRequest) {
     next: { revalidate: 0 },
   });
 
-  const out = (await res.json().catch(() => ({}))) as { duplicate?: boolean };
+  const out = (await res.json().catch(() => ({}))) as {
+    duplicate?: boolean;
+    sheet_append_ok?: boolean;
+  };
   if (!res.ok) return NextResponse.json(out, { status: res.status });
   if (out.duplicate) {
     return NextResponse.json({ success: true, duplicate: true });
@@ -88,5 +91,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({
+    success: true,
+    ...(typeof out.sheet_append_ok === "boolean" ? { sheet_append_ok: out.sheet_append_ok } : {}),
+  });
 }

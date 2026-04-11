@@ -28,13 +28,14 @@ export async function POST(req: NextRequest) {
       source_tag,
     } = body;
 
-    if (!email || !email.includes("@")) {
+    if (!email || !String(email).includes("@")) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
-    if (!isAllowedEmailDomain(String(email).trim())) {
+    const emailNorm = String(email).trim().toLowerCase();
+    if (!isAllowedEmailDomain(emailNorm)) {
       return NextResponse.json({ error: EMAIL_DOMAIN_ERROR }, { status: 400 });
     }
-    if (!(await hasValidMxRecords(String(email).trim()))) {
+    if (!(await hasValidMxRecords(emailNorm))) {
       return NextResponse.json({ error: EMAIL_MX_ERROR }, { status: 400 });
     }
 
@@ -67,13 +68,25 @@ export async function POST(req: NextRequest) {
       // optional
     }
 
+    const aff = affiliate_code ? String(affiliate_code).trim().toLowerCase() : null;
+    const resolvedSourceTag = String(source_tag ?? "").trim().toLowerCase() || (aff ? "affiliate" : "direct");
+
     const { error } = await supabase.from("leads").insert({
-      email,
+      email: emailNorm,
       phone: phone && String(phone).trim() ? String(phone).trim() : null,
       city,
       country,
       country_code,
       ip: ip || null,
+      affiliate_code: aff,
+      utm_source: utm_source != null ? String(utm_source).trim() || null : null,
+      utm_medium: utm_medium != null ? String(utm_medium).trim() || null : null,
+      utm_campaign: utm_campaign != null ? String(utm_campaign).trim() || null : null,
+      source_tag: resolvedSourceTag,
+      ...(process.env.SUPABASE_ENABLE_SUBMITTED_AT_BELGRADE === "1" &&
+      process.env.SUPABASE_DISABLE_SUBMITTED_AT_BELGRADE !== "1"
+        ? { submitted_at_belgrade: formatBelgradeDateTime() }
+        : {}),
     });
 
     if (error) {
@@ -90,14 +103,14 @@ export async function POST(req: NextRequest) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             date: formatBelgradeDateTime(),
-            email,
+            email: emailNorm,
             phone: phone ?? "",
             name: "",
-            source_tag: source_tag ?? (affiliate_code ? "affiliate" : "direct"),
+            source_tag: resolvedSourceTag,
             utm_source: utm_source ?? "",
             utm_medium: utm_medium ?? "",
             utm_campaign: utm_campaign ?? "",
-            affiliate_code: affiliate_code ?? "",
+            affiliate_code: aff ?? "",
           }),
         });
       } catch (e) {
@@ -106,17 +119,23 @@ export async function POST(req: NextRequest) {
     }
 
     // Leads by Source: direktan upis u Google Sheet (bez Make)
-    await appendLeadsToSheet({
-      date: formatBelgradeDateTime(),
-      email,
-      phone: phone ?? "",
-      name: "",
-      source_tag: source_tag ?? (affiliate_code ? "affiliate" : "direct"),
-      utm_source: utm_source ?? "",
-      utm_medium: utm_medium ?? "",
-      utm_campaign: utm_campaign ?? "",
-      affiliate_code: affiliate_code ?? "",
-    });
+    let sheetAppendOk = false;
+    try {
+      sheetAppendOk = await appendLeadsToSheet({
+        date: formatBelgradeDateTime(),
+        email: emailNorm,
+        phone: phone ?? "",
+        name: "",
+        source_tag: resolvedSourceTag,
+        utm_source: utm_source ?? "",
+        utm_medium: utm_medium ?? "",
+        utm_campaign: utm_campaign ?? "",
+        affiliate_code: aff ?? "",
+      });
+    } catch (e) {
+      console.error("Special access Sheet append error:", e);
+      sheetAppendOk = false;
+    }
 
     const ghlWebhook = process.env.GHL_WEBHOOK_URL;
     if (ghlWebhook) {
@@ -125,7 +144,7 @@ export async function POST(req: NextRequest) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            email,
+            email: emailNorm,
             firstName: "",
             lastName: "",
             name: "",
@@ -141,15 +160,19 @@ export async function POST(req: NextRequest) {
     }
 
     const cookieStore = await cookies();
-    cookieStore.set(COOKIE_NAME, "1", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: COOKIE_MAX_AGE,
-      path: "/",
-    });
+    try {
+      cookieStore.set(COOKIE_NAME, "1", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: COOKIE_MAX_AGE,
+        path: "/",
+      });
+    } catch (e) {
+      console.error("special_access cookie error:", e);
+    }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, sheet_append_ok: sheetAppendOk });
   } catch (err) {
     console.error("Special access API error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
