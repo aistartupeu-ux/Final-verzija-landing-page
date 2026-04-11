@@ -29,11 +29,14 @@ export function useWaitlistLiveCount(options: { min?: number; pollIntervalMs?: n
   }, [min]);
 
   useEffect(() => {
-    void refresh();
+    const initial = window.setTimeout(() => {
+      void refresh();
+    }, 0);
     const id = window.setInterval(() => void refresh(), pollIntervalMs);
     const onRefresh = () => void refresh();
     window.addEventListener(WAITLIST_REFRESH_EVENT, onRefresh);
     return () => {
+      window.clearTimeout(initial);
       window.clearInterval(id);
       window.removeEventListener(WAITLIST_REFRESH_EVENT, onRefresh);
     };

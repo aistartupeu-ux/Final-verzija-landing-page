@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Lokalni artefakti / worktree-i — ne lintovati (često sadrže .next i ogromne bundle fajlove).
+    ".claude/**",
+    "tmp/**",
   ]),
 ]);
 
