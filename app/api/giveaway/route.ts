@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { arePromoLandingPagesEnabled } from "@/lib/promo-landing-pages";
 import { appendGiveawayToSheet } from "@/lib/leads-sheet";
+import { formatBelgradeDateTime } from "@/lib/time-belgrade";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
 
     try {
       await appendGiveawayToSheet({
-        date: new Date().toISOString(),
+        date: formatBelgradeDateTime(),
         email,
         phone,
         name,

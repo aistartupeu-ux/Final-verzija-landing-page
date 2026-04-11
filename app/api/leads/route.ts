@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { appendLeadsToSheet } from "@/lib/leads-sheet";
+import { formatBelgradeDateTime } from "@/lib/time-belgrade";
+import {
+  SOURCE_TAG_LEAD_MAGNET,
+  SOURCE_TAG_LEAD_MAGNET_AFFILIATE,
+  isLeadMagnetSourceTag,
+} from "@/lib/lead-source-tags";
 import { appendAffiliateLeadToSheet, isAffiliateSheetConfigured } from "@/lib/affiliate-sheet";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR, EMAIL_MX_ERROR } from "@/lib/email-domains";
 import { hasValidMxRecords } from "@/lib/email-verify-server";
@@ -93,9 +99,20 @@ function normalizeSourceTag(
   return rawTag;
 }
 
+/** Interni poziv iz /api/lead-magnet — jedini pouzdan izvor za oznake lead_magnet* i LM Sheet tab. */
+const TRUSTED_LEAD_MAGNET_HEADER = "x-aih-lead-magnet";
+
+function isTrustedLeadMagnetRequest(req: NextRequest): boolean {
+  const sent = req.headers.get(TRUSTED_LEAD_MAGNET_HEADER);
+  const secret = process.env.LEAD_MAGNET_INTERNAL_SECRET?.trim();
+  if (secret) return sent === secret;
+  return sent === "1";
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const trustedLeadMagnet = isTrustedLeadMagnetRequest(req);
     const {
       email,
       phone,
@@ -160,13 +177,22 @@ export async function POST(req: NextRequest) {
     const cookieStore = await cookies();
     const affiliateCodeRaw = bodyAffiliate ?? cookieStore.get("af_ref")?.value ?? null;
     const affiliateCode = affiliateCodeRaw ? String(affiliateCodeRaw).trim().toLowerCase() : null;
-    const sourceTag = normalizeSourceTag(
+    const hasAffiliate = Boolean(affiliateCode);
+    let sourceTag = normalizeSourceTag(
       source_tag,
       utm_source,
       utm_medium ?? null,
       utm_campaign ?? null,
-      Boolean(affiliateCode)
+      hasAffiliate
     );
+    if (trustedLeadMagnet) {
+      sourceTag = hasAffiliate ? SOURCE_TAG_LEAD_MAGNET_AFFILIATE : SOURCE_TAG_LEAD_MAGNET;
+    } else if (isLeadMagnetSourceTag(sourceTag)) {
+      sourceTag = "direct";
+    }
+
+    /** Giveaway ide samo u GW tab (`appendGiveawayToSheet`); nikad u Лист1/LM preko ovog endpointa. */
+    const isGiveawayLead = sourceTag === "giveaway";
 
     const emailNorm = String(email).trim().toLowerCase();
     const { data: existing } = await supabase
@@ -210,7 +236,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { error } = await supabase.from("leads").insert({
+    const leadInsert = {
       email: emailNorm,
       phone: phone ?? null,
       city,
@@ -222,7 +248,12 @@ export async function POST(req: NextRequest) {
       utm_medium: utm_medium ?? null,
       utm_campaign: utm_campaign ?? null,
       source_tag: sourceTag,
-    });
+      ...(process.env.SUPABASE_DISABLE_SUBMITTED_AT_BELGRADE === "1"
+        ? {}
+        : { submitted_at_belgrade: formatBelgradeDateTime() }),
+    };
+
+    const { error } = await supabase.from("leads").insert(leadInsert);
 
     if (error) {
       console.error("Supabase insert error:", JSON.stringify({
@@ -240,7 +271,7 @@ export async function POST(req: NextRequest) {
     if (affiliateCode && isAffiliateSheetConfigured()) {
       try {
         await appendAffiliateLeadToSheet({
-          created_at: new Date().toISOString(),
+          created_at: formatBelgradeDateTime(),
           email: emailNorm,
           phone: phone ?? null,
           affiliate_code: affiliateCode,
@@ -256,11 +287,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Leads by Source Sheet: webhook za Meta / affiliate tracking
-    const shouldWriteLeadsSource = !Boolean(skip_leads_source_sheet);
+    const shouldWriteLeadsSource = !Boolean(skip_leads_source_sheet) && !isGiveawayLead;
     const leadsSourceWebhook = process.env.LEADS_SOURCE_WEBHOOK_URL;
     if (shouldWriteLeadsSource && leadsSourceWebhook) {
       const payload = {
-        date: new Date().toISOString(),
+        date: formatBelgradeDateTime(),
         email: emailNorm,
         phone: phone ?? "",
         name: "",
@@ -290,7 +321,7 @@ export async function POST(req: NextRequest) {
 
     // Leads by Source: direktan upis u Google Sheet (bez Make)
     const row = {
-      date: new Date().toISOString(),
+      date: formatBelgradeDateTime(),
       email: emailNorm,
       phone: phone ?? "",
       name: "",
@@ -310,7 +341,7 @@ export async function POST(req: NextRequest) {
     }
 
     // HighLevel: pošalji lead u jedan workflow (welcome + affiliate logika)
-    const shouldSendGhlWebhook = !Boolean(skip_ghl_webhook);
+    const shouldSendGhlWebhook = !Boolean(skip_ghl_webhook) && !isGiveawayLead;
     const ghlWebhook = process.env.GHL_WEBHOOK_URL;
     if (shouldSendGhlWebhook && ghlWebhook) {
       // Ne blokiramo lead na sporom GHL webhook-u.

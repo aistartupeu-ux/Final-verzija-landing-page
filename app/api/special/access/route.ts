@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { appendLeadsToSheet } from "@/lib/leads-sheet";
+import { formatBelgradeDateTime } from "@/lib/time-belgrade";
 import { isAllowedEmailDomain, EMAIL_DOMAIN_ERROR, EMAIL_MX_ERROR } from "@/lib/email-domains";
 import { hasValidMxRecords } from "@/lib/email-verify-server";
 
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            date: new Date().toISOString(),
+            date: formatBelgradeDateTime(),
             email,
             phone: phone ?? "",
             name: "",
@@ -106,7 +107,7 @@ export async function POST(req: NextRequest) {
 
     // Leads by Source: direktan upis u Google Sheet (bez Make)
     await appendLeadsToSheet({
-      date: new Date().toISOString(),
+      date: formatBelgradeDateTime(),
       email,
       phone: phone ?? "",
       name: "",

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { updateLeadsSheetPhoneByEmail } from "@/lib/leads-sheet";
+import { formatBelgradeDateTime } from "@/lib/time-belgrade";
+import { SOURCE_TAG_LEAD_MAGNET, isLeadMagnetSourceTag, usesLeadMagnetSheetTab } from "@/lib/lead-source-tags";
 import { THANK_YOU_AI_EXPERIENCE_OPTIONS } from "@/lib/thank-you-ai-experience";
 import {
   normalizeSurveyGoal,
@@ -60,7 +62,6 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const email = typeof body?.email === "string" ? body.email.trim() : "";
     const phone = typeof body?.phone === "string" ? body.phone.trim() : "";
-    const sourceTag = typeof body?.source_tag === "string" ? body.source_tag.trim().toLowerCase() : "";
     const firstName = normalizePersonName(body?.first_name);
     const lastName = normalizePersonName(body?.last_name);
     const aiRaw = typeof body?.ai_experience === "string" ? body.ai_experience.trim() : "";
@@ -69,6 +70,7 @@ export async function PATCH(req: NextRequest) {
     )
       ? aiRaw
       : "";
+
     const q1Raw = typeof body?.survey_q1_interest === "string" ? body.survey_q1_interest.trim() : "";
     const q1 = THANK_YOU_SURVEY_Q1_OPTIONS.includes(q1Raw as (typeof THANK_YOU_SURVEY_Q1_OPTIONS)[number])
       ? q1Raw
@@ -111,7 +113,7 @@ export async function PATCH(req: NextRequest) {
 
     const { data: leadRow, error: findErr } = await supabase
       .from("leads")
-      .select("id, affiliate_code, city, country")
+      .select("id, affiliate_code, city, country, source_tag")
       .ilike("email", emailNorm)
       .order("id", { ascending: false })
       .limit(1)
@@ -125,6 +127,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
 
+    const dbSourceTag = typeof leadRow.source_tag === "string" ? leadRow.source_tag.trim() : "";
+
     const fullName = `${firstName} ${lastName}`.trim();
     const baseUpdate = { phone, name: fullName };
     const surveyUpdate = {
@@ -136,6 +140,7 @@ export async function PATCH(req: NextRequest) {
     };
     const withAi = { ...baseUpdate, ai_experience: aiExperience };
     const fullUpdate = { ...withAi, ...surveyUpdate };
+
     const { error: updateErr } = await supabase.from("leads").update(fullUpdate).eq("id", leadRow.id);
 
     if (updateErr) {
@@ -156,7 +161,7 @@ export async function PATCH(req: NextRequest) {
           survey_q4: q4,
           survey_q5: q5,
         },
-        { sourceTag }
+        usesLeadMagnetSheetTab(dbSourceTag) ? { sourceTag: dbSourceTag } : undefined
       );
     } catch (e) {
       console.error("Sheet phone update:", e);
@@ -198,7 +203,7 @@ export async function PATCH(req: NextRequest) {
       })();
     }
 
-    if (sourceTag === "lead_magnet") {
+    if (isLeadMagnetSourceTag(dbSourceTag)) {
       const leadMagnetWebhook =
         process.env.LEAD_MAGNET_THANK_YOU_WEBHOOK_URL?.trim() ||
         process.env.LEAD_MAGNET_WEBHOOK_URL?.trim();
@@ -211,7 +216,7 @@ export async function PATCH(req: NextRequest) {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                ts: new Date().toISOString(),
+                ts: formatBelgradeDateTime(),
                 email: emailNorm,
                 phone,
                 first_name: firstName,
@@ -222,7 +227,8 @@ export async function PATCH(req: NextRequest) {
                 survey_q3_blocker: q3,
                 survey_q4_system_apply: q4,
                 survey_q5_occupation: q5,
-                source_tag: "lead_magnet",
+                source_tag: dbSourceTag || SOURCE_TAG_LEAD_MAGNET,
+                landing: "thank_you_lead_magnet",
                 event_name: "thank_you_form_submitted",
               }),
               signal: ctrl.signal,
