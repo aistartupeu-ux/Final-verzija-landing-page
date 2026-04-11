@@ -430,13 +430,18 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     if (!silent) setLoading(true);
     setError(null);
     let primaryOk = false;
+    const ctrl = new AbortController();
+    const tid = window.setTimeout(() => ctrl.abort(), 58_000);
     try {
       const params = new URLSearchParams();
       if (from) params.set("from", from);
       if (to) params.set("to", to);
       if (withDebug) params.set("debug", "1");
       if (legacy) params.set("legacy", "1");
-      const res = await fetch(`/api/admin/analytics?${params}`, { credentials: "include" });
+      const res = await fetch(`/api/admin/analytics?${params}`, {
+        credentials: "include",
+        signal: ctrl.signal,
+      });
       if (res.status === 401) {
         redirectToLogin();
         return;
@@ -447,8 +452,16 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       void fetchTodayData();
       primaryOk = true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Greška pri učitavanju.");
+      const aborted = e instanceof DOMException && e.name === "AbortError";
+      setError(
+        aborted
+          ? "Timeout: analitika predugo ne odgovara (često Google Sheet ili mreža). Pokušaj Osveži ili proveri Vercel logove."
+          : e instanceof Error
+            ? e.message
+            : "Greška pri učitavanju."
+      );
     } finally {
+      window.clearTimeout(tid);
       if (!silent) setLoading(false);
     }
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getLeadsFromSheet } from "@/lib/leads-sheet";
+import { getLeadsFromSheet, type LeadsSourceRow } from "@/lib/leads-sheet";
 import { isAdminApiAuthorized } from "@/lib/admin-api-auth";
+import { withTimeout } from "@/lib/with-timeout";
 import { SOURCE_TAG_LEAD_MAGNET, SOURCE_TAG_LEAD_MAGNET_AFFILIATE } from "@/lib/lead-source-tags";
 import {
   belgradeYmdUtcInclusiveBounds,
@@ -11,6 +12,9 @@ import {
   sheetRowYmdAllowedForLegacy,
   sheetRowYmdInPeriod,
 } from "@/lib/analytics-legacy";
+
+/** Produženo trajanje na Vercel-u — Sheet + Supabase mogu dugo da traju na velikim tabelama. */
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   if (!(await isAdminApiAuthorized(req))) {
@@ -114,7 +118,12 @@ export async function GET(req: NextRequest) {
 
   // 1) Leads by Source Sheet — primarni izvor (pouzdaniji)
   // Datum: YYYY-MM-DD u Beogradu + period Od–Do + legacy presek (ne mešati sa Date() u lokalnom TZ servera).
-  const sheetRows = await getLeadsFromSheet();
+  const sheetRows = await withTimeout(
+    getLeadsFromSheet(),
+    22_000,
+    [] as LeadsSourceRow[],
+    "admin/analytics getLeadsFromSheet"
+  );
   let sheetRowsUsed = 0;
   for (const row of sheetRows) {
     const rowYmd = extractYmdFromSheetDate(row.date);
@@ -167,8 +176,10 @@ export async function GET(req: NextRequest) {
   };
 
   const PAGE = 1000;
+  /** Zaštita od beskonačnog paginiranja (npr. loš upit); 80 strana = 80k redova. */
+  const MAX_SUPABASE_PAGES = 80;
   const listSupabase: LeadRow[] = [];
-  for (let offset = 0; ; offset += PAGE) {
+  for (let offset = 0, page = 0; page < MAX_SUPABASE_PAGES; offset += PAGE, page += 1) {
     let q = supabase
       .from("leads")
       .select("id, created_at, source_tag, utm_source, utm_medium, utm_campaign, affiliate_code, email");
