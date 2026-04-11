@@ -9,6 +9,7 @@
  * 4. Glavni tab: LEADS_SHEET_NAME (npr. Лист1). Bez env-a koristi se prvi tab koji NIJE lead-magnet tab (LM često prvi u fajlu).
  * 5. Tab LM: samo source_tag lead_magnet (čist LM). lead_magnet_affiliate i ostalo → glavni list (Лист1).
  * 6. Kolona I (ref): na Лист1 = pravi affiliate_code kad postoji; na tabu LM uvek „LM“, na tabu GW uvek „GW“ (kampanja kao ref, ne partner kod).
+ * 7. Admin analitika: getLeadsFromSheet čita glavni tab + LM + GW (isti dokument), i GW iz GIVEAWAY_SHEET_ID ako je druga knjiga.
  */
 
 import { google } from "googleapis";
@@ -16,9 +17,12 @@ import { formatBelgradeDateOnly } from "@/lib/time-belgrade";
 import { usesLeadMagnetSheetTab } from "@/lib/lead-source-tags";
 
 /** Ref u koloni I na LM tabu — kampanjski kod, ne affiliate partner. */
-const SHEET_CAMPAIGN_REF_LM = "LM";
+export const SHEET_CAMPAIGN_REF_LM = "LM";
 /** Ref u koloni I na GW tabu. */
-const SHEET_CAMPAIGN_REF_GW = "GW";
+export const SHEET_CAMPAIGN_REF_GW = "GW";
+
+/** Odakle je red učitan (admin / merge). */
+export type LeadsSheetTabOrigin = "main" | "lm" | "gw";
 
 export type LeadsSourceRow = {
   date: string;
@@ -30,6 +34,8 @@ export type LeadsSourceRow = {
   utm_medium: string;
   utm_campaign: string;
   affiliate_code: string;
+  /** Samo pri čitanju iz Sheet-a — koji tab (List1 / LM / GW). */
+  sheetTab?: LeadsSheetTabOrigin;
 };
 
 export type GiveawaySheetRow = {
@@ -298,7 +304,19 @@ export async function appendGiveawayToSheet(row: GiveawaySheetRow): Promise<bool
   }
 }
 
-/** Čita sve leadove iz Sheet-a. Podržava varijabilnu strukturu redova (form, Make, Meta Lead Ads). */
+function quoteSheetRangeTab(tabTitle: string): string {
+  return `'${String(tabTitle).replace(/'/g, "''")}'`;
+}
+
+function sheetTitleSet(titles: string[]): Set<string> {
+  return new Set(titles.map((t) => t.trim().toLowerCase()));
+}
+
+function hasSheetTitle(titles: string[], name: string): boolean {
+  return sheetTitleSet(titles).has(name.trim().toLowerCase());
+}
+
+/** Čita sve leadove iz Sheet-a: glavni tab (Лист1) + LM + GW u istom dokumentu; opciono GW iz GIVEAWAY_SHEET_ID. */
 export async function getLeadsFromSheet(): Promise<LeadsSourceRow[]> {
   const sheetId = process.env.LEADS_SHEET_ID;
   const json = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -317,16 +335,50 @@ export async function getLeadsFromSheet(): Promise<LeadsSourceRow[]> {
 
     const sheets = google.sheets({ version: "v4", auth });
     const titles = await getSpreadsheetTabTitles(sheets, sheetId);
-    const sheetName = resolveMainLeadsSheetTabName(titles, process.env.LEADS_SHEET_NAME);
-    const range = `'${sheetName}'!A2:Z`;
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range });
-    const rows = (res.data.values ?? []) as string[][];
+    const mainName = resolveMainLeadsSheetTabName(titles, process.env.LEADS_SHEET_NAME);
+    const lmName = leadMagnetSheetTabName();
+    const gwName = process.env.GIVEAWAY_SHEET_NAME?.trim() || "GW";
 
     const result: LeadsSourceRow[] = [];
-    for (const r of rows) {
-      const parsed = parseRow(r);
-      if (parsed) result.push(parsed);
+    const ingestedLower = new Set<string>();
+
+    async function ingestTab(spreadsheetId: string, tabTitle: string, origin: LeadsSheetTabOrigin) {
+      const key = tabTitle.trim().toLowerCase();
+      if (!key || ingestedLower.has(`${spreadsheetId}:${key}`)) return;
+      const tabTitles =
+        spreadsheetId === sheetId ? titles : await getSpreadsheetTabTitles(sheets, spreadsheetId);
+      if (!hasSheetTitle(tabTitles, tabTitle)) return;
+      ingestedLower.add(`${spreadsheetId}:${key}`);
+      try {
+        const range = `${quoteSheetRangeTab(tabTitle)}!A2:Z`;
+        const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
+        const rows = (res.data.values ?? []) as string[][];
+        for (const r of rows) {
+          const parsed = parseRow(r);
+          if (parsed) result.push({ ...parsed, sheetTab: origin });
+        }
+      } catch (e) {
+        const err = e as { message?: string };
+        console.warn(`getLeadsFromSheet tab "${tabTitle}" (${spreadsheetId}):`, err?.message ?? e);
+      }
     }
+
+    await ingestTab(sheetId, mainName, "main");
+    if (mainName.trim().toLowerCase() !== lmName.trim().toLowerCase()) {
+      await ingestTab(sheetId, lmName, "lm");
+    }
+    if (
+      gwName.trim().toLowerCase() !== mainName.trim().toLowerCase() &&
+      gwName.trim().toLowerCase() !== lmName.trim().toLowerCase()
+    ) {
+      await ingestTab(sheetId, gwName, "gw");
+    }
+
+    const giveawayDocId = process.env.GIVEAWAY_SHEET_ID?.trim();
+    if (giveawayDocId && giveawayDocId !== sheetId) {
+      await ingestTab(giveawayDocId, gwName, "gw");
+    }
+
     return result;
   } catch (e) {
     const err = e as { message?: string };

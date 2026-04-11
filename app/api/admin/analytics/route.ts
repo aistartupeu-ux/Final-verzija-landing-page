@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getLeadsFromSheet } from "@/lib/leads-sheet";
+import { getLeadsFromSheet, SHEET_CAMPAIGN_REF_GW, SHEET_CAMPAIGN_REF_LM } from "@/lib/leads-sheet";
 import { isAdminApiAuthorized } from "@/lib/admin-api-auth";
 import { SOURCE_TAG_LEAD_MAGNET, SOURCE_TAG_LEAD_MAGNET_AFFILIATE } from "@/lib/lead-source-tags";
 import {
@@ -60,8 +60,28 @@ export async function GET(req: NextRequest) {
     to = todayBelgrade;
   }
 
-  const fromYmd = queryParamToYmd(from);
-  const toYmd = queryParamToYmd(to);
+  let fromYmd = queryParamToYmd(from);
+  let toYmd = queryParamToYmd(to);
+
+  /**
+   * Bez from/to (i bez today=1) ranije je Supabase išao bez created_at filtera — ceo `leads`,
+   * što na velikim tabelama ide u minutima / 504 i klijent ostane na spinneru.
+   * Podrazumevamo poslednjih 30 kalendarskih dana (Beograd), u skladu sa admin UI.
+   */
+  if (!todayOnly && fromYmd === null && toYmd === null) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Belgrade",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+    const todayBelgrade = `${get("year")}-${get("month")}-${get("day")}`;
+    const d = new Date(`${todayBelgrade}T12:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() - 29);
+    fromYmd = d.toISOString().slice(0, 10);
+    toYmd = todayBelgrade;
+  }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
   const leadByEmail = new Map<string, { tag: string; ts: number; order: number }>();
@@ -91,7 +111,13 @@ export async function GET(req: NextRequest) {
     if (rawTag === SOURCE_TAG_LEAD_MAGNET || rawTag === SOURCE_TAG_LEAD_MAGNET_AFFILIATE) {
       return rawTag;
     }
-    if ((affiliateCode ?? "").toString().trim()) return "affiliate";
+    const affTrim = (affiliateCode ?? "").toString().trim();
+    if (affTrim) {
+      const al = affTrim.toLowerCase();
+      if (al !== SHEET_CAMPAIGN_REF_LM.toLowerCase() && al !== SHEET_CAMPAIGN_REF_GW.toLowerCase()) {
+        return "affiliate";
+      }
+    }
     const rawSource = (utmSource ?? "").trim().toLowerCase();
     const rawMedium = (utmMedium ?? "").trim().toLowerCase();
     const rawCampaign = (utmCampaign ?? "").trim().toLowerCase();
@@ -146,31 +172,46 @@ export async function GET(req: NextRequest) {
   };
 
   const PAGE = 1000;
+
+  /** PostgREST vraća grešku ako kolona nije u šemi (npr. migracija nije primenjena u prod). */
+  const LEADS_SELECT_FALLBACKS = [
+    "id, created_at, source_tag, utm_source, utm_medium, utm_campaign, affiliate_code, email",
+    "id, created_at, source_tag, utm_source, utm_medium, utm_campaign, email",
+    "id, created_at, source_tag, utm_source, utm_campaign, email",
+    "id, created_at, source_tag, email",
+  ] as const;
+
   async function fetchAllSupabaseLeadRows(): Promise<LeadRow[]> {
-    const listSupabase: LeadRow[] = [];
-    for (let offset = 0; ; offset += PAGE) {
-      let q = supabase
-        .from("leads")
-        .select("id, created_at, source_tag, utm_source, utm_medium, utm_campaign, affiliate_code, email");
-      if (supabaseGteIso) {
-        q = q.gte("created_at", supabaseGteIso);
+    for (const selectList of LEADS_SELECT_FALLBACKS) {
+      const listSupabase: LeadRow[] = [];
+      let failed = false;
+      for (let offset = 0; ; offset += PAGE) {
+        let q = supabase.from("leads").select(selectList);
+        if (supabaseGteIso) {
+          q = q.gte("created_at", supabaseGteIso);
+        }
+        if (supabaseLteIso) {
+          q = q.lte("created_at", supabaseLteIso);
+        }
+        const { data: batch, error } = await q.order("created_at", { ascending: true }).range(offset, offset + PAGE - 1);
+        if (error) {
+          console.error("admin analytics leads:", selectList, error.code ?? "", error.message);
+          failed = true;
+          break;
+        }
+        const rows = (batch ?? []) as unknown as LeadRow[];
+        listSupabase.push(...rows);
+        if (rows.length < PAGE) break;
       }
-      if (supabaseLteIso) {
-        q = q.lte("created_at", supabaseLteIso);
-      }
-      const { data: batch, error } = await q.order("created_at", { ascending: true }).range(offset, offset + PAGE - 1);
-      if (error) {
-        console.error("admin analytics leads:", error.message);
-        break;
-      }
-      const rows = (batch ?? []) as LeadRow[];
-      listSupabase.push(...rows);
-      if (rows.length < PAGE) break;
+      if (!failed) return listSupabase;
     }
-    return listSupabase;
+    return [];
   }
 
   const [sheetRows, listSupabase] = await Promise.all([getLeadsFromSheet(), fetchAllSupabaseLeadRows()]);
+
+  const sheetRowsByTab = { main: 0, lm: 0, gw: 0 };
+  const sheetLeadsByDay: Record<string, number> = {};
 
   let sheetRowsUsed = 0;
   for (const row of sheetRows) {
@@ -179,6 +220,11 @@ export async function GET(req: NextRequest) {
     if (!sheetRowYmdInPeriod(rowYmd, fromYmd, toYmd)) continue;
     if (legacyCutoffDate && !sheetRowYmdAllowedForLegacy(rowYmd, legacyCutoffDate)) continue;
     sheetRowsUsed += 1;
+    const tab = row.sheetTab ?? "main";
+    if (tab === "lm") sheetRowsByTab.lm += 1;
+    else if (tab === "gw") sheetRowsByTab.gw += 1;
+    else sheetRowsByTab.main += 1;
+    sheetLeadsByDay[rowYmd] = (sheetLeadsByDay[rowYmd] ?? 0) + 1;
     const emailKey = (row.email ?? "").trim().toLowerCase();
     if (!emailKey) continue;
     const tag = normalizeSourceTag(
@@ -229,6 +275,11 @@ export async function GET(req: NextRequest) {
     affiliate: bySource["affiliate"] ?? 0,
     /** Broj redova iz Supabase u istom created_at opsegu (pre spajanja sa Sheet-om). Za poređenje sa Table Editor COUNT. */
     supabaseRowsInPeriod: listSupabase.length,
+    /** Sheet redovi u periodu (List1 + LM + GW), posle datumskega filtera; jedan red = jedna prijava u tabu. */
+    sheetRowsInPeriod: sheetRowsUsed,
+    sheetRowsByTab,
+    /** Broj Sheet redova po kalendarskom danu (Beograd, kolona A datum). */
+    sheetLeadsByDay: Object.fromEntries(Object.entries(sheetLeadsByDay).sort(([a], [b]) => a.localeCompare(b))),
     /** Jedinstveni email u merged skupu — glavni broj u adminu; Sheet+Supabase deduplikovano. */
     countingModel: "unique_email_sheet_plus_supabase_belgrade_day_bounds",
     supabaseCreatedAtGte: supabaseGteIso,
@@ -284,6 +335,7 @@ export async function GET(req: NextRequest) {
       sheetBySource,
       sheetSample: sheetRows.slice(0, 5).map((r) => ({
         date: r.date,
+        sheetTab: r.sheetTab ?? "main",
         source_tag: r.source_tag,
         utm_source: r.utm_source,
         utm_medium: r.utm_medium,
