@@ -189,6 +189,14 @@ type GoogleTrafficPayload = {
 
 /** Kratka pauša pre prvog fetch-a — smanjuje burst na server; kompletan Sheet + Supabase i dalje bez sečenja. */
 const ADMIN_LEADS_INITIAL_DELAY_MS = 1200;
+/** Klijentski timeout — izbegava „večiti“ spinner ako server/edge ne odgovori (Vercel limit, mreža). */
+const ADMIN_PRIMARY_FETCH_TIMEOUT_MS = 85_000;
+
+function isAbortError(e: unknown): boolean {
+  if (e instanceof Error && e.name === "AbortError") return true;
+  const o = e as { name?: string; code?: number } | null;
+  return o?.name === "AbortError" || o?.code === 20;
+}
 const BELGRADE_YMD = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Europe/Belgrade",
   year: "numeric",
@@ -336,6 +344,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [waitingInitialDelay, setWaitingInitialDelay] = useState(false);
+  const [loadSeconds, setLoadSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -437,7 +446,17 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       if (to) params.set("to", to);
       if (withDebug) params.set("debug", "1");
       if (legacy) params.set("legacy", "1");
-      const res = await fetch(`/api/admin/analytics?${params}`, { credentials: "include" });
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), ADMIN_PRIMARY_FETCH_TIMEOUT_MS);
+      let res: Response;
+      try {
+        res = await fetch(`/api/admin/analytics?${params}`, {
+          credentials: "include",
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(tid);
+      }
       if (res.status === 401) {
         redirectToLogin();
         return;
@@ -448,7 +467,13 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
       void fetchTodayData();
       primaryOk = true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Greška pri učitavanju.");
+      if (isAbortError(e)) {
+        setError(
+          "Zahtev za analitiku je predugo trajao (timeout). Suzi period datuma ili proveri Vercel log / limit funkcije."
+        );
+      } else {
+        setError(e instanceof Error ? e.message : "Greška pri učitavanju.");
+      }
     } finally {
       if (!silent) setLoading(false);
     }
@@ -494,6 +519,23 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
     }
   }, [legacy, from, to, fetchTodayData]);
 
+  const fetchDataRef = useRef(fetchData);
+  fetchDataRef.current = fetchData;
+
+  useEffect(() => {
+    const blocking = loading || waitingInitialDelay;
+    if (!blocking) {
+      setLoadSeconds(0);
+      return;
+    }
+    const t0 = Date.now();
+    setLoadSeconds(0);
+    const id = setInterval(() => {
+      setLoadSeconds(Math.floor((Date.now() - t0) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [loading, waitingInitialDelay]);
+
   const fetchGoogleTraffic = useCallback(async (customFrom?: string, customTo?: string) => {
     const fromValue = customFrom ?? graphFrom;
     const toValue = customTo ?? graphTo;
@@ -535,7 +577,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
   // lastFetchedRange sprečava ponovni fetch samo zbog promene reference na fetchData.
   useEffect(() => {
     if (!from || !to) return;
-    const key = `${from}|${to}`;
+    const key = `${legacy ? 1 : 0}|${from}|${to}`;
 
     if (isFirstLoadPassRef.current) {
       if (firstLoadTimerForKeyRef.current === key) return;
@@ -545,7 +587,7 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
         isFirstLoadPassRef.current = false;
         setWaitingInitialDelay(false);
         lastFetchedRangeRef.current = key;
-        void fetchData();
+        void fetchDataRef.current();
       }, ADMIN_LEADS_INITIAL_DELAY_MS);
       return () => {
         clearTimeout(t);
@@ -556,8 +598,9 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
 
     if (lastFetchedRangeRef.current === key) return;
     lastFetchedRangeRef.current = key;
-    void fetchData();
-  }, [from, to, fetchData]);
+    void fetchDataRef.current();
+    // fetchDataRef uvek pokazuje najnoviji fetch; ponovno pokretanje samo kad se promene from/to/legacy.
+  }, [from, to, legacy]);
 
   const lastFetchedGraphRangeRef = useRef<string | null>(null);
   useEffect(() => {
@@ -712,11 +755,16 @@ export function AdminAnalyticsDashboard({ legacy = false }: { legacy?: boolean }
             }}
           >
             <Loader2 size={32} color="#00d4ff" style={{ animation: "spin 1s linear infinite", willChange: "transform" }} />
-            {waitingInitialDelay && !loading ? (
-              <span style={{ maxWidth: 340, lineHeight: 1.5 }}>
-                Kratka pauza pre prvog učitavanja (manje opterećenje), zatim ceo izveštaj — Sheet i baza bez skraćivanja.
-              </span>
-            ) : null}
+            <span style={{ maxWidth: 380, lineHeight: 1.55 }}>
+              {waitingInitialDelay && !loading ? (
+                <>Kratka pauza pre prvog učitavanja (manje opterećenje), zatim ceo izveštaj — Sheet i baza bez skraćivanja.</>
+              ) : loading ? (
+                <>
+                  Preuzimanje analitike (Sheet + Supabase)
+                  {loadSeconds > 0 ? ` — ${loadSeconds}s` : ""}. Veliki period može dugo da traje na produkciji; ako stoji predugo, suzi datume ili proveri Vercel logove.
+                </>
+              ) : null}
+            </span>
           </div>
         ) : data ? (
           <>

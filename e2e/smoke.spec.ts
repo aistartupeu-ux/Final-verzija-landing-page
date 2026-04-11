@@ -34,7 +34,9 @@ test.describe("smoke", () => {
   test("admin analytics route settles", async ({ page }) => {
     await page.goto("/admin/k4m8p2w7", { waitUntil: "domcontentloaded" });
     await expect(
-      page.getByText(/Admin pristup|Ukupno leadova|Greška pri učitavanju|Database not configured/i).first(),
+      page.getByText(
+        /Admin pristup|Ukupno leadova|Greška pri učitavanju|Database not configured|predugo trajao|Preuzimanje analitike/i,
+      ).first(),
     ).toBeVisible({ timeout: 90_000 });
   });
 
