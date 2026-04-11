@@ -262,6 +262,46 @@ export async function POST(req: NextRequest) {
     const { error } = await supabase.from("leads").insert(leadInsert);
 
     if (error) {
+      if (error.code === "23505") {
+        if (sourceTag === "giveaway") {
+          const repeatTag = "giveaway_repeat";
+          const { data: rowAfterRace } = await supabase
+            .from("leads")
+            .select("id, utm_campaign")
+            .ilike("email", emailNorm)
+            .limit(1)
+            .maybeSingle();
+          if (rowAfterRace?.id) {
+            const campaignRaw =
+              typeof rowAfterRace.utm_campaign === "string" ? rowAfterRace.utm_campaign.trim() : "";
+            const hasRepeatTag = campaignRaw.toLowerCase().includes(repeatTag);
+            const updatedCampaign = hasRepeatTag
+              ? campaignRaw
+              : campaignRaw
+                ? `${campaignRaw}|${repeatTag}`
+                : repeatTag;
+            try {
+              await supabase.from("leads").update({ utm_campaign: updatedCampaign }).eq("id", rowAfterRace.id);
+            } catch {}
+          }
+        }
+        try {
+          cookieStore.set("special_access", "1", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            maxAge: 60 * 60 * 24,
+            path: "/",
+          });
+        } catch (e) {
+          console.error("special_access cookie error (duplicate):", e);
+        }
+        return NextResponse.json({
+          success: true,
+          duplicate: true,
+          giveaway_repeat_tagged: sourceTag === "giveaway",
+        });
+      }
       console.error("Supabase insert error:", JSON.stringify({
         code: error.code,
         message: error.message,

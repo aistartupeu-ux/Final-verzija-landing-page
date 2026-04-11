@@ -24,10 +24,9 @@ export async function POST(req: NextRequest) {
   const token = await createAdminSessionToken(expected, "archive");
   const res = NextResponse.json({ ok: true });
 
-  // path mora biti "/" da bi se kolačić slao i na /api/admin/* (ne samo na /admin/* stranice)
   res.cookies.set("admin_session", token, {
     ...adminSessionCookieOpts(),
-    maxAge: 86400, // 24h
+    maxAge: 86400,
   });
 
   return res;

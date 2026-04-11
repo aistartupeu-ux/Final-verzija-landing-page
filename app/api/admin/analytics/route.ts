@@ -29,7 +29,6 @@ const ADMIN_ANALYTICS_SUPABASE_PARALLEL_PAGES = 5;
 const REF_LM_LC = SHEET_CAMPAIGN_REF_LM.toLowerCase();
 const REF_GW_LC = SHEET_CAMPAIGN_REF_GW.toLowerCase();
 
-/** PostgREST vraća grešku ako kolona nije u šemi (npr. migracija nije primenjena u prod). */
 const ADMIN_ANALYTICS_LEADS_SELECT_FALLBACKS = [
   "id, created_at, source_tag, utm_source, utm_medium, utm_campaign, affiliate_code, email",
   "id, created_at, source_tag, utm_source, utm_medium, utm_campaign, email",
@@ -134,7 +133,6 @@ function normalizeSourceTag(
   const rawCampaign = (utmCampaign ?? "").trim().toLowerCase();
   const probe = `${rawTag} ${rawSource} ${rawMedium} ${rawCampaign}`;
 
-  // Isto kao Sheet findSourceTag: platforma (utm / tag) pre „affiliate“ kolone — inače TT/IG/FB padaju u affiliate.
   if (probe.includes("tiktok") || rawSource === "tt" || rawMedium === "tt") return "tiktok";
   if (probe.includes("instagram") || probe.includes("insta") || rawTag === "ig" || rawSource === "ig" || rawMedium === "ig")
     return "instagram";
@@ -160,7 +158,6 @@ function normalizeSourceTag(
   return rawTag;
 }
 
-/** Vercel Hobby često max ~10–60s; Pro može više. Paginacija je ograničena da ne prekorači funkciju. */
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
@@ -211,11 +208,6 @@ export async function GET(req: NextRequest) {
   let fromYmd = queryParamToYmd(from);
   let toYmd = queryParamToYmd(to);
 
-  /**
-   * Bez from/to (i bez today=1) ranije je Supabase išao bez created_at filtera — ceo `leads`,
-   * što na velikim tabelama ide u minutima / 504 i klijent ostane na spinneru.
-   * Podrazumevamo poslednjih 30 kalendarskih dana (Beograd), u skladu sa admin UI.
-   */
   if (!todayOnly && fromYmd === null && toYmd === null) {
     const parts = new Intl.DateTimeFormat("en-CA", {
       timeZone: "Europe/Belgrade",
@@ -232,7 +224,6 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
-  /** Jedinstveni email: Sheet + Supabase (noviji zapis po vremenu pobedi — bolji utm/source_tag za IG/FB/TikTok). */
   const leadByEmail = new Map<string, { tag: string; ts: number; order: number }>();
   let leadOrderCounter = 0;
 
@@ -248,8 +239,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 1) Sheet + Supabase u paraleli (ranije sekvencijalno — duplo čekanje na wall-clock).
-  // Datum: YYYY-MM-DD u Beogradu + period Od–Do + legacy presek (ne mešati sa Date() u lokalnom TZ servera).
   let supabaseGteIso: string | null = null;
   let supabaseLteIso: string | null = null;
   if (fromYmd) {
@@ -267,7 +256,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  /** Jednom po zahtevu — ne zvati lastInclusiveBelgradeYmdForLegacyCutoff u petlji po redovima (Intl × hiljade). */
   const legacyLastInclusiveSheetYmd = legacyCutoffDate
     ? lastInclusiveBelgradeYmdForLegacyCutoff(legacyCutoffDate)
     : null;
@@ -294,12 +282,6 @@ export async function GET(req: NextRequest) {
 
   const sheetRowsByTab = { main: 0, lm: 0, gw: 0 };
 
-  /**
-   * Sheet: broj redova / tab po koloni A (datum u Beogradu). Supabase: redovi po created_at u [gte,lte] za isti Od–Do.
-   * Ukupno leadova = jedinstveni email posle merge-a (Sheet pa Supabase; noviji zapis menja izvor).
-   * Zato sheetRowsInPeriod ≠ supabaseRowsInPeriod ≠ total: različita merila (red vs red), granice dana (A vs UTC),
-   * duplikati emaila u istom izvoru, red u Sheet-u bez odgovarajućeg reda u DB ili obrnuto, kašnjenje append-a u Sheet.
-   */
   let sheetRowsUsed = 0;
   for (const row of sheetRows) {
     const rowYmd = extractYmdFromSheetDate(row.date);
@@ -324,7 +306,6 @@ export async function GET(req: NextRequest) {
     upsertLeadByEmail(emailKey, tag, Number.isNaN(ts) ? 0 : ts);
   }
 
-  // 2) Supabase — merge u isti skup (created_at + utm često tačniji za Meta/TikTok od Sheet reda).
   for (const lead of listSupabase) {
     const emailKey = (lead.email ?? "").trim().toLowerCase();
     if (!emailKey) continue;
@@ -359,16 +340,12 @@ export async function GET(req: NextRequest) {
     tiktokLeads: bySource["tiktok"] ?? 0,
     direct: bySource["direct"] ?? 0,
     affiliate: bySource["affiliate"] ?? 0,
-    /** Broj redova iz Supabase u istom created_at opsegu (pre spajanja sa Sheet-om). Za poređenje sa Table Editor COUNT. */
     supabaseRowsInPeriod: listSupabase.length,
-    /** Sheet redovi u periodu (List1 + LM + GW), posle datumskega filtera; jedan red = jedna prijava u tabu. */
     sheetRowsInPeriod: sheetRowsUsed,
     sheetRowsByTab,
-    /** Jedinstveni email u merged skupu — Sheet + Supabase deduplikovano. */
     countingModel: "unique_email_sheet_plus_supabase_belgrade_day_bounds",
     supabaseCreatedAtGte: supabaseGteIso,
     supabaseCreatedAtLte: supabaseLteIso,
-    /** true ako je dostignut limit stranica (200×1000) — suzi Od–Da. */
     supabaseFetchTruncated,
   };
   if (legacyMode && legacyCutoffDate && legacyLastInclusiveSheetYmd !== null) {

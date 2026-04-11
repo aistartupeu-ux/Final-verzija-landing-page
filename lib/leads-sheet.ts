@@ -168,6 +168,33 @@ async function getSpreadsheetTabTitles(sheets: SheetsClient, spreadsheetId: stri
     .filter(Boolean);
 }
 
+async function appendValuesWithRetry(
+  sheets: SheetsClient,
+  spreadsheetId: string,
+  range: string,
+  values: string[][]
+): Promise<void> {
+  const backoffMs = [0, 600, 1400];
+  let last: unknown;
+  for (let i = 0; i < backoffMs.length; i++) {
+    const wait = backoffMs[i] ?? 0;
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    try {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range,
+        valueInputOption: "USER_ENTERED",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: { values },
+      });
+      return;
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
+}
+
 function leadMagnetSheetTabName(): string {
   return process.env.LEAD_MAGNET_SHEET_NAME?.trim() || "LM";
 }
@@ -234,13 +261,7 @@ export async function appendLeadsToSheet(row: LeadsSourceRow): Promise<boolean> 
       ? resolveLeadMagnetSheetTabName()
       : resolveMainLeadsSheetTabName(titles, process.env.LEADS_SHEET_NAME);
     const range = `'${sheetName}'!A:I`;
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: sheetId,
-      range,
-      valueInputOption: "USER_ENTERED",
-      insertDataOption: "INSERT_ROWS",
-      requestBody: { values },
-    });
+    await appendValuesWithRetry(sheets, sheetId, range, values);
     return true;
   } catch (e) {
     const err = e as { message?: string; code?: number };
@@ -289,13 +310,7 @@ export async function appendGiveawayToSheet(row: GiveawaySheetRow): Promise<bool
       row.status,
     ]];
     const range = `'${sheetName}'!A:J`;
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: sheetId,
-      range,
-      valueInputOption: "USER_ENTERED",
-      insertDataOption: "INSERT_ROWS",
-      requestBody: { values },
-    });
+    await appendValuesWithRetry(sheets, sheetId, range, values);
     return true;
   } catch (e) {
     const err = e as { message?: string };
