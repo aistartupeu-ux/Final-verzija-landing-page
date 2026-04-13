@@ -5,7 +5,6 @@ import { appendLeadsToSheet } from "@/lib/leads-sheet";
 import { formatBelgradeDateTime } from "@/lib/time-belgrade";
 import {
   SOURCE_TAG_LEAD_MAGNET,
-  SOURCE_TAG_LEAD_MAGNET_AFFILIATE,
   isLeadMagnetSourceTag,
 } from "@/lib/lead-source-tags";
 import { appendAffiliateLeadToSheet, isAffiliateSheetConfigured } from "@/lib/affiliate-sheet";
@@ -123,6 +122,7 @@ export async function POST(req: NextRequest) {
       source_tag,
       skip_leads_source_sheet,
       skip_ghl_webhook,
+      skip_main_leads_insert,
     } = body;
     const name = typeof body?.name === "string" ? body.name.trim() : null;
 
@@ -186,7 +186,8 @@ export async function POST(req: NextRequest) {
       hasAffiliate
     );
     if (trustedLeadMagnet) {
-      sourceTag = hasAffiliate ? SOURCE_TAG_LEAD_MAGNET_AFFILIATE : SOURCE_TAG_LEAD_MAGNET;
+      // Svi leadovi sa /api/lead-magnet idu u LM tok (Supabase lead_magnet_contacts + Sheet tab LM).
+      sourceTag = SOURCE_TAG_LEAD_MAGNET;
     } else if (isLeadMagnetSourceTag(sourceTag)) {
       sourceTag = "direct";
     }
@@ -195,120 +196,96 @@ export async function POST(req: NextRequest) {
     const isGiveawayLead = sourceTag === "giveaway";
 
     const emailNorm = String(email).trim().toLowerCase();
-    const { data: existing } = await supabase
-      .from("leads")
-      .select("id, utm_campaign")
-      .ilike("email", emailNorm)
-      .limit(1)
-      .maybeSingle();
+    let isDuplicate = false;
+    const shouldInsertMainLead = !(trustedLeadMagnet && skip_main_leads_insert === true);
+    if (shouldInsertMainLead) {
+      const { data: existing } = await supabase
+        .from("leads")
+        .select("id, utm_campaign")
+        .ilike("email", emailNorm)
+        .limit(1)
+        .maybeSingle();
 
-    if (existing) {
-      if (sourceTag === "giveaway") {
-        const repeatTag = "giveaway_repeat";
-        const campaignRaw = typeof existing.utm_campaign === "string" ? existing.utm_campaign.trim() : "";
-        const hasRepeatTag = campaignRaw.toLowerCase().includes(repeatTag);
-        const updatedCampaign = hasRepeatTag
-          ? campaignRaw
-          : campaignRaw
-            ? `${campaignRaw}|${repeatTag}`
-            : repeatTag;
-        try {
-          await supabase
-            .from("leads")
-            .update({ utm_campaign: updatedCampaign })
-            .eq("id", existing.id);
-        } catch {
-          // duplicirani giveaway upis je opciona oznaka; ne blokiramo response
-        }
-      }
-
-      try {
-        cookieStore.set("special_access", "1", {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          maxAge: 60 * 60 * 24,
-          path: "/",
-        });
-      } catch (e) {
-        console.error("special_access cookie error (duplicate):", e);
-      }
-      return NextResponse.json({
-        success: true,
-        duplicate: true,
-        giveaway_repeat_tagged: sourceTag === "giveaway",
-      });
-    }
-
-    const leadInsert = {
-      email: emailNorm,
-      phone: phone ?? null,
-      city,
-      country,
-      country_code,
-      ip: ip || null,
-      affiliate_code: affiliateCode,
-      utm_source: utm_source ?? null,
-      utm_medium: utm_medium ?? null,
-      utm_campaign: utm_campaign ?? null,
-      source_tag: sourceTag,
-      // submitted_at_belgrade samo ako kolona postoji u Supabase (ENABLE=1). Inače insert pada sa PGRST204 i Sheet se ne pozove.
-      ...(process.env.SUPABASE_ENABLE_SUBMITTED_AT_BELGRADE === "1" &&
-      process.env.SUPABASE_DISABLE_SUBMITTED_AT_BELGRADE !== "1"
-        ? { submitted_at_belgrade: formatBelgradeDateTime() }
-        : {}),
-    };
-
-    const { error } = await supabase.from("leads").insert(leadInsert);
-
-    if (error) {
-      if (error.code === "23505") {
+      if (existing) {
         if (sourceTag === "giveaway") {
           const repeatTag = "giveaway_repeat";
-          const { data: rowAfterRace } = await supabase
-            .from("leads")
-            .select("id, utm_campaign")
-            .ilike("email", emailNorm)
-            .limit(1)
-            .maybeSingle();
-          if (rowAfterRace?.id) {
-            const campaignRaw =
-              typeof rowAfterRace.utm_campaign === "string" ? rowAfterRace.utm_campaign.trim() : "";
-            const hasRepeatTag = campaignRaw.toLowerCase().includes(repeatTag);
-            const updatedCampaign = hasRepeatTag
-              ? campaignRaw
-              : campaignRaw
-                ? `${campaignRaw}|${repeatTag}`
-                : repeatTag;
-            try {
-              await supabase.from("leads").update({ utm_campaign: updatedCampaign }).eq("id", rowAfterRace.id);
-            } catch {}
+          const campaignRaw = typeof existing.utm_campaign === "string" ? existing.utm_campaign.trim() : "";
+          const hasRepeatTag = campaignRaw.toLowerCase().includes(repeatTag);
+          const updatedCampaign = hasRepeatTag
+            ? campaignRaw
+            : campaignRaw
+              ? `${campaignRaw}|${repeatTag}`
+              : repeatTag;
+          try {
+            await supabase
+              .from("leads")
+              .update({ utm_campaign: updatedCampaign })
+              .eq("id", existing.id);
+          } catch {
+            // duplicirani giveaway upis je opciona oznaka; ne blokiramo response
           }
         }
-        try {
-          cookieStore.set("special_access", "1", {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            maxAge: 60 * 60 * 24,
-            path: "/",
-          });
-        } catch (e) {
-          console.error("special_access cookie error (duplicate):", e);
-        }
-        return NextResponse.json({
-          success: true,
-          duplicate: true,
-          giveaway_repeat_tagged: sourceTag === "giveaway",
-        });
+        isDuplicate = true;
       }
-      console.error("Supabase insert error:", JSON.stringify({
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-      }));
-      return NextResponse.json({ error: error.message }, { status: 500 });
+
+      if (!isDuplicate) {
+        const leadInsert = {
+          email: emailNorm,
+          phone: phone ?? null,
+          city,
+          country,
+          country_code,
+          ip: ip || null,
+          affiliate_code: affiliateCode,
+          utm_source: utm_source ?? null,
+          utm_medium: utm_medium ?? null,
+          utm_campaign: utm_campaign ?? null,
+          source_tag: sourceTag,
+          // submitted_at_belgrade samo ako kolona postoji u Supabase (ENABLE=1). Inače insert pada sa PGRST204 i Sheet se ne pozove.
+          ...(process.env.SUPABASE_ENABLE_SUBMITTED_AT_BELGRADE === "1" &&
+          process.env.SUPABASE_DISABLE_SUBMITTED_AT_BELGRADE !== "1"
+            ? { submitted_at_belgrade: formatBelgradeDateTime() }
+            : {}),
+        };
+
+        const { error } = await supabase.from("leads").insert(leadInsert);
+
+        if (error) {
+          if (error.code === "23505") {
+            isDuplicate = true;
+            if (sourceTag === "giveaway") {
+              const repeatTag = "giveaway_repeat";
+              const { data: rowAfterRace } = await supabase
+                .from("leads")
+                .select("id, utm_campaign")
+                .ilike("email", emailNorm)
+                .limit(1)
+                .maybeSingle();
+              if (rowAfterRace?.id) {
+                const campaignRaw =
+                  typeof rowAfterRace.utm_campaign === "string" ? rowAfterRace.utm_campaign.trim() : "";
+                const hasRepeatTag = campaignRaw.toLowerCase().includes(repeatTag);
+                const updatedCampaign = hasRepeatTag
+                  ? campaignRaw
+                  : campaignRaw
+                    ? `${campaignRaw}|${repeatTag}`
+                    : repeatTag;
+                try {
+                  await supabase.from("leads").update({ utm_campaign: updatedCampaign }).eq("id", rowAfterRace.id);
+                } catch {}
+              }
+            }
+          } else {
+            console.error("Supabase insert error:", JSON.stringify({
+              code: error.code,
+              message: error.message,
+              details: error.details,
+              hint: error.hint,
+            }));
+            return NextResponse.json({ error: error.message }, { status: 500 });
+          }
+        }
+      }
     }
 
     // Meta CAPI Lead šalje se sa thank-you stranice (delay) za bolju atribuciju.
@@ -437,6 +414,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      duplicate: isDuplicate,
       ...(typeof sheetAppendOk === "boolean" ? { sheet_append_ok: sheetAppendOk } : {}),
     });
   } catch (err) {

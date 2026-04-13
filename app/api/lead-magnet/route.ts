@@ -2,13 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import { arePromoLandingPagesEnabled } from "@/lib/promo-landing-pages";
 import { formatBelgradeDateTime } from "@/lib/time-belgrade";
 import { SOURCE_TAG_LEAD_MAGNET, SOURCE_TAG_LEAD_MAGNET_AFFILIATE } from "@/lib/lead-source-tags";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+const LEAD_MAGNET_TABLE = "lead_magnet_contacts";
+
+type LeadMagnetLeadsPayload = {
+  email: string;
+  source_tag: typeof SOURCE_TAG_LEAD_MAGNET;
+  skip_main_leads_insert: true;
+  phone?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  affiliate_code?: string;
+};
 
 /** Samo ova polja prosleđujemo u /api/leads — sprečava skip_* / name / lažne interne ključeve iz browsera. */
-function buildLeadsPayload(body: Record<string, unknown>): Record<string, unknown> {
+function buildLeadsPayload(body: Record<string, unknown>): LeadMagnetLeadsPayload {
   const email = typeof body.email === "string" ? body.email.trim() : "";
-  const out: Record<string, unknown> = {
+  const out: LeadMagnetLeadsPayload = {
     email,
     source_tag: SOURCE_TAG_LEAD_MAGNET,
+    skip_main_leads_insert: true,
   };
   if (typeof body.phone === "string" && body.phone.trim()) {
     out.phone = body.phone.trim();
@@ -28,6 +46,65 @@ function buildLeadsPayload(body: Record<string, unknown>): Record<string, unknow
   return out;
 }
 
+type LeadMagnetSubmissionPayload = {
+  email: string;
+  phone: string | null;
+  utm_source: string;
+  utm_medium: string;
+  utm_campaign: string;
+  affiliate_code: string;
+  source_tag: string;
+};
+
+async function writeLeadMagnetSubmission(
+  payload: LeadMagnetSubmissionPayload
+): Promise<boolean> {
+  if (!supabase) return false;
+
+  try {
+    const { data: existing } = await supabase
+      .from(LEAD_MAGNET_TABLE)
+      .select("id, repeat_count")
+      .ilike("email", payload.email)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing?.id) {
+      await supabase
+        .from(LEAD_MAGNET_TABLE)
+        .update({
+          phone: payload.phone,
+          source_tag: payload.source_tag,
+          utm_source: payload.utm_source,
+          utm_medium: payload.utm_medium,
+          utm_campaign: payload.utm_campaign,
+          affiliate_code: payload.affiliate_code || null,
+          repeat_count: Number(existing.repeat_count ?? 0) + 1,
+          last_submitted_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id);
+      return true;
+    }
+
+    await supabase.from(LEAD_MAGNET_TABLE).insert({
+      email: payload.email,
+      phone: payload.phone,
+      source_tag: payload.source_tag,
+      utm_source: payload.utm_source,
+      utm_medium: payload.utm_medium,
+      utm_campaign: payload.utm_campaign,
+      affiliate_code: payload.affiliate_code || null,
+      repeat_count: 0,
+      first_submitted_at: new Date().toISOString(),
+      last_submitted_at: new Date().toISOString(),
+    });
+    return false;
+  } catch (e) {
+    console.error("Lead Magnet Supabase write error:", e);
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   if (!arePromoLandingPagesEnabled()) {
     return NextResponse.json({ error: "Lead magnet trenutno nije aktivan." }, { status: 403 });
@@ -42,7 +119,7 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = buildLeadsPayload(body as Record<string, unknown>);
-  if (!payload.email || !String(payload.email).includes("@")) {
+  if (!payload.email?.includes("@")) {
     return NextResponse.json({ error: "Email is required" }, { status: 400 });
   }
 
@@ -62,7 +139,18 @@ export async function POST(req: NextRequest) {
     sheet_append_ok?: boolean;
   };
   if (!res.ok) return NextResponse.json(out, { status: res.status });
-  if (out.duplicate) {
+
+  const lmDuplicate = await writeLeadMagnetSubmission({
+    email: payload.email.trim().toLowerCase(),
+    phone: typeof payload.phone === "string" && payload.phone.trim() ? payload.phone.trim() : null,
+    utm_source: payload.utm_source ?? "",
+    utm_medium: payload.utm_medium ?? "",
+    utm_campaign: payload.utm_campaign ?? "",
+    affiliate_code: payload.affiliate_code ?? "",
+    source_tag: payload.source_tag,
+  });
+
+  if (out.duplicate || lmDuplicate) {
     return NextResponse.json({ success: true, duplicate: true });
   }
 
@@ -77,7 +165,7 @@ export async function POST(req: NextRequest) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ts: formatBelgradeDateTime(),
-          email: String(payload.email ?? "").trim(),
+          email: payload.email.trim(),
           utm_source: payload.utm_source ?? "",
           utm_medium: payload.utm_medium ?? "",
           utm_campaign: payload.utm_campaign ?? "",
