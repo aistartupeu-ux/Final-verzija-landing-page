@@ -58,21 +58,31 @@ type LeadMagnetSubmissionPayload = {
   source_tag: string;
 };
 
+type LeadMagnetWriteResult = {
+  ok: boolean;
+  duplicate: boolean;
+};
+
 async function writeLeadMagnetSubmission(
   payload: LeadMagnetSubmissionPayload
-): Promise<boolean> {
-  if (!supabase) return false;
+): Promise<LeadMagnetWriteResult> {
+  if (!supabase) return { ok: false, duplicate: false };
 
   try {
-    const { data: existing } = await supabase
+    const { data: existing, error: selectErr } = await supabase
       .from(LEAD_MAGNET_TABLE)
       .select("id, repeat_count")
       .ilike("email", payload.email)
       .limit(1)
       .maybeSingle();
 
+    if (selectErr) {
+      console.error("Lead Magnet Supabase select error:", selectErr);
+      return { ok: false, duplicate: false };
+    }
+
     if (existing?.id) {
-      await supabase
+      const { error: updateErr } = await supabase
         .from(LEAD_MAGNET_TABLE)
         .update({
           phone: payload.phone,
@@ -85,10 +95,14 @@ async function writeLeadMagnetSubmission(
           last_submitted_at: new Date().toISOString(),
         })
         .eq("id", existing.id);
-      return true;
+      if (updateErr) {
+        console.error("Lead Magnet Supabase update error:", updateErr);
+        return { ok: false, duplicate: true };
+      }
+      return { ok: true, duplicate: true };
     }
 
-    await supabase.from(LEAD_MAGNET_TABLE).insert({
+    const { error: insertErr } = await supabase.from(LEAD_MAGNET_TABLE).insert({
       email: payload.email,
       phone: payload.phone,
       source_tag: payload.source_tag,
@@ -100,10 +114,14 @@ async function writeLeadMagnetSubmission(
       first_submitted_at: new Date().toISOString(),
       last_submitted_at: new Date().toISOString(),
     });
-    return false;
+    if (insertErr) {
+      console.error("Lead Magnet Supabase insert error:", insertErr);
+      return { ok: false, duplicate: false };
+    }
+    return { ok: true, duplicate: false };
   } catch (e) {
     console.error("Lead Magnet Supabase write error:", e);
-    return false;
+    return { ok: false, duplicate: false };
   }
 }
 
@@ -142,7 +160,7 @@ export async function POST(req: NextRequest) {
   };
   if (!res.ok) return NextResponse.json(out, { status: res.status });
 
-  const lmDuplicate = await writeLeadMagnetSubmission({
+  const lmWrite = await writeLeadMagnetSubmission({
     email: payload.email.trim().toLowerCase(),
     phone: typeof payload.phone === "string" && payload.phone.trim() ? payload.phone.trim() : null,
     utm_source: payload.utm_source ?? "",
@@ -152,7 +170,7 @@ export async function POST(req: NextRequest) {
     source_tag: payload.source_tag,
   });
 
-  const isDuplicate = Boolean(out.duplicate || lmDuplicate);
+  const isDuplicate = Boolean(out.duplicate || lmWrite.duplicate);
 
   const webhook = process.env.LEAD_MAGNET_WEBHOOK_URL?.trim();
   if (webhook) {
@@ -184,6 +202,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     success: true,
     duplicate: isDuplicate,
+    lm_supabase_ok: lmWrite.ok,
     ...(typeof out.sheet_append_ok === "boolean" ? { sheet_append_ok: out.sheet_append_ok } : {}),
   });
 }
