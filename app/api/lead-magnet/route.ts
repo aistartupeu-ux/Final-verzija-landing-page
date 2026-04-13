@@ -13,6 +13,7 @@ type LeadMagnetLeadsPayload = {
   email: string;
   source_tag: typeof SOURCE_TAG_LEAD_MAGNET;
   skip_main_leads_insert: true;
+  skip_ghl_webhook: true;
   phone?: string;
   utm_source?: string;
   utm_medium?: string;
@@ -27,6 +28,7 @@ function buildLeadsPayload(body: Record<string, unknown>): LeadMagnetLeadsPayloa
     email,
     source_tag: SOURCE_TAG_LEAD_MAGNET,
     skip_main_leads_insert: true,
+    skip_ghl_webhook: true,
   };
   if (typeof body.phone === "string" && body.phone.trim()) {
     out.phone = body.phone.trim();
@@ -150,9 +152,7 @@ export async function POST(req: NextRequest) {
     source_tag: payload.source_tag,
   });
 
-  if (out.duplicate || lmDuplicate) {
-    return NextResponse.json({ success: true, duplicate: true });
-  }
+  const isDuplicate = Boolean(out.duplicate || lmDuplicate);
 
   const webhook = process.env.LEAD_MAGNET_WEBHOOK_URL?.trim();
   if (webhook) {
@@ -172,6 +172,8 @@ export async function POST(req: NextRequest) {
           affiliate_code: payload.affiliate_code ?? "",
           source_tag: tagForWebhook,
           landing: "lead_magnet",
+          is_duplicate: isDuplicate,
+          send_welcome: false,
         }),
       });
     } catch {
@@ -181,6 +183,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     success: true,
+    duplicate: isDuplicate,
     ...(typeof out.sheet_append_ok === "boolean" ? { sheet_append_ok: out.sheet_append_ok } : {}),
   });
 }
