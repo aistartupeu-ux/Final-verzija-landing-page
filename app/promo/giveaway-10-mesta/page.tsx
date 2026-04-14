@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 /**
  * Tajmer do 15.04.2026. 00:00:00, Europe/Belgrade (CEST = UTC+2 u aprilu).
  */
-const TARGET_DATE = new Date("2026-04-15T00:00:00+02:00");
+const TARGET_DATE = new Date("2026-04-15T15:00:00+02:00");
 
 const SPARKLE_INDICES = [0, 1, 2, 3, 4, 5, 6, 7] as const;
 

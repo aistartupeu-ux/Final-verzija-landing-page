@@ -4,8 +4,8 @@ import LpBackgroundEffects from "@/components/lp/LpBackgroundEffects";
 import LpTopBarCountdown from "@/components/lp/LpTopBarCountdown";
 import LpWaitlistCount from "@/components/lp/LpWaitlistCount";
 
-/** Kraj 14. apr. 2026 u Beogradu (CEST, +02) = 15. apr. 00:00 lokalno — u skladu sa giveaway 2.–14. apr. */
-const TARGET_DATE_MS = new Date("2026-04-15T00:00:00+02:00").getTime();
+/** Zatvaranje prijava: 15. apr. 2026. u 15:00 (Beograd, CEST +02). */
+const TARGET_DATE_MS = new Date("2026-04-15T15:00:00+02:00").getTime();
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
