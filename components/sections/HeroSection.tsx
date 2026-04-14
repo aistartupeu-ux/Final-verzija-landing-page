@@ -12,8 +12,7 @@ import { CDN_PATH_EXPLAINER_MP4 } from "@/lib/video-cdn-paths";
 const HERO_VSL_WATERMARK_SRC = "/logo.png";
 
 // Perioda giveawaya 2.–14. apr. 2026, Europe/Belgrade (CEST = UTC+2 u aprilu).
-// Tajmer do kraja 14. apr. = 15. apr. 00:00 lokalno. Isto za hero / giveaway LP.
-/** Prijave se zatvaraju 15. apr. 2026. u 15:00 (Beograd, CEST +02). */
+/** Hero tajmer: zatvaranje 15. apr. 2026. u 15:00 (Beograd, CEST +02). */
 const TARGET_DATE = new Date("2026-04-15T15:00:00+02:00");
 
 /** Ispod ovog učestka hero sekcije u viewportu — pauziraj VSL, ugasi „heavy“ režim, izađi iz fullscreena. */
@@ -45,18 +44,41 @@ export default function HeroSection({
   const { explainerMp4: EXPLAINER_MP4 } = mediaUrls;
   const explainerRef = useRef<HTMLVideoElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [shouldAttachExplainerSrc, setShouldAttachExplainerSrc] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [startedMuted, setStartedMuted] = useState(false);
   const [hovering, setHovering] = useState(false);
   const [explainerFailed, setExplainerFailed] = useState(false);
-  /** Manje mrežnog/dekoderskog pritiska kad hero skoro nije u kadru. */
-  const [explainerPreload, setExplainerPreload] = useState<"auto" | "metadata">("auto");
   /** Kad je jednom krenuo repro — sklanja preview (logo + providni sloj), pun video. */
   const [explainerHasPlayed, setExplainerHasPlayed] = useState(false);
   const primeExplainerFrameRef = useRef(true);
   /** Jednokratni iOS/WebKit „prime“ (play→pause); ne sme da okine UI kao pravo puštanje. */
   const explainerIosPrimeDoneRef = useRef(false);
   const suppressExplainerPlayUiRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px)");
+    const sync = () => {
+      const mobile = mq.matches;
+      setIsMobile(mobile);
+      // Desktop: attach odmah; mobilni: staged attach da se smanji burst na first paint-u.
+      setShouldAttachExplainerSrc(!mobile);
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    if (playing) return;
+    if (shouldAttachExplainerSrc) return;
+    // Mobilni: odloži attach da hero headline/forma dobiju prioritet.
+    const t = window.setTimeout(() => setShouldAttachExplainerSrc(true), 1200);
+    return () => window.clearTimeout(t);
+  }, [isMobile, playing, shouldAttachExplainerSrc]);
 
   const tryPrimeExplainerStaticFrame = useCallback(
     (v: HTMLVideoElement) => {
@@ -135,15 +157,9 @@ export default function HeroSection({
 
         if (!visibleEnough) {
           setPlaying(false);
-          setExplainerPreload("metadata");
           const v = explainerRef.current;
           if (v) {
             v.pause();
-            try {
-              v.preload = "metadata";
-            } catch {
-              /* ignore */
-            }
             try {
               if (document.fullscreenElement === v) {
                 void document.exitFullscreen();
@@ -153,16 +169,6 @@ export default function HeroSection({
             }
           }
           document.documentElement.removeAttribute("data-hero-vsl-heavy");
-        } else {
-          setExplainerPreload("auto");
-          const v = explainerRef.current;
-          if (v) {
-            try {
-              v.preload = "auto";
-            } catch {
-              /* ignore */
-            }
-          }
         }
       },
       {
@@ -200,6 +206,7 @@ export default function HeroSection({
     if (explainerFailed) return;
     const v = explainerRef.current;
     if (!v) return;
+    if (!shouldAttachExplainerSrc) return;
     if (!playing) {
       v.pause();
       return;
@@ -209,11 +216,7 @@ export default function HeroSection({
     if (v.paused) {
       void v.play().catch(() => {});
     }
-  }, [playing, explainerFailed, EXPLAINER_MP4]);
-
-  useEffect(() => {
-    if (playing) setExplainerPreload("auto");
-  }, [playing]);
+  }, [playing, explainerFailed, EXPLAINER_MP4, shouldAttachExplainerSrc]);
 
   const togglePlay = useCallback(() => {
     const v = explainerRef.current;
@@ -233,6 +236,9 @@ export default function HeroSection({
     // One-tap start across devices: mark intent immediately and retry with muted fallback if needed.
     primeExplainerFrameRef.current = false;
     setExplainerHasPlayed(true);
+    if (!shouldAttachExplainerSrc) {
+      setShouldAttachExplainerSrc(true);
+    }
     setPlaying(true);
     const start = async () => {
       try {
@@ -252,7 +258,7 @@ export default function HeroSection({
       }
     };
     void start();
-  }, [playing, startedMuted, explainerFailed]);
+  }, [playing, startedMuted, explainerFailed, shouldAttachExplainerSrc]);
 
   const enterFullscreen = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -350,85 +356,43 @@ export default function HeroSection({
   return (
     <section
       ref={sectionRef}
-      className="landing-section-y--hero landing-hero-viewport-height"
       style={{
-        position: "relative", zIndex: 10,
+        position: "relative", zIndex: 10, minHeight: "100vh",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        overflow: "hidden",
+        padding: "120px 24px 80px", overflow: "hidden",
       }}
     >
-      <div
-        aria-hidden="true"
-        style={{ position: "absolute", inset: 0, zIndex: 0, overflow: "hidden" }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage: "url('/hero-static-bg.png')",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "rgba(5, 5, 8, 0.34)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: "26%",
-            background: "linear-gradient(to bottom, rgba(5,5,8,0.45), transparent)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: "42%",
-            background: "linear-gradient(to top, rgba(5,5,8,0.9) 0%, rgba(5,5,8,0.45) 54%, transparent 100%)",
-          }}
-        />
+      {/* Static background like other sections (no video wallpaper). */}
+      <div style={{ position: "absolute", inset: 0, zIndex: 0, overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 20% 10%, rgba(0,212,255,0.08) 0%, transparent 42%), radial-gradient(ellipse at 80% 20%, rgba(168,85,247,0.10) 0%, transparent 45%), #050508" }} />
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "45%", background: "linear-gradient(to top, #050508 0%, rgba(5,5,8,0.7) 50%, transparent 100%)" }} />
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "25%", background: "linear-gradient(to bottom, rgba(5,5,8,0.4), transparent)" }} />
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at center, transparent 50%, rgba(5,5,8,0.5) 100%)" }} />
       </div>
 
-      {/* Content: naslov/forma uži; VSL punom širinom shell-a (bolje na velikim monitorima). */}
-      <div className="section-container" style={{ textAlign: "center", position: "relative", zIndex: 2 }}>
-        <div
-          className="landing-measure-copy landing-hero-headline-copy"
+      {/* Content */}
+      <div
+        style={{ textAlign: "center", maxWidth: 720, margin: "0 auto", width: "100%", position: "relative", zIndex: 2 }}
+      >
+        <h1
+          className="hero-headline"
           style={{
-            position: "relative",
-            zIndex: 3,
-            transform: "translateY(clamp(-10px, -1.35vw, -24px))",
+            fontSize: "clamp(24px, 4.5vw, 44px)", fontWeight: 800, color: "#fff",
+            lineHeight: 1.15, marginBottom: 32,
+            textShadow: "0 2px 40px rgba(0,0,0,0.5), 0 0 80px rgba(0,212,255,0.1)",
           }}
         >
-          <h1
-            className="hero-headline landing-hero-title"
-            style={{
-              marginBottom: 40,
-            }}
-          >
-            <span className="hero-headline-line">
-              Počni da koristiš AI, pre nego što bude kasno.
-            </span>
-            <span className="gradient-text hero-headline-line" style={{ marginTop: "0.28em" }}>
-              Prijavi se odmah.
-            </span>
-          </h1>
-        </div>
+          <span className="hero-headline-line">
+            Počni da koristiš AI, pre nego što bude kasno.
+          </span>
+          <span className="gradient-text hero-headline-line" style={{ marginTop: "0.35em" }}>
+            Prijavi se odmah.
+          </span>
+        </h1>
 
-        {/* 1. VSL video — prvo (niži z-index od naslova da glow ne prekriva tekst) */}
+        {/* 1. VSL video — prvo */}
         <div
-          className="hero-vsl-outer"
-          style={{ marginBottom: 32, position: "relative", zIndex: 1 }}
+          style={{ marginBottom: 32, position: "relative" }}
           onMouseEnter={() => setHovering(true)}
           onMouseLeave={() => setHovering(false)}
         >
@@ -445,9 +409,7 @@ export default function HeroSection({
               background: explainerHasPlayed
                 ? "linear-gradient(145deg, #12182a 0%, #0a0d18 45%, #050508 100%)"
                 : "transparent",
-              border: "1px solid rgba(168,85,247,0.46)",
-              boxShadow:
-                "0 0 0 1px rgba(168,85,247,0.14) inset, 0 0 28px rgba(168,85,247,0.34), 0 0 72px rgba(168,85,247,0.18)",
+              border: "1px solid rgba(0,212,255,0.2)",
             }}
           >
             {/* Pauza: muted pomaže iOS/WebKit da prikaže prvi kadar; u reprodukciji zvuk je uključen (muted={!playing}). */}
@@ -455,10 +417,10 @@ export default function HeroSection({
               key={EXPLAINER_MP4}
               ref={explainerRef}
               className="hero-vsl-explainer-video"
-              src={EXPLAINER_MP4}
+              src={shouldAttachExplainerSrc ? EXPLAINER_MP4 : undefined}
               playsInline
               muted={!playing || startedMuted}
-              preload={explainerPreload}
+              preload={shouldAttachExplainerSrc ? (isMobile ? "metadata" : "auto") : "none"}
               disableRemotePlayback
               onLoadedMetadata={(e) => {
                 if (!primeExplainerFrameRef.current) return;
@@ -655,19 +617,17 @@ export default function HeroSection({
           </div>
         </div>
 
-        <div className="landing-measure-copy">
-          {/* 2. Email forma — ispod videa */}
-          <div id="hero-email-form" style={{ marginBottom: 32, scrollMarginTop: 100 }}>
-            <EmailForm variant="hero" />
-          </div>
-
-          {/* 3. Tajmer — na produkciji uključen po defaultu; isključi NEXT_PUBLIC_HERO_COUNTDOWN=false */}
-          {isHeroCountdownEnabled() ? (
-            <div style={{ marginBottom: 36 }}>
-              <CountdownTimer targetDate={TARGET_DATE} />
-            </div>
-          ) : null}
+        {/* 2. Email forma — ispod videa */}
+        <div id="hero-email-form" style={{ marginBottom: 32, scrollMarginTop: 100 }}>
+          <EmailForm variant="hero" />
         </div>
+
+        {/* 3. Tajmer — na produkciji uključen po defaultu; isključi NEXT_PUBLIC_HERO_COUNTDOWN=false */}
+        {isHeroCountdownEnabled() ? (
+          <div style={{ marginBottom: 36 }}>
+            <CountdownTimer targetDate={TARGET_DATE} />
+          </div>
+        ) : null}
       </div>
     </section>
   );
