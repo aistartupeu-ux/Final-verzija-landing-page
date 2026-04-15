@@ -144,6 +144,8 @@ const VideoCard = memo(function VideoCard({
   hoverLoop = false,
   autoPlayActive = false,
   allowAutoPlay = true,
+  disableAutoLoop = false,
+  onAutoPlayEnded,
   showcaseBaseIndex,
   showcaseLoopSegment,
   registerShowcaseCard,
@@ -160,6 +162,8 @@ const VideoCard = memo(function VideoCard({
   hoverLoop?: boolean;
   autoPlayActive?: boolean;
   allowAutoPlay?: boolean;
+  disableAutoLoop?: boolean;
+  onAutoPlayEnded?: (baseIndex: number) => void;
   showcaseBaseIndex?: number;
   showcaseLoopSegment?: "first" | "second";
   registerShowcaseCard?: (baseIndex: number, segment: "first" | "second", el: HTMLDivElement | null) => void;
@@ -344,7 +348,7 @@ const VideoCard = memo(function VideoCard({
           ref={videoRef}
           src={videoSrc}
           muted
-          loop={shouldPlay}
+          loop={shouldPlay && !disableAutoLoop}
           playsInline
           disableRemotePlayback
           preload={videoPreload}
@@ -409,6 +413,11 @@ const VideoCard = memo(function VideoCard({
           onCanPlay={() => {
             setVideoHasRenderableFrame(true);
             if (!shouldPlay) videoRef.current?.pause();
+          }}
+          onEnded={() => {
+            if (autoPlayActive && onAutoPlayEnded && showcaseBaseIndex !== undefined) {
+              onAutoPlayEnded(showcaseBaseIndex);
+            }
           }}
           style={{
             width: "100%",
@@ -564,6 +573,7 @@ function VideoRow({
 
   const visibilityRef = useRef<Map<string, number>>(new Map());
   const [activePlayKeys, setActivePlayKeys] = useState<Set<string>>(() => new Set());
+  const [mobileLockedBaseKey, setMobileLockedBaseKey] = useState<string | null>(null);
 
   const flushActivePick = useCallback(() => {
     if (maxSlotsEffective <= 0) {
@@ -597,6 +607,22 @@ function VideoRow({
       }
     }
     const next = new Set(selected);
+    if (lightStrip && !mobilePosterOnly && maxSlotsEffective === 1) {
+      const rankedKeys = [...next];
+      const keepCurrent =
+        mobileLockedBaseKey !== null && rankedKeys.includes(mobileLockedBaseKey);
+      const resolvedKey = keepCurrent ? mobileLockedBaseKey : rankedKeys[0] ?? null;
+      setMobileLockedBaseKey(resolvedKey);
+      const mobileOnly = resolvedKey ? new Set([resolvedKey]) : new Set<string>();
+      setActivePlayKeys((prev) => {
+        if (prev.size !== mobileOnly.size) return mobileOnly;
+        for (const k of mobileOnly) {
+          if (!prev.has(k)) return mobileOnly;
+        }
+        return prev;
+      });
+      return;
+    }
     setActivePlayKeys((prev) => {
       if (prev.size !== next.size) return next;
       for (const k of next) {
@@ -604,7 +630,29 @@ function VideoRow({
       }
       return prev;
     });
-  }, [maxSlotsEffective, videos.length]);
+  }, [maxSlotsEffective, videos.length, lightStrip, mobilePosterOnly, mobileLockedBaseKey]);
+
+  const handleMobileAutoPlayEnded = useCallback(
+    (endedBaseIndex: number) => {
+      if (!lightStrip || mobilePosterOnly || maxSlotsEffective !== 1) return;
+      const endedKey = String(endedBaseIndex);
+      const ranked = [...visibilityRef.current.entries()]
+        .filter(([, ratio]) => ratio >= VISIBILITY_AUTOPLAY_MIN_H_FRAC)
+        .sort((a, b) => b[1] - a[1])
+        .map(([k]) => k);
+      const nextKey = ranked.find((k) => k !== endedKey) ?? endedKey;
+      setMobileLockedBaseKey(nextKey);
+      if (nextKey === endedKey) {
+        setActivePlayKeys(new Set());
+        requestAnimationFrame(() => {
+          setActivePlayKeys(new Set([nextKey]));
+        });
+        return;
+      }
+      setActivePlayKeys(new Set([nextKey]));
+    },
+    [lightStrip, mobilePosterOnly, maxSlotsEffective]
+  );
 
   const registerShowcaseCard = useCallback((baseIndex: number, segment: "first" | "second", el: HTMLDivElement | null) => {
     if (segment === "first") firstCopyRefs.current[baseIndex] = el;
@@ -756,6 +804,7 @@ function VideoRow({
     visibilityRef.current.clear();
     const id = globalThis.window.requestAnimationFrame(() => {
       setActivePlayKeys(new Set());
+      setMobileLockedBaseKey(null);
     });
     return () => globalThis.window.cancelAnimationFrame(id);
   }, [maxSlotsEffective]);
@@ -798,6 +847,7 @@ function VideoRow({
       setIsDesktopLike(next);
       visibilityRef.current.clear();
       setActivePlayKeys(new Set());
+      setMobileLockedBaseKey(null);
       setAttachedBaseKeys(new Set());
       setMobileAttachedSlotKeys(new Set());
     };
@@ -817,6 +867,7 @@ function VideoRow({
     if (!canAttachMedia || paused) {
       const id = globalThis.window.requestAnimationFrame(() => {
         setActivePlayKeys(new Set());
+        setMobileLockedBaseKey(null);
         setMobileAttachedSlotKeys(new Set());
       });
       return () => globalThis.window.cancelAnimationFrame(id);
@@ -1152,6 +1203,8 @@ function VideoRow({
                 hoverLoop={desktopHoverPlay}
                 autoPlayActive={allowAutoPlay && maxSlotsEffective > 0 && desktopActiveKey}
                 allowAutoPlay={allowAutoPlay}
+                disableAutoLoop={lightStrip && !mobilePosterOnly}
+                onAutoPlayEnded={lightStrip ? handleMobileAutoPlayEnded : undefined}
                 showcaseBaseIndex={baseIdx}
                 showcaseLoopSegment={showcaseLoopSegment}
                 registerShowcaseCard={registerShowcaseCard}
