@@ -28,9 +28,6 @@ const SocialProofSection = dynamic(() => import("@/components/sections/SocialPro
 const CourseStructureSection = dynamic(() => import("@/components/sections/CourseStructureSection"), {
   loading: sectionLoad,
 });
-const HowToEnterSection = dynamic(() => import("@/components/sections/HowToEnterSection"), {
-  loading: sectionLoad,
-});
 const FAQSection = dynamic(() => import("@/components/sections/FAQSection"), {
   loading: sectionLoad,
 });
@@ -58,8 +55,6 @@ function useLocalHeroMedia() {
 }
 
 export default function HomeLanding() {
-  const hideHowToEnterOnLocalhost = process.env.NODE_ENV === "development";
-  const hideSocialProofDividersOnLocalhost = process.env.NODE_ENV === "development";
   const heroFromPublic = useLocalHeroMedia();
   const heroMedia = heroFromPublic
     ? {
@@ -104,21 +99,9 @@ export default function HomeLanding() {
           <ViewportDeferredSection rootMargin="240px 0px 300px 0px">
             <CourseStructureSection />
           </ViewportDeferredSection>
-          {hideSocialProofDividersOnLocalhost ? null : <div className="section-divider section-divider--visible" />}
           <ViewportDeferredSection rootMargin="240px 0px 300px 0px">
             <SocialProofSection />
           </ViewportDeferredSection>
-          {hideHowToEnterOnLocalhost ? (
-            null
-          ) : (
-            <>
-              <div className="section-divider section-divider--visible" />
-              <ViewportDeferredSection rootMargin="240px 0px 300px 0px">
-                <HowToEnterSection />
-              </ViewportDeferredSection>
-              <div className="section-divider section-divider--visible" />
-            </>
-          )}
           <ViewportDeferredSection rootMargin="240px 0px 320px 0px">
             <FAQSection />
           </ViewportDeferredSection>

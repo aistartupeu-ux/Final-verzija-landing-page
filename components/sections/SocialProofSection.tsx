@@ -84,7 +84,7 @@ const ticks = [
 const SOCIAL_PROOF_INVIEW_THRESHOLDS = [0, 0.15, 0.35, 0.55, 0.75, 1] as const;
 
 export default function SocialProofSection() {
-  const hideSocialProofCtaOnLocalhost = process.env.NODE_ENV === "development";
+  const showSocialProofCta = process.env.NEXT_PUBLIC_SOCIAL_PROOF_CTA === "true";
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, {
     once: false,
@@ -139,7 +139,7 @@ export default function SocialProofSection() {
         position: "relative",
         zIndex: 10,
         overflow: "hidden",
-        padding: hideSocialProofCtaOnLocalhost ? "0" : undefined,
+        padding: "0",
       }}
     >
 
@@ -150,7 +150,7 @@ export default function SocialProofSection() {
           borderBottom: "1px solid rgba(255,255,255,0.05)",
           background:   "rgba(255,255,255,0.015)",
           padding: "14px 0",
-          marginBottom: hideSocialProofCtaOnLocalhost ? 0 : "clamp(2.5rem, 8vw, 5rem)",
+          marginBottom: 0,
           maskImage:        "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
           WebkitMaskImage:  "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
           overflow: "hidden",
@@ -191,7 +191,7 @@ export default function SocialProofSection() {
         </div>
       </div>
 
-      {hideSocialProofCtaOnLocalhost ? null : (
+      {showSocialProofCta ? (
       <div className="section-container" style={{ textAlign: "center", position: "relative" }}>
 
         {heavyOk ? (
@@ -297,7 +297,7 @@ export default function SocialProofSection() {
           </div>
         </div>
       </div>
-      )}
+      ) : null}
     </section>
   );
 }
