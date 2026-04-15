@@ -139,7 +139,7 @@ function getShowcaseDesktopLike(): boolean {
  */
 const VideoCard = memo(function VideoCard({
   src,
-  fallbackVideoSrc,
+  mp4FallbackSrc,
   posterUrl,
   reduced,
   sectionInView,
@@ -155,7 +155,7 @@ const VideoCard = memo(function VideoCard({
   posterLoading = "lazy",
 }: Readonly<{
   src: string;
-  fallbackVideoSrc?: string;
+  mp4FallbackSrc?: string;
   posterUrl: string;
   reduced: boolean;
   sectionInView: boolean;
@@ -337,14 +337,14 @@ const VideoCard = memo(function VideoCard({
           preload="auto"
           onError={() => {
             if (
-              fallbackVideoSrc &&
+              mp4FallbackSrc &&
               !triedFallbackRef.current &&
-              videoSrc !== fallbackVideoSrc
+              videoSrc !== mp4FallbackSrc
             ) {
               triedFallbackRef.current = true;
               errorRetries.current = 0;
               setVideoHasRenderableFrame(false);
-              setVideoSrc(fallbackVideoSrc);
+              setVideoSrc(mp4FallbackSrc);
               return;
             }
             if (errorRetries.current >= 1) {
@@ -480,7 +480,8 @@ const VideoCard = memo(function VideoCard({
 
 function VideoRow({
   videos,
-  fallbackVideoSrc,
+  posterSrcByBaseIndex,
+  mp4SrcByBaseIndex,
   paused = false,
   reduced,
   sectionInView,
@@ -489,7 +490,8 @@ function VideoRow({
   maxConcurrentAutoplayMobile = DEFAULT_MAX_AUTOPLAY_MOBILE,
 }: Readonly<{
   videos: string[];
-  fallbackVideoSrc?: string;
+  posterSrcByBaseIndex?: readonly string[];
+  mp4SrcByBaseIndex?: readonly string[];
   paused?: boolean;
   reduced: boolean;
   sectionInView: boolean;
@@ -1118,7 +1120,8 @@ function VideoRow({
             const baseKey = String(baseIdx);
             const showcaseLoopSegment: "first" | "second" =
               i < videos.length ? "first" : "second";
-            const posterUrl = posterUrlFromVideoUrl(videoSrc);
+            const posterUrl = posterSrcByBaseIndex?.[baseIdx] ?? posterUrlFromVideoUrl(videoSrc);
+            const mp4FallbackSrc = mp4SrcByBaseIndex?.[baseIdx];
             const desktopActiveKey = activePlayKeys.has(baseKey);
             const manualSrcAttached = lightStrip
               ? mobileVideoSlotKey === mobileVideoAttachKey(showcaseLoopSegment, baseIdx)
@@ -1129,7 +1132,7 @@ function VideoRow({
               <VideoCard
                 key={`${videoSrc}-${i}`}
                 src={videoSrc}
-                fallbackVideoSrc={fallbackVideoSrc}
+                mp4FallbackSrc={mp4FallbackSrc}
                 posterUrl={posterUrl}
                 reduced={reduced}
                 sectionInView={sectionInView}
@@ -1184,12 +1187,15 @@ function VideoRow({
 
 export default function VideoShowcaseSection({
   videoSrcs = DEFAULT_SHOWCASE_VIDEOS,
-  fallbackVideoSrc,
+  posterSrcs,
+  mp4Srcs,
 }: Readonly<{
   /** URL-ovi klipova za jednu horizontalnu traku (duplirana sekvenca u komponenti radi seamless loop-a). */
   videoSrcs?: string[];
-  /** Rezervni video koji se prikazuje ako određeni showcase video nije dostupan. */
-  fallbackVideoSrc?: string;
+  /** Potpisani/postojeci poster URL-ovi po istom redosledu kao `videoSrcs`. */
+  posterSrcs?: string[];
+  /** Opcioni MP4 fallback URL-ovi po istom redosledu kao `videoSrcs` (iOS/Safari). */
+  mp4Srcs?: string[];
 }>) {
   const stripVideos = videoSrcs;
   const ref = useRef(null);
@@ -1240,13 +1246,13 @@ export default function VideoShowcaseSection({
     for (let i = 0; i < warmCount; i += 1) {
       const src = stripVideos[i];
       if (!src) continue;
-      const poster = posterUrlFromVideoUrl(src);
+      const poster = posterSrcs?.[i] ?? posterUrlFromVideoUrl(src);
       const img = new globalThis.Image();
       img.decoding = "async";
       img.fetchPriority = i < 3 ? "high" : "auto";
       img.src = poster;
     }
-  }, [canAttachMedia, stripVideos]);
+  }, [canAttachMedia, stripVideos, posterSrcs]);
 
   return (
     <section
@@ -1306,7 +1312,8 @@ export default function VideoShowcaseSection({
       >
         <VideoRow
           videos={stripVideos}
-          fallbackVideoSrc={fallbackVideoSrc}
+          posterSrcByBaseIndex={posterSrcs}
+          mp4SrcByBaseIndex={mp4Srcs}
           paused={pauseMarquee}
           reduced={reduced}
           sectionInView={sectionInView}

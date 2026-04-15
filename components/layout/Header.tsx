@@ -8,6 +8,7 @@ import Image from "next/image";
 const NAV_SECTIONS = ["blog", "kako-funkcionise"];
 const GIVEAWAY_PREFIXES = ["/giveaway", "/promo/giveaway-10-mesta"];
 const LEAD_MAGNET_PREFIXES = ["/free-guide", "/promo/lead-magnet"];
+const SKOOL_ABOUT_URL = "https://www.skool.com/ai-hype-academy/about";
 
 function pathMatchesPrefixes(pathname: string, prefixes: string[]): boolean {
   return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -68,13 +69,9 @@ export default function Header() {
     };
   }, []);
 
-  const jump = () => {
+  const goToSkool = () => {
     setOpen(false);
-    if (hideHomeSectionNav) {
-      window.location.assign("/#final-cta");
-      return;
-    }
-    document.getElementById("final-cta")?.scrollIntoView({ behavior: "smooth" });
+    window.open(SKOOL_ABOUT_URL, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -136,7 +133,7 @@ export default function Header() {
               </a>
             ))}
           <button
-            onClick={jump}
+            onClick={goToSkool}
             className={usePromoHeaderVariant ? "glow-btn glow-btn--giveaway" : "glow-btn"}
             style={{ padding: "10px 24px", fontSize: 12, borderRadius: 10 }}
           >
@@ -158,7 +155,7 @@ export default function Header() {
             </>
           )}
           <button
-            onClick={jump}
+            onClick={goToSkool}
             className={usePromoHeaderVariant ? "glow-btn glow-btn--giveaway" : "glow-btn"}
             style={{ width: "100%", marginTop: 12, borderRadius: 10, fontFamily: "inherit" }}
           >

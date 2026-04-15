@@ -64,6 +64,12 @@ export default function HomeLanding() {
         explainerMp4: getServerCdnUrl(CDN_PATH_EXPLAINER_MP4, undefined, CDN_EXPLAINER_CACHE_TAG),
       };
   const showcaseUrls = CDN_PATH_SHOWCASE_VIDEOS.map((p) => getServerCdnUrl(p));
+  const showcasePosterUrls = CDN_PATH_SHOWCASE_VIDEOS.map((p) =>
+    getServerCdnUrl(p.replace(/\.webm$/i, ".webp"))
+  );
+  const showcaseMp4Urls = CDN_PATH_SHOWCASE_VIDEOS.map((p) =>
+    getServerCdnUrl(p.replace(/\.webm$/i, ".mp4"))
+  );
 
   return (
     <div className="lp-landing-apple" style={{ position: "relative", minHeight: "100vh" }}>
@@ -91,7 +97,8 @@ export default function HomeLanding() {
           <ViewportDeferredSection rootMargin="160px 0px 240px 0px">
             <VideoShowcaseSection
               videoSrcs={showcaseUrls}
-              fallbackVideoSrc={heroMedia.explainerMp4}
+              posterSrcs={showcasePosterUrls}
+              mp4Srcs={showcaseMp4Urls}
             />
           </ViewportDeferredSection>
           <div className="section-divider section-divider--visible" />
