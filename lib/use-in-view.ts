@@ -9,6 +9,11 @@ type UseInViewOptions = {
   /** 0–1: smatra se u kadru kad je intersectionRatio >= amount (približno kao framer-motion). */
   amount?: number;
   margin?: string;
+  /**
+   * Prilagođeni pragovi za IntersectionObserver. Podrazumevano je gust niz (više callback-ova pri skrolu).
+   * Za „teške” sekcije prosledi retke pragove npr. [0, 0.16, 0.5, 1] da smanjiš setState tokom skrola.
+   */
+  thresholds?: readonly number[];
 };
 
 /**
@@ -18,12 +23,14 @@ export function useInView<T extends Element>(
   ref: RefObject<T | null>,
   options?: UseInViewOptions
 ): boolean {
-  const { once = false, amount = 0, margin = "0px" } = options ?? {};
+  const { once = false, amount = 0, margin = "0px", thresholds } = options ?? {};
   const [inView, setInView] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+
+    const thresholdList = thresholds ?? THRESHOLDS;
 
     const io = new IntersectionObserver(
       ([entry]) => {
@@ -36,12 +43,12 @@ export function useInView<T extends Element>(
           setInView(false);
         }
       },
-      { root: null, rootMargin: margin, threshold: THRESHOLDS }
+      { root: null, rootMargin: margin, threshold: [...thresholdList] }
     );
 
     io.observe(el);
     return () => io.disconnect();
-  }, [ref, once, amount, margin]);
+  }, [ref, once, amount, margin, thresholds]);
 
   return inView;
 }
