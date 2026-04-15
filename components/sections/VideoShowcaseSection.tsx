@@ -144,8 +144,6 @@ const VideoCard = memo(function VideoCard({
   hoverLoop = false,
   autoPlayActive = false,
   allowAutoPlay = true,
-  disableAutoLoop = false,
-  onAutoPlayEnded,
   showcaseBaseIndex,
   showcaseLoopSegment,
   registerShowcaseCard,
@@ -162,8 +160,6 @@ const VideoCard = memo(function VideoCard({
   hoverLoop?: boolean;
   autoPlayActive?: boolean;
   allowAutoPlay?: boolean;
-  disableAutoLoop?: boolean;
-  onAutoPlayEnded?: (baseIndex: number) => void;
   showcaseBaseIndex?: number;
   showcaseLoopSegment?: "first" | "second";
   registerShowcaseCard?: (baseIndex: number, segment: "first" | "second", el: HTMLDivElement | null) => void;
@@ -348,7 +344,7 @@ const VideoCard = memo(function VideoCard({
           ref={videoRef}
           src={videoSrc}
           muted
-          loop={shouldPlay && !disableAutoLoop}
+          loop={shouldPlay}
           playsInline
           disableRemotePlayback
           preload={videoPreload}
@@ -413,11 +409,6 @@ const VideoCard = memo(function VideoCard({
           onCanPlay={() => {
             setVideoHasRenderableFrame(true);
             if (!shouldPlay) videoRef.current?.pause();
-          }}
-          onEnded={() => {
-            if (autoPlayActive && onAutoPlayEnded && showcaseBaseIndex !== undefined) {
-              onAutoPlayEnded(showcaseBaseIndex);
-            }
           }}
           style={{
             width: "100%",
@@ -631,28 +622,6 @@ function VideoRow({
       return prev;
     });
   }, [maxSlotsEffective, videos.length, lightStrip, mobilePosterOnly, mobileLockedBaseKey]);
-
-  const handleMobileAutoPlayEnded = useCallback(
-    (endedBaseIndex: number) => {
-      if (!lightStrip || mobilePosterOnly || maxSlotsEffective !== 1) return;
-      const endedKey = String(endedBaseIndex);
-      const ranked = [...visibilityRef.current.entries()]
-        .filter(([, ratio]) => ratio >= VISIBILITY_AUTOPLAY_MIN_H_FRAC)
-        .sort((a, b) => b[1] - a[1])
-        .map(([k]) => k);
-      const nextKey = ranked.find((k) => k !== endedKey) ?? endedKey;
-      setMobileLockedBaseKey(nextKey);
-      if (nextKey === endedKey) {
-        setActivePlayKeys(new Set());
-        requestAnimationFrame(() => {
-          setActivePlayKeys(new Set([nextKey]));
-        });
-        return;
-      }
-      setActivePlayKeys(new Set([nextKey]));
-    },
-    [lightStrip, mobilePosterOnly, maxSlotsEffective]
-  );
 
   const registerShowcaseCard = useCallback((baseIndex: number, segment: "first" | "second", el: HTMLDivElement | null) => {
     if (segment === "first") firstCopyRefs.current[baseIndex] = el;
@@ -1067,7 +1036,8 @@ function VideoRow({
   const marqueeDurationSec =
     (SHOWCASE_MARQUEE_BASE_S + videos.length * SHOWCASE_MARQUEE_PER_CARD_S) *
     (lightStrip ? MOBILE_MARQUEE_SLOWDOWN_FACTOR : 1);
-  const marqueeRunning = !reduced && canAttachMedia && !paused;
+  const freezeMobileMarquee = lightStrip && activePlayKeys.size > 0;
+  const marqueeRunning = !reduced && canAttachMedia && !paused && !freezeMobileMarquee;
 
   useLayoutEffect(() => {
     if (isDesktopLike) return;
@@ -1203,8 +1173,6 @@ function VideoRow({
                 hoverLoop={desktopHoverPlay}
                 autoPlayActive={allowAutoPlay && maxSlotsEffective > 0 && desktopActiveKey}
                 allowAutoPlay={allowAutoPlay}
-                disableAutoLoop={lightStrip && !mobilePosterOnly}
-                onAutoPlayEnded={lightStrip ? handleMobileAutoPlayEnded : undefined}
                 showcaseBaseIndex={baseIdx}
                 showcaseLoopSegment={showcaseLoopSegment}
                 registerShowcaseCard={registerShowcaseCard}
