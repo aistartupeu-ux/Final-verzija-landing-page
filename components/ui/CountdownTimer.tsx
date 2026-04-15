@@ -21,7 +21,7 @@ export default function CountdownTimer({
   label?: string;
   theme?: CountdownTheme;
 }) {
-  const [defaultEndMs] = useState(() => Date.now() + 86400000);
+  const [defaultEndMs] = useState(() => new Date("2026-04-16T00:00:00+02:00").getTime());
   const resolvedTarget = targetDate ?? target ?? new Date(defaultEndMs);
   const targetMs = resolvedTarget.getTime();
   const safeTargetMs = Number.isFinite(targetMs) ? targetMs : defaultEndMs;
