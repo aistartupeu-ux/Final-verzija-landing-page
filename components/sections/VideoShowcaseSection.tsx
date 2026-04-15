@@ -62,7 +62,7 @@ const SHOWCASE_INVIEW_THRESHOLDS = [0, 0.16, 0.35, 0.55, 0.75, 1] as const;
  * — Kandidat sa bilo kakvim presekom ulazi u igru (ivica u kadru = počinje učitavanje u sledećem tick-u).
  */
 /** Koliko često biramo aktivni slot na touch / tablet traci (marquee). */
-const MOBILE_VIDEO_PICK_MS = 200;
+const MOBILE_VIDEO_PICK_MS = 420;
 /** Trajanje jednog kruga automatske trake (s); skalira se sa brojem klipova. */
 const SHOWCASE_MARQUEE_BASE_S = 38;
 const SHOWCASE_MARQUEE_PER_CARD_S = 3.2;
@@ -83,6 +83,9 @@ const MOBILE_NEAR_ATTACH_MARGIN = "920px 0px 980px 0px";
 const DEFAULT_NEAR_ATTACH_MARGIN = "340px 0px 360px 0px";
 const MOBILE_VISIBILITY_POLL_MS = 360;
 const MOBILE_ATTACH_PREFETCH_PX = 140;
+const MOBILE_MAX_ATTACHED_SLOTS = 1;
+const MOBILE_MARQUEE_SLOWDOWN_FACTOR = 1.45;
+const MOBILE_POSTER_ONLY_MODE = true;
 
 /** Jedinstven ključ za koju fizičku karticu (prva ili druga kopija u loop-u) drži `<video src>` na mobilnom. */
 function mobileVideoAttachKey(segment: "first" | "second", baseIdx: number): string {
@@ -528,6 +531,7 @@ function VideoRow({
 }>) {
   const [isDesktopLike, setIsDesktopLike] = useState(() => getShowcaseDesktopLike());
   const lightStrip = !isDesktopLike;
+  const mobilePosterOnly = lightStrip && MOBILE_POSTER_ONLY_MODE;
   const isDesktopLikeRef = useRef(isDesktopLike);
   const lightStripRef = useRef(lightStrip);
   useEffect(() => {
@@ -553,7 +557,9 @@ function VideoRow({
   const maxSlotsEffective = reduced
     ? 0
     : lightStrip
-      ? Math.max(0, maxConcurrentAutoplayMobile)
+      ? mobilePosterOnly
+        ? 0
+        : Math.max(0, maxConcurrentAutoplayMobile)
       : Math.max(0, maxConcurrentAutoplayDesktop);
 
   const visibilityRef = useRef<Map<string, number>>(new Map());
@@ -608,20 +614,40 @@ function VideoRow({
   /** Touch / tablet: jedan `<video src>`; prefetch zona širi root da se slot bira pre ulaska kartice u kadar. */
   const pickMobileVideoSlot = useCallback(() => {
     if (!lightStrip || reduced || !canAttachMedia) return;
+    if (mobilePosterOnly) {
+      setMobileAttachedSlotKeys(new Set());
+      return;
+    }
     const root = scrollRef.current;
     if (!root) return;
     const px = MOBILE_ATTACH_PREFETCH_PX;
-    const nextSlots = new Set<string>();
+    const candidates: Array<{ key: string; overlap: number }> = [];
     for (let i = 0; i < videos.length; i += 1) {
       const a = firstCopyRefs.current[i];
       const b = secondCopyRefs.current[i];
-      if (a && horizontalOverlapWithPrefetchPx(a, root, px) > 0) {
-        nextSlots.add(mobileVideoAttachKey("first", i));
+      if (a) {
+        const overlapA = horizontalOverlapWithPrefetchPx(a, root, px);
+        if (overlapA > 0) {
+          candidates.push({
+            key: mobileVideoAttachKey("first", i),
+            overlap: overlapA,
+          });
+        }
       }
-      if (b && horizontalOverlapWithPrefetchPx(b, root, px) > 0) {
-        nextSlots.add(mobileVideoAttachKey("second", i));
+      if (b) {
+        const overlapB = horizontalOverlapWithPrefetchPx(b, root, px);
+        if (overlapB > 0) {
+          candidates.push({
+            key: mobileVideoAttachKey("second", i),
+            overlap: overlapB,
+          });
+        }
       }
     }
+    candidates.sort((x, y) => y.overlap - x.overlap);
+    const nextSlots = new Set(
+      candidates.slice(0, MOBILE_MAX_ATTACHED_SLOTS).map((candidate) => candidate.key)
+    );
     setMobileAttachedSlotKeys((prev) => {
       if (prev.size !== nextSlots.size) return nextSlots;
       for (const key of nextSlots) {
@@ -629,7 +655,7 @@ function VideoRow({
       }
       return prev;
     });
-  }, [lightStrip, reduced, canAttachMedia, videos.length]);
+  }, [lightStrip, reduced, canAttachMedia, videos.length, mobilePosterOnly]);
 
   const mobilePickRafRef = useRef(0);
   const scheduleMobileVideoPick = useCallback(() => {
@@ -972,7 +998,14 @@ function VideoRow({
       ro.disconnect();
       if (roRaf) cancelAnimationFrame(roRaf);
     };
-  }, [videos.length, reduced, canAttachMedia, attachVisibleDesktopCards, pickMobileVideoSlot]);
+  }, [
+    videos.length,
+    reduced,
+    canAttachMedia,
+    attachVisibleDesktopCards,
+    pickMobileVideoSlot,
+    mobilePosterOnly,
+  ]);
 
   useLayoutEffect(() => {
     if (!lightStrip || reduced || !canAttachMedia) return;
@@ -981,7 +1014,8 @@ function VideoRow({
   }, [lightStrip, reduced, canAttachMedia, videos.length, pickMobileVideoSlot]);
 
   const marqueeDurationSec =
-    SHOWCASE_MARQUEE_BASE_S + videos.length * SHOWCASE_MARQUEE_PER_CARD_S;
+    (SHOWCASE_MARQUEE_BASE_S + videos.length * SHOWCASE_MARQUEE_PER_CARD_S) *
+    (lightStrip ? MOBILE_MARQUEE_SLOWDOWN_FACTOR : 1);
   const marqueeRunning = !reduced && canAttachMedia && !paused;
 
   useLayoutEffect(() => {
@@ -1092,7 +1126,9 @@ function VideoRow({
             const mobileSlotKey = mobileVideoAttachKey(showcaseLoopSegment, baseIdx);
             const mobileCardAttached = mobileAttachedSlotKeys.has(mobileSlotKey);
             const manualSrcAttached = lightStrip
-              ? mobileCardAttached
+              ? mobilePosterOnly
+                ? false
+                : mobileCardAttached
               : desktopSrcKeys.has(baseKey) || desktopActiveKey;
             const posterLoading: "eager" | "lazy" = lightStrip
               ? mobileCardAttached
@@ -1111,7 +1147,7 @@ function VideoRow({
                 posterUrl={posterUrl}
                 reduced={reduced}
                 sectionInView={sectionInView}
-                canAttach={canAttachMedia}
+                canAttach={mobilePosterOnly ? false : canAttachMedia}
                 manualSrcAttached={manualSrcAttached}
                 hoverLoop={desktopHoverPlay}
                 autoPlayActive={allowAutoPlay && maxSlotsEffective > 0 && desktopActiveKey}
@@ -1227,7 +1263,7 @@ export default function VideoShowcaseSection({
   // Hero "heavy" više ne gasi showcase skroz, već samo smanjujemo broj aktivnih slotova.
   const pauseMarquee = reduced || !canAttachMedia || !tabVisible;
   const desktopAutoplayBudget = heroVslHeavy ? 1 : 3;
-  const mobileAutoplayBudget = 2;
+  const mobileAutoplayBudget = 1;
   const postersWarmedRef = useRef(false);
   const videoMetadataWarmedRef = useRef(false);
 
@@ -1253,16 +1289,17 @@ export default function VideoShowcaseSection({
     if (!canWarmMediaEarly || stripVideos.length === 0) return;
     if (videoMetadataWarmedRef.current) return;
     if (!mobileLike) return;
+    if (MOBILE_POSTER_ONLY_MODE) return;
 
     videoMetadataWarmedRef.current = true;
-    const warmCount = Math.min(stripVideos.length, 2);
+    const warmCount = Math.min(stripVideos.length, 1);
     for (let i = 0; i < warmCount; i += 1) {
       const primary = stripVideos[i];
       if (!primary) continue;
       const fallbackMp4 = mp4Srcs?.[i];
       const warmSrc = fallbackMp4 ?? primary;
       const v = document.createElement("video");
-      v.preload = i === 0 ? "auto" : "metadata";
+      v.preload = "metadata";
       v.muted = true;
       v.playsInline = true;
       v.src = warmSrc;
