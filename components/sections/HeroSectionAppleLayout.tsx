@@ -2,19 +2,12 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Play, Pause, Maximize } from "lucide-react";
-import CountdownTimer from "@/components/ui/CountdownTimer";
-import EmailForm from "@/components/ui/EmailForm";
+import SkoolCtaButton from "@/components/ui/SkoolCtaButton";
 import { getCdnMediaUrl } from "@/lib/cdn-media";
-import { isHeroCountdownEnabled } from "@/lib/promo-landing-pages";
 import { CDN_PATH_EXPLAINER_MP4 } from "@/lib/video-cdn-paths";
 
 /** Watermark preko VSL preview-a — isti fajl kao header (`public/logo.png`), vizuelno beli + providan kao na mobilnom referenci. */
 const HERO_VSL_WATERMARK_SRC = "/logo.png";
-
-// Perioda giveawaya 2.–14. apr. 2026, Europe/Belgrade (CEST = UTC+2 u aprilu).
-// Tajmer do kraja 14. apr. = 15. apr. 00:00 lokalno. Isto za hero / giveaway LP.
-/** Prijave se zatvaraju 15. apr. 2026. u 15:00 (Beograd, CEST +02). */
-const TARGET_DATE = new Date("2026-04-15T15:00:00+02:00");
 
 /** Ispod ovog učestka hero sekcije u viewportu — pauziraj VSL, ugasi „heavy“ režim, izađi iz fullscreena. */
 const HERO_VISIBLE_MIN_RATIO = 0.1;
@@ -208,10 +201,6 @@ export default function HeroSectionAppleLayout({
       void v.play().catch(() => {});
     }
   }, [playing, explainerFailed, EXPLAINER_MP4]);
-
-  useEffect(() => {
-    if (playing) setExplainerPreload("auto");
-  }, [playing]);
 
   const togglePlay = useCallback(() => {
     const v = explainerRef.current;
@@ -654,17 +643,9 @@ export default function HeroSectionAppleLayout({
         </div>
 
         <div className="landing-measure-copy">
-          {/* 2. Email forma — ispod videa */}
-          <div id="hero-email-form" style={{ marginBottom: 32, scrollMarginTop: 100 }}>
-            <EmailForm variant="hero" />
+          <div style={{ marginTop: 14, marginBottom: 36 }}>
+            <SkoolCtaButton />
           </div>
-
-          {/* 3. Tajmer — na produkciji uključen po defaultu; isključi NEXT_PUBLIC_HERO_COUNTDOWN=false */}
-          {isHeroCountdownEnabled() ? (
-            <div style={{ marginBottom: 36 }}>
-              <CountdownTimer targetDate={TARGET_DATE} />
-            </div>
-          ) : null}
         </div>
       </div>
     </section>

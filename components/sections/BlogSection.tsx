@@ -6,6 +6,8 @@ import Image from "next/image";
 import { useInView } from "@/lib/use-in-view";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
+const BLOG_INVIEW_THRESHOLDS = [0, 0.08, 0.28, 0.5, 0.72, 1] as const;
+
 interface Article {
   id: string;
   badge: { icon: ReactNode; label: string; color: string; bg: string; border: string };
@@ -52,20 +54,20 @@ const articles: Article[] = [
     date: "2026",
     intro: (
       <>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
+        <p style={{ fontSize: 17, color: "rgba(245,245,247,0.55)", lineHeight: 1.55, marginBottom: 16 }}>
           <strong style={{ color: "#fff" }}>Trile</strong> je poznati muzičar sa Balkana i osnivač AI Hype Akademije. Godinama je aktivan na regionalnoj muzičkoj sceni i kroz svoje pesme je izgradio veliku publiku širom Balkana, sa milionima pregleda na spotovima i pesmama.
         </p>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 20 }}>
+        <p style={{ fontSize: 17, color: "rgba(245,245,247,0.55)", lineHeight: 1.55, marginBottom: 20 }}>
           Autor je hitova poput „Ciganka“, „Hugo“, „Feragamo“, „Moja Lelo“ i „Kaljinka“. Poznat je po autentičnom stilu i spremnosti da eksperimentiše i pomera granice u produkciji.
         </p>
       </>
     ),
     full: (
       <>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
+        <p style={{ fontSize: 17, color: "rgba(245,245,247,0.55)", lineHeight: 1.55, marginBottom: 16 }}>
           U poslednjih nekoliko godina intenzivno koristi veštačku inteligenciju u video i audio produkciji, koristeći AI alate za razvoj ideja, kreiranje vizuelnih stilova i unapređenje kvaliteta produkcije.
         </p>
-        <p style={{ fontSize: 15, color: "#999", lineHeight: 1.75, marginBottom: 16 }}>
+        <p style={{ fontSize: 17, color: "rgba(245,245,247,0.55)", lineHeight: 1.55, marginBottom: 16 }}>
           Iz tog iskustva nastala je <strong style={{ color: "#fff" }}>AI Hype Akademija</strong>. Cilj akademije je da pokaže ljudima kako uz pomoć AI alata mogu sami da prave muziku, video sadržaj i moderan digitalni sadržaj, čak i bez velikog produkcijskog tima.
         </p>
       </>
@@ -194,7 +196,7 @@ function ArticleCard({ article, active }: { article: Article; active: boolean })
 
       <div style={{ padding: "24px 24px 20px", flex: 1, display: "flex", flexDirection: "column" }}>
         <div style={{ fontSize: 11, color: "#555", marginBottom: 10 }}>{article.date}</div>
-        <h3 style={{ fontSize: "clamp(16px, 2.5vw, 22px)", fontWeight: 800, lineHeight: 1.3, marginBottom: 16, color: "#fff" }}>
+        <h3 style={{ fontSize: "clamp(17px, 2.5vw, 22px)", fontWeight: 600, lineHeight: 1.35, letterSpacing: "-0.02em", marginBottom: 16, color: "#f5f5f7" }}>
           {article.title}
         </h3>
 
@@ -241,25 +243,34 @@ function ArticleCard({ article, active }: { article: Article; active: boolean })
 
 export default function BlogSection() {
   const ref = useRef<HTMLElement>(null);
-  const inView = useInView(ref, { once: false, amount: 0.08, margin: "180px 0px 220px 0px" });
+  const inView = useInView(ref, {
+    once: false,
+    amount: 0.08,
+    margin: "180px 0px 220px 0px",
+    thresholds: BLOG_INVIEW_THRESHOLDS,
+  });
   const reduced = useReducedMotion();
   const iv = inView || reduced;
 
   return (
-    <section id="blog" ref={ref} className={reduced ? "sr-nomotion" : undefined} style={{ position: "relative", zIndex: 10, padding: "80px 24px 100px", contentVisibility: "auto", containIntrinsicSize: "auto 700px" }}>
+    <section
+      id="blog"
+      ref={ref}
+      className={`landing-section-y--compact${reduced ? " sr-nomotion" : ""}`}
+      style={{ position: "relative", zIndex: 10 }}
+    >
       <div className="section-container">
 
-        <div className={`sr-from-y sr-from-y-lg sr-ease ${iv ? "sr-inview" : ""}`} style={{ textAlign: "center", marginBottom: 48 }}>
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 8,
-            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: 50, padding: "6px 16px", marginBottom: 18,
-          }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#00d4ff", boxShadow: "0 0 6px #00d4ff" }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#aaa", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>Ko stoji iza AI Hype Akademije</span>
+        <div className={`landing-section-head sr-from-y sr-from-y-lg sr-ease ${iv ? "sr-inview" : ""}`}>
+          <div className="landing-eyebrow-pill landing-eyebrow-pill--muted">
+            <span
+              className="landing-eyebrow-dot landing-eyebrow-dot--muted"
+              style={{ background: "#00d4ff", boxShadow: "0 0 8px rgba(0,212,255,0.4)" }}
+            />
+            <span className="landing-eyebrow-pill-label">Ko stoji iza AI Hype Akademije</span>
           </div>
-          <h2 style={{ fontSize: "clamp(26px, 4vw, 42px)", fontWeight: 800, lineHeight: 1.15 }}>
-            Muzika, video i <span style={{ color: "#00d4ff" }}>AI eksperti</span>
+          <h2 className="landing-display">
+            Muzika, video i <span className="apple-accent-word">AI eksperti</span>
           </h2>
         </div>
 

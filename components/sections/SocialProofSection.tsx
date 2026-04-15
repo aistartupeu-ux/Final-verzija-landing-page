@@ -2,20 +2,19 @@
 
 import { useRef, useEffect, useState, type CSSProperties } from "react";
 import { Eye, Users, Play, BookOpen, Award, Zap } from "lucide-react";
+import SkoolCtaButton from "@/components/ui/SkoolCtaButton";
 import { useInView } from "@/lib/use-in-view";
 import { useDocumentHtmlDataFlag } from "@/lib/use-html-data-flag";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
-import { useWaitlistLiveCount } from "@/lib/use-waitlist-live-count";
 
 const START_DATE = new Date(2026, 2, 11, 0, 0, 0);
-/** Fallback dok API ne učita; stvarni broj = WAITLIST_DISPLAY_BASE + leads (vidi /api/public/waitlist-count). */
-const WAITLIST_FALLBACK = 9000;
+const START_VALUE = 1200;
 
-const COUNTDOWN_END = new Date(2026, 3, 15, 0, 0, 0);
+const COUNTDOWN_END = new Date(2026, 3, 16, 0, 0, 0);
 const BAR_START_PCT = 58;
 
 function getBarProgress(): number {
-  if (typeof window === "undefined") return BAR_START_PCT;
+  if (globalThis.window === undefined) return BAR_START_PCT;
   const now = Date.now();
   const start = START_DATE.getTime();
   const end = COUNTDOWN_END.getTime();
@@ -27,6 +26,52 @@ function getBarProgress(): number {
   return BAR_START_PCT + (100 - BAR_START_PCT) * raw;
 }
 
+function getDaysSinceStart(d: Date): number {
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const start = new Date(START_DATE.getFullYear(), START_DATE.getMonth(), START_DATE.getDate()).getTime();
+  return Math.floor((day - start) / 86400000);
+}
+
+function getDailyLimit(dayIndex: number): number {
+  const base = 350;
+  const spread = 251; // 350..600
+  return base + ((dayIndex * 7919 + 31) % spread);
+}
+
+function easeInOut(t: number): number {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+function getWaitlistCount(): number {
+  if (globalThis.window === undefined) return START_VALUE;
+  const now = new Date();
+  const daysSinceStart = getDaysSinceStart(now);
+  if (daysSinceStart < 0) return START_VALUE;
+
+  let baseAtMidnight = START_VALUE;
+  for (let i = 0; i < daysSinceStart; i++) {
+    baseAtMidnight += getDailyLimit(i);
+  }
+
+  const todayLimit = getDailyLimit(daysSinceStart);
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const progress = easeInOut((now.getTime() - midnight) / 86400000);
+  const todayAdded = Math.floor(progress * todayLimit);
+
+  const computed = baseAtMidnight + todayAdded;
+
+  try {
+    const key = "aha_waitlist_max_v2";
+    const storedRaw = globalThis.window.localStorage.getItem(key);
+    const stored = storedRaw ? Number.parseInt(storedRaw, 10) : Number.NaN;
+    const safe = Number.isFinite(stored) ? Math.max(computed, stored) : computed;
+    globalThis.window.localStorage.setItem(key, String(safe));
+    return safe;
+  } catch {
+    return computed;
+  }
+}
+
 const ticks = [
   { icon: Eye,      value: "2.1M+", label: "Pregleda",    color: "#00d4ff" },
   { icon: Users,    value: "48K+",  label: "Pratilaca",   color: "#a855f7" },
@@ -36,34 +81,48 @@ const ticks = [
   { icon: Zap,      value: "100%",  label: "Prakticno",   color: "#22c55e" },
 ];
 
+const SOCIAL_PROOF_INVIEW_THRESHOLDS = [0, 0.15, 0.35, 0.55, 0.75, 1] as const;
+
 export default function SocialProofSection() {
+  const hideSocialProofCtaOnLocalhost = process.env.NODE_ENV === "development";
   const ref = useRef<HTMLElement>(null);
-  const inView = useInView(ref, { once: false, amount: 0.15 });
+  const inView = useInView(ref, {
+    once: false,
+    amount: 0.15,
+    thresholds: SOCIAL_PROOF_INVIEW_THRESHOLDS,
+  });
   const reducedHook = useReducedMotion();
   const heroVslHeavy = useDocumentHtmlDataFlag("data-hero-vsl-heavy");
   const heavyOk = inView && !reducedHook && !heroVslHeavy;
 
-  const { display: waitlist } = useWaitlistLiveCount({ min: WAITLIST_FALLBACK, pollIntervalMs: 35_000 });
+  // Keep initial SSR and client render identical to avoid hydration mismatch.
+  const [waitlist, setWaitlist] = useState(START_VALUE);
   const [barProgress, setBarProgress] = useState(BAR_START_PCT);
 
   useEffect(() => {
-    const t = window.setTimeout(() => {
+    const t = globalThis.window.setTimeout(() => {
+      setWaitlist(getWaitlistCount());
       setBarProgress(getBarProgress());
     }, 0);
-    return () => window.clearTimeout(t);
+    return () => globalThis.window.clearTimeout(t);
   }, []);
 
   useEffect(() => {
-    const id = window.setInterval(() => setBarProgress(getBarProgress()), 60_000);
-    return () => window.clearInterval(id);
+    let t: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      setWaitlist(getWaitlistCount());
+      t = setTimeout(tick, 120000 + Math.random() * 120000);
+    };
+    t = setTimeout(tick, 60000 + Math.random() * 60000);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
-    const r = window.setTimeout(() => setBarProgress(getBarProgress()), 0);
+    const r = globalThis.window.setTimeout(() => setBarProgress(getBarProgress()), 0);
     const ms = heavyOk ? 1000 : 10000;
     const i = setInterval(() => setBarProgress(getBarProgress()), ms);
     return () => {
-      window.clearTimeout(r);
+      globalThis.window.clearTimeout(r);
       clearInterval(i);
     };
   }, [heavyOk]);
@@ -73,7 +132,16 @@ export default function SocialProofSection() {
   const iv = inView || reducedHook;
 
   return (
-    <section ref={ref} className={reducedHook ? "sr-nomotion" : undefined} style={{ position: "relative", zIndex: 10, padding: "80px 0 100px", overflow: "hidden", contentVisibility: "auto", containIntrinsicSize: "auto 600px" }}>
+    <section
+      ref={ref}
+      className={`landing-section-y--compact${reducedHook ? " sr-nomotion" : ""}`}
+      style={{
+        position: "relative",
+        zIndex: 10,
+        overflow: "hidden",
+        padding: hideSocialProofCtaOnLocalhost ? "0" : undefined,
+      }}
+    >
 
       <div
         className={`sr-fade sr-ease ${iv ? "sr-inview" : ""}`}
@@ -82,7 +150,7 @@ export default function SocialProofSection() {
           borderBottom: "1px solid rgba(255,255,255,0.05)",
           background:   "rgba(255,255,255,0.015)",
           padding: "14px 0",
-          marginBottom: 80,
+          marginBottom: hideSocialProofCtaOnLocalhost ? 0 : "clamp(2.5rem, 8vw, 5rem)",
           maskImage:        "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
           WebkitMaskImage:  "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)",
           overflow: "hidden",
@@ -98,8 +166,9 @@ export default function SocialProofSection() {
         <div className={`ticker-track${heavyOk ? " ticker-anim" : ""}`}>
           {tickItems.map((t, i) => {
             const Icon = t.icon;
+            const itemKey = `${t.label}-${t.value}-${i}`;
             return (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 28, paddingRight: 40, flexShrink: 0 }}>
+              <div key={itemKey} style={{ display: "flex", alignItems: "center", gap: 28, paddingRight: 40, flexShrink: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, whiteSpace: "nowrap" }}>
                   <div style={{
                     width: 30, height: 30, borderRadius: 9,
@@ -122,7 +191,8 @@ export default function SocialProofSection() {
         </div>
       </div>
 
-      <div style={{ textAlign: "center", position: "relative", padding: "0 24px" }}>
+      {hideSocialProofCtaOnLocalhost ? null : (
+      <div className="section-container" style={{ textAlign: "center", position: "relative" }}>
 
         {heavyOk ? (
           <div
@@ -137,14 +207,17 @@ export default function SocialProofSection() {
         ) : null}
 
         <div
-          className={`sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 24, position: "relative", transitionDelay: reducedHook ? "0s" : "0.1s" }}
+          className={`landing-eyebrow-pill landing-eyebrow-pill--green sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
+          style={{ marginBottom: 24, position: "relative", transitionDelay: reducedHook ? "0s" : "0.1s" }}
         >
           <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 10, height: 10 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", display: "block", position: "relative", zIndex: 1 }} />
+            <span
+              className="landing-eyebrow-dot--green"
+              style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", display: "block", position: "relative", zIndex: 1 }}
+            />
             {heavyOk ? <span className="sp-status-ping" style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(34,197,94,0.5)" }} /> : null}
           </span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#22c55e", textTransform: "uppercase" as const, letterSpacing: "0.18em" }}>Uzivo</span>
+          <span className="landing-eyebrow-pill-label" style={{ letterSpacing: "0.14em" }}>Uzivo</span>
         </div>
 
         <div
@@ -173,15 +246,15 @@ export default function SocialProofSection() {
         </div>
 
         <div
-          className={`sr-fade ${iv ? "sr-inview" : ""}`}
-          style={{ fontSize: "clamp(15px,2vw,18px)", color: "#666", marginBottom: 36, fontWeight: 400, "--sr-delay": reducedHook ? "0s" : "0.4s", "--sr-d": "0.5s" } as CSSProperties}
+          className={`landing-lede sr-fade ${iv ? "sr-inview" : ""}`}
+          style={{ fontSize: "clamp(16px,2vw,18px)", marginBottom: 36, "--sr-delay": reducedHook ? "0s" : "0.4s", "--sr-d": "0.5s" } as CSSProperties}
         >
-          osoba ceka na kurs
+          osoba čeka na kurs
         </div>
 
         <div
           className={`sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
-          style={{ maxWidth: 440, margin: "0 auto 32px", transitionDelay: reducedHook ? "0s" : "0.5s" }}
+          style={{ maxWidth: 440, marginLeft: "auto", marginRight: "auto", marginBottom: 32, transitionDelay: reducedHook ? "0s" : "0.5s" }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 12, color: "#555" }}>
             <span>Lista cekanja</span>
@@ -218,27 +291,13 @@ export default function SocialProofSection() {
           className={`sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
           style={{ transitionDelay: reducedHook ? "0s" : "0.65s" }}
         >
-          <a
-            href="#"
-            onClick={e => { e.preventDefault(); document.querySelector("input[type=email]")?.scrollIntoView({ behavior: "smooth", block: "center" }); }}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 8,
-              padding: "16px 44px", borderRadius: 14, fontSize: 15, fontWeight: 700,
-              background: "linear-gradient(135deg, #00d4ff, #7c3aed)",
-              color: "#fff", textDecoration: "none", cursor: "pointer",
-              boxShadow: "0 0 40px rgba(0,212,255,0.2), 0 0 80px rgba(124,58,237,0.1)",
-              transition: "transform .2s, box-shadow .2s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 6px 50px rgba(0,212,255,0.35), 0 0 80px rgba(124,58,237,0.2)"; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 0 40px rgba(0,212,255,0.2), 0 0 80px rgba(124,58,237,0.1)"; }}
-          >
-            Obezbedi svoje mesto
-          </a>
+          <SkoolCtaButton label="Udji u AI Hype Academy" />
           <div style={{ marginTop: 12, fontSize: 12, color: "#3a3a3a" }}>
-            Prijava traje 10 sekundi. Bez kreditne kartice.
+            Upis je otvoren danas.
           </div>
         </div>
       </div>
+      )}
     </section>
   );
 }

@@ -1,0 +1,185 @@
+/* Ekskluzivni bonusi — scoped modul (landing Apple tema) */
+
+.courseStructure {
+  position: relative;
+  overflow: hidden;
+}
+
+.courseStructureBg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(168, 85, 247, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(0, 212, 255, 0.06) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.courseStructureInner {
+  position: relative;
+  z-index: 1;
+}
+
+/* Dvolinijski eyebrow: poništi uppercase sa LP pill-a */
+.bonusEyebrowLabel {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.bonusGrid {
+  --bonus-grid-gap: clamp(1rem, 2.5vw, 1.375rem);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--bonus-grid-gap);
+  max-width: min(56rem, 100%);
+  margin: 0 auto;
+}
+
+@media (min-width: 640px) {
+  .bonusGrid {
+    --bonus-grid-gap: clamp(1.125rem, 2.2vw, 1.5rem);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Poslednja kartica u donjem redu: centrirana između dve kolone iznad */
+  .bonusGrid .bonusCard:last-child {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: calc((100% - var(--bonus-grid-gap)) / 2);
+    max-width: 100%;
+  }
+}
+
+.bonusCard {
+  position: relative;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.05), rgba(139, 92, 246, 0.05));
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 16px;
+  padding: clamp(1.5rem, 3vw, 1.875rem) clamp(1.25rem, 2.5vw, 1.625rem);
+  text-align: center;
+  transition:
+    opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.bonusCard::before {
+  content: "";
+  position: absolute;
+  inset: -100%;
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    transparent 0deg,
+    rgba(168, 85, 247, 0.3) 60deg,
+    transparent 120deg
+  );
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  animation: bonusRotate 4s linear infinite;
+  animation-play-state: paused;
+}
+
+@keyframes bonusRotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.bonusCard:hover {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(139, 92, 246, 0.08));
+  border-color: rgba(168, 85, 247, 0.4);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow:
+    0 12px 40px rgba(168, 85, 247, 0.25),
+    0 0 0 1px rgba(168, 85, 247, 0.2);
+}
+
+.bonusCard:hover::before {
+  opacity: 1;
+  animation-play-state: running;
+}
+
+.bonusCard:hover .bonusCardIcon {
+  background: linear-gradient(135deg, #a855f7, #8b5cf6);
+  box-shadow: 0 0 28px rgba(168, 85, 247, 0.5);
+  transform: scale(1.1) rotate(-5deg);
+  color: #f5f5f7;
+}
+
+.bonusCardIcon {
+  position: relative;
+  z-index: 1;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(139, 92, 246, 0.2));
+  border-radius: 16px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #a855f7;
+}
+
+.bonusCardIcon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.bonusCardTitle {
+  position: relative;
+  z-index: 1;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #f5f5f7;
+  margin-bottom: 0.5rem;
+  line-height: 1.25;
+}
+
+.bonusCardDescription {
+  position: relative;
+  z-index: 1;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
+  color: rgba(245, 245, 247, 0.62);
+  margin-bottom: 1.125rem;
+  max-width: 38ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.bonusCardValue {
+  position: relative;
+  z-index: 1;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #a855f7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bonusCard {
+    animation: none !important;
+  }
+
+  .bonusCard:hover {
+    transform: none;
+  }
+
+  .bonusCard::before {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .bonusCard {
+    padding: 1.5rem 1.25rem;
+  }
+}

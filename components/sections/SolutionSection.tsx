@@ -28,56 +28,60 @@ export default function SolutionSection() {
   const iv = inView || reduced;
 
   return (
-    <section ref={ref} className={reduced ? "sr-nomotion" : undefined} style={{ position: "relative", zIndex: 10, padding: "120px 24px", textAlign: "center" }}>
+    <section ref={ref} className={`landing-section-y--spacious${reduced ? " sr-nomotion" : ""}`} style={{ position: "relative", zIndex: 10 }}>
       <div className="section-container">
-        <div className={`sr-from-y sr-from-y-xl sr-ease ${iv ? "sr-inview" : ""}`}>
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 8,
-            background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.12)",
-            borderRadius: 50, padding: "6px 16px", marginBottom: 24,
-          }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#00d4ff", boxShadow: "0 0 6px #00d4ff" }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#00d4ff", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>Rešenje</span>
+        <div className={`landing-section-head sr-from-y sr-from-y-xl sr-ease ${iv ? "sr-inview" : ""}`}>
+          <div className="landing-eyebrow-pill landing-eyebrow-pill--cyan">
+            <span
+              className="landing-eyebrow-dot landing-eyebrow-dot--cyan"
+              style={{ background: "#00d4ff", boxShadow: "0 0 8px rgba(0,212,255,0.45)" }}
+            />
+            <span className="landing-eyebrow-pill-label">Rešenje</span>
           </div>
 
-          <h2 style={{ fontSize: "clamp(30px, 5vw, 50px)", fontWeight: 800, lineHeight: 1.1, marginBottom: 16 }}>
-            AI Hype Academy je tvoj <span className="gradient-text">unfair advantage.</span>
+          <h2 className="apple-display landing-measure-copy" style={{ maxWidth: "22ch" }}>
+            AI Hype Academy je tvoj{" "}
+            <span className="gradient-text">unfair advantage.</span>
           </h2>
-          <p style={{ fontSize: 16, color: "#8a8a9a", maxWidth: 540, margin: "0 auto 56px", lineHeight: 1.7 }}>
+
+          <p className="apple-solution-lede">
             Nije još jedan kurs. Ovo je operativni sistem koji te vodi od nule do pravih rezultata.
           </p>
         </div>
 
         <div
-          className={`sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
-          style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 64, transitionDelay: reduced ? "0s" : "0.15s" }}
+          className={`apple-steps-wrap sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
+          style={{ transitionDelay: reduced ? "0s" : "0.12s" }}
         >
           {flow.map((s, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div key={s.label} className="apple-step-cluster">
               <div
                 className={`sr-scale-pop ${iv ? "sr-inview" : ""}`}
-                style={{ "--sr-delay": reduced ? "0s" : `${0.2 + i * 0.1}s` } as CSSProperties}
+                style={{ "--sr-delay": reduced ? "0s" : `${0.15 + i * 0.08}s` } as CSSProperties}
               >
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-                  <div style={{
-                    width: 68, height: 68, borderRadius: 20,
-                    background: `linear-gradient(145deg, ${s.color}12, ${s.color}06)`,
-                    border: `1px solid ${s.color}25`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    boxShadow: `0 4px 20px ${s.color}10`,
-                    transition: "all 0.3s ease",
-                  }}>
-                    <s.icon size={28} color={s.color} strokeWidth={1.8} />
+                <div className="apple-step-node">
+                  <div
+                    className="apple-step-icon"
+                    style={{
+                      background: `linear-gradient(145deg, ${s.color}18, ${s.color}08)`,
+                      border: `1px solid ${s.color}40`,
+                      boxShadow: `0 4px 24px ${s.color}18`,
+                    }}
+                  >
+                    <s.icon size={22} color={s.color} strokeWidth={1.65} aria-hidden />
                   </div>
-                  <span style={{ fontSize: 12, color: "#aaa", fontWeight: 600, letterSpacing: "0.03em" }}>{s.label}</span>
+                  <span className="apple-step-label" style={{ color: s.color }}>
+                    {s.label}
+                  </span>
                 </div>
               </div>
               {i < flow.length - 1 && (
                 <div
-                  className={`sr-fade ${iv ? "sr-inview" : ""}`}
-                  style={{ marginBottom: 24, "--sr-delay": reduced ? "0s" : `${0.3 + i * 0.1}s`, "--sr-d": "0.3s" } as CSSProperties}
+                  className={`apple-chevron sr-fade ${iv ? "sr-inview" : ""}`}
+                  style={{ "--sr-delay": reduced ? "0s" : `${0.22 + i * 0.08}s`, "--sr-d": "0.28s" } as CSSProperties}
+                  aria-hidden
                 >
-                  <ChevronRight size={18} color="rgba(0,212,255,0.25)" />
+                  <ChevronRight size={14} color="rgba(0,212,255,0.35)" strokeWidth={2} />
                 </div>
               )}
             </div>
@@ -85,28 +89,22 @@ export default function SolutionSection() {
         </div>
 
         <div
-          className={`sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
-          style={{ textAlign: "left", maxWidth: 580, margin: "0 auto", transitionDelay: reduced ? "0s" : "0.4s" }}
+          className={`landing-measure-narrow sr-from-y sr-from-y-tight sr-ease ${iv ? "sr-inview" : ""}`}
+          style={{ transitionDelay: reduced ? "0s" : "0.35s" }}
         >
-          <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 20, color: "#fff" }}>Ovo je sistem koji:</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <p className="apple-solution-subhead">Ovo je sistem koji:</p>
+          <ul className="apple-list" style={{ maxWidth: "none" }}>
             {points.map((p, i) => (
-              <div
-                key={i}
+              <li
+                key={p.text}
                 className={`sr-from-x-item ${iv ? "sr-inview" : ""}`}
-                style={{ display: "flex", alignItems: "center", gap: 14, "--sr-delay": reduced ? "0s" : `${0.45 + i * 0.07}s` } as CSSProperties}
+                style={{ "--sr-delay": reduced ? "0s" : `${0.4 + i * 0.06}s` } as CSSProperties}
               >
-                <div style={{
-                  width: 36, height: 36, borderRadius: 10,
-                  background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.12)",
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                }}>
-                  <p.icon size={16} color="#00d4ff" strokeWidth={2} />
-                </div>
-                <span style={{ fontSize: 14, color: "#999", lineHeight: 1.6 }}>{p.text}</span>
-              </div>
+                <p.icon className="apple-list-icon" size={20} color="#00d4ff" strokeWidth={1.5} aria-hidden />
+                <span>{p.text}</span>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       </div>
     </section>

@@ -2,13 +2,13 @@ import dynamic from "next/dynamic";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import SectionChunkFallback from "@/components/layout/SectionChunkFallback";
+import ViewportDeferredSection from "@/components/layout/ViewportDeferredSection";
 import HeroSection from "@/components/sections/HeroSection";
 import { getServerCdnUrl } from "@/lib/bunny-cdn-sign";
 import {
   CDN_PATH_EXPLAINER_MP4,
   CDN_EXPLAINER_CACHE_TAG,
-  CDN_PATH_SHOWCASE_ROW1,
-  CDN_PATH_SHOWCASE_ROW2,
+  CDN_PATH_SHOWCASE_VIDEOS,
 } from "@/lib/video-cdn-paths";
 
 const sectionLoad = () => <SectionChunkFallback />;
@@ -19,20 +19,27 @@ const ProblemSection = dynamic(() => import("@/components/sections/ProblemSectio
 const SolutionSection = dynamic(() => import("@/components/sections/SolutionSection"), {
   loading: sectionLoad,
 });
+const ForWhoSection = dynamic(() => import("@/components/sections/ForWhoSection"), {
+  loading: sectionLoad,
+});
 const SocialProofSection = dynamic(() => import("@/components/sections/SocialProofSection"), {
   loading: sectionLoad,
 });
-const ForWhoSection = dynamic(() => import("@/components/sections/ForWhoSection"), {
+const CourseStructureSection = dynamic(() => import("@/components/sections/CourseStructureSection"), {
   loading: sectionLoad,
 });
 const HowToEnterSection = dynamic(() => import("@/components/sections/HowToEnterSection"), {
   loading: sectionLoad,
 });
-const FAQSection = dynamic(() => import("@/components/sections/FAQSection"), { loading: sectionLoad });
+const FAQSection = dynamic(() => import("@/components/sections/FAQSection"), {
+  loading: sectionLoad,
+});
 const FinalCTASection = dynamic(() => import("@/components/sections/FinalCTASection"), {
   loading: sectionLoad,
 });
-const BlogSection = dynamic(() => import("@/components/sections/BlogSection"), { loading: sectionLoad });
+const BlogSection = dynamic(() => import("@/components/sections/BlogSection"), {
+  loading: sectionLoad,
+});
 const VideoShowcaseSection = dynamic(() => import("@/components/sections/VideoShowcaseSection"), {
   loading: sectionLoad,
 });
@@ -51,6 +58,8 @@ function useLocalHeroMedia() {
 }
 
 export default function HomeLanding() {
+  const hideHowToEnterOnLocalhost = process.env.NODE_ENV === "development";
+  const hideSocialProofDividersOnLocalhost = process.env.NODE_ENV === "development";
   const heroFromPublic = useLocalHeroMedia();
   const heroMedia = heroFromPublic
     ? {
@@ -59,38 +68,65 @@ export default function HomeLanding() {
     : {
         explainerMp4: getServerCdnUrl(CDN_PATH_EXPLAINER_MP4, undefined, CDN_EXPLAINER_CACHE_TAG),
       };
-  const showcaseRow1Urls = CDN_PATH_SHOWCASE_ROW1.map((p) => getServerCdnUrl(p));
-  const showcaseRow2Urls = CDN_PATH_SHOWCASE_ROW2.map((p) => getServerCdnUrl(p));
+  const showcaseUrls = CDN_PATH_SHOWCASE_VIDEOS.map((p) => getServerCdnUrl(p));
 
   return (
-    <div style={{ position: "relative", minHeight: "100vh" }}>
+    <div className="lp-landing-apple" style={{ position: "relative", minHeight: "100vh" }}>
       <Header />
       <main style={{ position: "relative", zIndex: 1 }}>
         <HeroSection mediaUrls={heroMedia} />
         <div className="section-divider" />
         <div className="problem-solution-bg">
           <div className="problem-solution-bg__image" aria-hidden />
-          <ProblemSection />
-          <div className="section-divider section-divider--visible" />
-          <SolutionSection />
+          <ViewportDeferredSection rootMargin="200px 0px 440px 0px">
+            <>
+              <ProblemSection />
+              <div className="section-divider section-divider--visible" />
+              <SolutionSection />
+            </>
+          </ViewportDeferredSection>
         </div>
         <div className="section-divider" />
         <div className="plexus-sections-bg">
           <div className="plexus-sections-bg__image" aria-hidden />
-          <BlogSection />
+          <ViewportDeferredSection rootMargin="240px 0px 320px 0px">
+            <BlogSection />
+          </ViewportDeferredSection>
           <div className="section-divider section-divider--visible" />
-          <VideoShowcaseSection row1Srcs={showcaseRow1Urls} row2Srcs={showcaseRow2Urls} />
+          <ViewportDeferredSection rootMargin="160px 0px 240px 0px">
+            <VideoShowcaseSection videoSrcs={showcaseUrls} />
+          </ViewportDeferredSection>
           <div className="section-divider section-divider--visible" />
-          <SocialProofSection />
+          <ViewportDeferredSection rootMargin="240px 0px 300px 0px">
+            <ForWhoSection />
+          </ViewportDeferredSection>
           <div className="section-divider section-divider--visible" />
-          <ForWhoSection />
-          <div className="section-divider section-divider--visible" />
-          <HowToEnterSection />
-          <div className="section-divider section-divider--visible" />
-          <FAQSection />
+          <ViewportDeferredSection rootMargin="240px 0px 300px 0px">
+            <CourseStructureSection />
+          </ViewportDeferredSection>
+          {hideSocialProofDividersOnLocalhost ? null : <div className="section-divider section-divider--visible" />}
+          <ViewportDeferredSection rootMargin="240px 0px 300px 0px">
+            <SocialProofSection />
+          </ViewportDeferredSection>
+          {hideHowToEnterOnLocalhost ? (
+            null
+          ) : (
+            <>
+              <div className="section-divider section-divider--visible" />
+              <ViewportDeferredSection rootMargin="240px 0px 300px 0px">
+                <HowToEnterSection />
+              </ViewportDeferredSection>
+              <div className="section-divider section-divider--visible" />
+            </>
+          )}
+          <ViewportDeferredSection rootMargin="240px 0px 320px 0px">
+            <FAQSection />
+          </ViewportDeferredSection>
         </div>
         <div className="section-divider" />
-        <FinalCTASection />
+        <ViewportDeferredSection rootMargin="280px 0px 400px 0px">
+          <FinalCTASection />
+        </ViewportDeferredSection>
         <div className="section-divider" />
       </main>
       <Footer />

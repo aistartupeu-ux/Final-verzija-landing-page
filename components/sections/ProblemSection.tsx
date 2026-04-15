@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Compass, Puzzle, Palette, Banknote, Clock } from "lucide-react";
 import { useInView } from "@/lib/use-in-view";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
+import { SpotlightGlowCard } from "@/components/ui/spotlight-card";
 
 const problems = [
   { icon: Compass, text: "Ne znaš odakle da kreneš" },
@@ -12,6 +13,11 @@ const problems = [
   { icon: Banknote, text: "Ne znaš kako da to pretvoriš u novac" },
   { icon: Clock, text: "Gubiš vreme na alate umesto na napredak" },
 ];
+
+/** Sporija, cinematskija animacija stubaca (manji „rush“, premium feel). */
+const CHART_BAR_DURATION_S = 1.55;
+const CHART_BAR_STAGGER_S = 0.09;
+const CHART_BAR_EASE = "cubic-bezier(0.22, 0.95, 0.28, 1)";
 
 function Chart({ reduced }: { reduced: boolean }) {
   const chartRef = useRef<HTMLDivElement>(null);
@@ -29,23 +35,18 @@ function Chart({ reduced }: { reduced: boolean }) {
   const anim = go || reduced;
 
   return (
-    <div
-      ref={chartRef}
-      style={{
-        padding: "32px 28px",
-        borderRadius: 24,
-        background: "linear-gradient(145deg, rgba(0,212,255,0.04) 0%, rgba(124,58,237,0.04) 100%)",
-        border: "1px solid rgba(0,212,255,0.12)",
-        boxShadow: "0 4px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.02)",
-        contain: "layout style",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 28 }}>
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#00d4ff", boxShadow: "0 0 8px rgba(0,212,255,0.5)" }} />
-        <h4 style={{ fontSize: 18, fontWeight: 700 }}>Tvoj napredak uz AI sistem</h4>
+    <SpotlightGlowCard glowColor="purple" className="w-full max-w-[400px] mx-auto">
+      <div ref={chartRef} className="apple-chart-card" style={{ padding: "36px 28px", contain: "layout style" }}>
+      <div style={{ textAlign: "center", marginBottom: 28 }}>
+        <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(245,245,247,0.42)", margin: "0 0 8px" }}>
+          Napredak
+        </p>
+        <h4 style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em", color: "#f5f5f7", margin: 0 }}>
+          Tvoj put uz <span className="apple-accent-word">AI sistem</span>
+        </h4>
       </div>
 
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 5, height: 190, padding: "0 4px" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 184, padding: "0 2px" }}>
         {data.map((v, i) => (
           <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%" }}>
             <div style={{ flex: 1, width: "100%", position: "relative", overflow: "hidden" }}>
@@ -53,45 +54,93 @@ function Chart({ reduced }: { reduced: boolean }) {
                 style={{
                   position: "absolute",
                   bottom: 0,
-                  left: "8%",
-                  right: "8%",
+                  left: "10%",
+                  right: "10%",
                   height: "100%",
                   transformOrigin: "bottom",
                   transform: anim ? `scaleY(${v / 100})` : "scaleY(0.02)",
-                  transition: reduced ? "none" : `transform 0.7s cubic-bezier(0.22, 1, 0.36, 1) ${i * 0.04}s`,
-                  background: `linear-gradient(to top, #00d4ff, #9333ea)`,
-                  borderRadius: "5px 5px 1px 1px",
-                  boxShadow: anim ? `0 0 12px rgba(0,212,255,${0.15 + (v / 100) * 0.2})` : "none",
+                  transition: reduced
+                    ? "none"
+                    : `transform ${CHART_BAR_DURATION_S}s ${CHART_BAR_EASE} ${i * CHART_BAR_STAGGER_S}s`,
+                  background: "linear-gradient(to top, #00d4ff, #a855f7)",
+                  borderRadius: 5,
+                  boxShadow: anim ? `0 0 14px rgba(0,212,255,${0.12 + (v / 100) * 0.18})` : "none",
                 }}
               />
             </div>
-            <span style={{ fontSize: 9, color: "#555", marginTop: 8, whiteSpace: "nowrap", letterSpacing: "0.02em" }}>{labels[i]}</span>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 500,
+                color: "rgba(245,245,247,0.38)",
+                marginTop: 10,
+                whiteSpace: "nowrap",
+                letterSpacing: "0.04em",
+              }}
+            >
+              {labels[i]}
+            </span>
           </div>
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 24 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr",
+          gap: 1,
+          marginTop: 28,
+          borderRadius: 14,
+          overflow: "hidden",
+          border: "1px solid rgba(0,212,255,0.12)",
+          background: "rgba(0,212,255,0.04)",
+        }}
+      >
         {[
-          { l: "Početni nivo", v: "10%", c: "#8a8a9a" },
-          { l: "Trenutni nivo", v: "82%", c: "#00d4ff" },
-          { l: "Napredak", v: "+720%", c: "#a855f7" },
-        ].map((s) => (
+          { l: "Početak", v: "10%", highlight: false },
+          { l: "Danas", v: "82%", highlight: true },
+          { l: "Rast", v: "+720%", highlight: false },
+        ].map((s, idx) => (
           <div
             key={s.l}
             style={{
               textAlign: "center",
-              padding: "12px 8px",
-              borderRadius: 14,
-              background: "rgba(255,255,255,0.025)",
-              border: "1px solid rgba(255,255,255,0.06)",
+              padding: "14px 8px",
+              background: s.highlight ? "rgba(168,85,247,0.1)" : "rgba(255,255,255,0.03)",
+              borderRight: idx < 2 ? "1px solid rgba(255,255,255,0.06)" : undefined,
             }}
           >
-            <div style={{ fontSize: 10, color: "#666", letterSpacing: "0.03em", marginBottom: 4 }}>{s.l}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: s.c }}>{s.v}</div>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "rgba(245,245,247,0.4)",
+                marginBottom: 6,
+              }}
+            >
+              {s.l}
+            </div>
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 600,
+                letterSpacing: "-0.03em",
+                background: s.highlight ? "linear-gradient(135deg, #00d4ff, #a855f7)" : "none",
+                WebkitBackgroundClip: s.highlight ? "text" : undefined,
+                backgroundClip: s.highlight ? "text" : undefined,
+                WebkitTextFillColor: s.highlight ? "transparent" : undefined,
+                color: s.highlight ? undefined : "#f5f5f7",
+              }}
+            >
+              {s.v}
+            </div>
           </div>
         ))}
       </div>
     </div>
+    </SpotlightGlowCard>
   );
 }
 
@@ -104,69 +153,50 @@ export default function ProblemSection() {
   return (
     <section
       ref={ref}
-      className={reduced ? "sr-nomotion" : undefined}
-      style={{ position: "relative", zIndex: 10, padding: "120px 24px", contain: "layout style" }}
+      className={`landing-section-y--spacious${reduced ? " sr-nomotion" : ""}`}
+      style={{ position: "relative", zIndex: 10, contain: "layout style" }}
     >
       <div className="section-container">
-        <style>{`@media(min-width:768px){.problem-grid{grid-template-columns:1fr 1fr !important; gap: 56px !important}}`}</style>
-        <div className="problem-grid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: 48, alignItems: "center" }}>
+        <div className="problem-grid-apple">
           <div className={`sr-from-x-n sr-ease ${iv ? "sr-inview" : ""}`}>
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                background: "rgba(239,68,68,0.08)",
-                border: "1px solid rgba(239,68,68,0.15)",
-                borderRadius: 50,
-                padding: "6px 16px",
-                marginBottom: 24,
-              }}
-            >
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444" }} />
-              <span style={{ fontSize: 11, fontWeight: 600, color: "#ef4444", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>Problem</span>
+            <div className="landing-eyebrow-pill landing-eyebrow-pill--problem">
+              <span
+                className="landing-eyebrow-dot landing-eyebrow-dot--problem"
+                style={{ background: "#FFB547", boxShadow: "0 0 8px rgba(255,181,71,0.55)" }}
+              />
+              <span className="landing-eyebrow-pill-label">Problem</span>
             </div>
 
-            <h2 style={{ fontSize: "clamp(26px, 4vw, 42px)", fontWeight: 800, lineHeight: 1.1, marginBottom: 20 }}>
-              Svi pričaju o <span style={{ color: "#00d4ff", fontWeight: 800 }}>AI-ju.</span> Malo ko zna kako da ga pretvori u novac.
-            </h2>
-            <p style={{ fontSize: 15, color: "#8a8a9a", lineHeight: 1.7, marginBottom: 28, maxWidth: 480 }}>
-              Internet je prepun tutorijala, alata i kurseva.
+            <h2 className="apple-display">
+              Svi pričaju o <span className="gradient-text">AI-ju.</span>
               <br />
-              Ali bez sistema sve to ostaje samo još jedna informacija.
-            </p>
-            <p style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 24, lineHeight: 1.4 }}>
-              AI nije problem. Problem je što nemaš sistem koji zarađuje.
+              Malo ko zna kako da ga pretvori u <span className="apple-accent-word">novac.</span>
+            </h2>
+
+            <p className="apple-body">
+              Internet je prepun tutorijala, alata i kurseva. Bez sistema sve to ostaje samo još jedna informacija.
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <p className="apple-callout">AI nije problem. Problem je što nemaš sistem koji zarađuje.</p>
+
+            <ul className="apple-list">
               {problems.map((p, i) => (
-                <div
-                  key={i}
+                <li
+                  key={p.text}
                   className={`sr-from-x-item ${iv ? "sr-inview" : ""}`}
-                  style={{ "--sr-delay": reduced ? "0s" : `${0.15 + i * 0.05}s` } as CSSProperties}
+                  style={{ "--sr-delay": reduced ? "0s" : `${0.12 + i * 0.05}s` } as CSSProperties}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 10,
-                        background: "rgba(239,68,68,0.06)",
-                        border: "1px solid rgba(239,68,68,0.12)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <p.icon size={16} color="#ef4444" strokeWidth={2} />
-                    </div>
-                    <span style={{ fontSize: 14, color: "#999", lineHeight: 1.5 }}>{p.text}</span>
-                  </div>
-                </div>
+                  <p.icon
+                    className="apple-list-icon"
+                    size={20}
+                    strokeWidth={1.5}
+                    color="rgba(248,113,113,0.85)"
+                    aria-hidden
+                  />
+                  <span>{p.text}</span>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
 
           <div className={`sr-from-x-p sr-from-x-p-delay sr-ease ${iv ? "sr-inview" : ""}`}>

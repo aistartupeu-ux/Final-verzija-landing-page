@@ -245,7 +245,7 @@ body {
 .problem-solution-bg {
   position: relative;
   overflow: hidden;
-  contain: layout style paint;
+  contain: layout;
 }
 
 .problem-solution-bg__image {
@@ -267,14 +267,912 @@ body {
   pointer-events: none;
 }
 
+/* Landing: čist ritam + brend (cyan / purple) — ceo home */
+.lp-landing-apple .problem-solution-bg .problem-solution-bg__image {
+  opacity: 0.44;
+}
+.lp-landing-apple .problem-solution-bg .problem-solution-bg__image::after {
+  background: linear-gradient(to bottom, rgba(5,5,8,0.34) 0%, rgba(5,5,8,0.5) 50%, rgba(5,5,8,0.6) 100%);
+}
+
+/* Ispod heroa: plexus blok malo svetliji od default-a */
+.lp-landing-apple .plexus-sections-bg .plexus-sections-bg__image {
+  opacity: 0.48;
+}
+.lp-landing-apple .plexus-sections-bg .plexus-sections-bg__image::after {
+  background: linear-gradient(to bottom, rgba(5,5,8,0.32) 0%, rgba(5,5,8,0.42) 50%, rgba(5,5,8,0.52) 100%);
+}
+
+/* Završni CTA: blagi lift od čistog #050508 */
+.lp-landing-apple #final-cta {
+  background: radial-gradient(ellipse 100% 80% at 50% 0%, rgba(14, 14, 22, 0.95) 0%, rgba(8, 8, 14, 0.55) 45%, transparent 72%);
+}
+
+.lp-landing-apple {
+  --brand-cyan: #00d4ff;
+  --brand-purple: #a855f7;
+  --brand-violet: #8b5cf6;
+  --apple-fg: #f5f5f7;
+  --apple-fg-secondary: rgba(245, 245, 247, 0.68);
+  --apple-fg-tertiary: rgba(245, 245, 247, 0.45);
+  --apple-hairline: rgba(255, 255, 255, 0.1);
+  --apple-accent: var(--brand-cyan);
+  --landing-shell-max: 1120px;
+  /* Telefon → desktop: fluid gutter; nikad užče od ~320px prakse; + safe-area (notch) */
+  --landing-gutter-base: max(1.1rem, min(4vw, 3rem));
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+/* Jedan horizontalni stubac: sekcija bez bočnog paddinga — sve ide kroz .section-container */
+.lp-landing-apple main > section {
+  box-sizing: border-box;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.lp-landing-apple .section-container {
+  max-width: var(--landing-shell-max);
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: max(var(--landing-gutter-base), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--landing-gutter-base), env(safe-area-inset-right, 0px));
+}
+
+/* Vertikalni ritam kao na product stranicama (clamp = isti osećaj na tel/tablet/desktop) */
+.lp-landing-apple .landing-section-y {
+  padding-top: clamp(3.5rem, 9vw, 6.75rem) !important;
+  padding-bottom: clamp(3.5rem, 9vw, 6.75rem) !important;
+}
+
+.lp-landing-apple .landing-section-y--compact {
+  padding-top: clamp(3rem, 7vw, 5.5rem) !important;
+  padding-bottom: clamp(3rem, 7vw, 5.5rem) !important;
+}
+
+.lp-landing-apple .landing-section-y--spacious {
+  padding-top: clamp(4.25rem, 11vw, 8rem) !important;
+  padding-bottom: clamp(4.25rem, 11vw, 8rem) !important;
+}
+
+.lp-landing-apple .landing-section-y--hero {
+  padding-top: clamp(5.5rem, 14vw, 9rem) !important;
+  padding-bottom: clamp(3.5rem, 8vw, 5.5rem) !important;
+}
+
+/* Hero: puna visina ekrana na svim mobilnim browserima (vh/dvh/svh) */
+.lp-landing-apple .landing-hero-viewport-height {
+  min-height: 100vh;
+  min-height: 100dvh;
+  min-height: 100svh;
+}
+
+/* Uži stubac za naslov + podnaslov (čitljivost) */
+.lp-landing-apple .landing-measure-copy {
+  max-width: 42rem;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-landing-apple .landing-hero-headline-copy {
+    transform: none !important;
+  }
+}
+
+.lp-landing-apple .landing-measure-narrow {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+.lp-landing-apple .landing-measure-cta {
+  max-width: 40rem;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+.lp-landing-apple .landing-section-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: clamp(2rem, 4vw, 2.75rem);
+}
+
+.lp-landing-apple .landing-section-head .landing-eyebrow-pill {
+  margin-bottom: clamp(0.75rem, 2vw, 1.125rem);
+}
+
+/* Footer: vertikala + home-indicator (svi layout-i) */
+footer .footer-inner {
+  padding-top: clamp(2.5rem, 6vw, 3.5rem);
+  padding-bottom: max(2.25rem, calc(env(safe-area-inset-bottom, 0px) + 1.125rem));
+}
+
+.lp-landing-apple .lp-shell-inner {
+  max-width: var(--landing-shell-max);
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: max(var(--landing-gutter-base), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--landing-gutter-base), env(safe-area-inset-right, 0px));
+}
+
+.lp-landing-apple .landing-eyebrow-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 100px;
+  padding: 6px 16px;
+  margin-bottom: 18px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Problem pill — brend amber #FFB547 + blagi glow + sheen (suptilan „highlight“) */
+@keyframes problem-pill-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 14px rgba(255, 181, 71, 0.18),
+      0 0 0 0 rgba(255, 181, 71, 0);
+    border-color: rgba(255, 181, 71, 0.38);
+  }
+  50% {
+    box-shadow:
+      0 0 28px rgba(255, 181, 71, 0.42),
+      0 0 0 3px rgba(255, 181, 71, 0.08);
+    border-color: rgba(255, 181, 71, 0.72);
+  }
+}
+
+@keyframes problem-pill-sheen {
+  0% {
+    transform: translateX(-120%) skewX(-14deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  55% {
+    transform: translateX(220%) skewX(-14deg);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateX(220%) skewX(-14deg);
+    opacity: 0;
+  }
+}
+
+@keyframes problem-pill-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(255, 181, 71, 0.55);
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 16px rgba(255, 181, 71, 0.9);
+  }
+}
+
+@keyframes cyan-pill-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 14px rgba(0, 212, 255, 0.2),
+      0 0 0 0 rgba(0, 212, 255, 0);
+    border-color: rgba(0, 212, 255, 0.28);
+  }
+  50% {
+    box-shadow:
+      0 0 28px rgba(0, 212, 255, 0.45),
+      0 0 0 3px rgba(0, 212, 255, 0.1);
+    border-color: rgba(0, 212, 255, 0.55);
+  }
+}
+
+@keyframes cyan-pill-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 16px rgba(0, 212, 255, 0.85);
+  }
+}
+
+@keyframes purple-pill-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 14px rgba(168, 85, 247, 0.22),
+      0 0 0 0 rgba(168, 85, 247, 0);
+    border-color: rgba(168, 85, 247, 0.32);
+  }
+  50% {
+    box-shadow:
+      0 0 28px rgba(168, 85, 247, 0.48),
+      0 0 0 3px rgba(168, 85, 247, 0.1);
+    border-color: rgba(168, 85, 247, 0.62);
+  }
+}
+
+@keyframes purple-pill-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 5px rgba(168, 85, 247, 0.55));
+  }
+  50% {
+    transform: scale(1.14);
+    filter: drop-shadow(0 0 11px rgba(168, 85, 247, 0.9));
+  }
+}
+
+@keyframes green-pill-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 14px rgba(34, 197, 94, 0.2),
+      0 0 0 0 rgba(34, 197, 94, 0);
+    border-color: rgba(34, 197, 94, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 28px rgba(34, 197, 94, 0.45),
+      0 0 0 3px rgba(34, 197, 94, 0.09);
+    border-color: rgba(34, 197, 94, 0.58);
+  }
+}
+
+@keyframes green-pill-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 16px rgba(34, 197, 94, 0.88);
+  }
+}
+
+@keyframes muted-pill-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 12px rgba(0, 212, 255, 0.12),
+      0 0 0 0 rgba(255, 255, 255, 0);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 22px rgba(0, 212, 255, 0.22),
+      0 0 0 2px rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.22);
+  }
+}
+
+@keyframes muted-pill-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.45);
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.8);
+  }
+}
+
+.lp-landing-apple .landing-eyebrow-pill--problem {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: rgba(255, 181, 71, 0.1);
+  border: 1px solid rgba(255, 181, 71, 0.42);
+  color: #ffb547;
+  animation: problem-pill-glow 2.6s ease-in-out infinite;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--problem::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(105deg, transparent 0%, rgba(255, 213, 160, 0.12) 45%, transparent 70%);
+  pointer-events: none;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--problem::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  left: 0;
+  width: 45%;
+  height: 180%;
+  z-index: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.28) 45%,
+    transparent 100%
+  );
+  animation: problem-pill-sheen 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--problem > * {
+  position: relative;
+  z-index: 1;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--problem .landing-eyebrow-dot--problem {
+  animation: problem-pill-dot-pulse 2.6s ease-in-out infinite;
+}
+
+/* Rešenje — ista logika animacije kao Problem pill, brend cyan */
+.lp-landing-apple .landing-eyebrow-pill--cyan {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  color: var(--brand-cyan);
+  animation: cyan-pill-glow 2.6s ease-in-out infinite;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--cyan::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(105deg, transparent 0%, rgba(160, 240, 255, 0.1) 45%, transparent 70%);
+  pointer-events: none;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--cyan::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  left: 0;
+  width: 45%;
+  height: 180%;
+  z-index: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.28) 45%,
+    transparent 100%
+  );
+  animation: problem-pill-sheen 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--cyan > * {
+  position: relative;
+  z-index: 1;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--cyan .landing-eyebrow-dot--cyan {
+  animation: cyan-pill-dot-pulse 2.6s ease-in-out infinite;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--purple {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: rgba(168, 85, 247, 0.08);
+  border: 1px solid rgba(168, 85, 247, 0.22);
+  color: var(--brand-purple);
+  animation: purple-pill-glow 2.6s ease-in-out infinite;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--purple::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(105deg, transparent 0%, rgba(216, 180, 254, 0.1) 45%, transparent 70%);
+  pointer-events: none;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--purple::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  left: 0;
+  width: 45%;
+  height: 180%;
+  z-index: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.26) 45%,
+    transparent 100%
+  );
+  animation: problem-pill-sheen 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--purple > * {
+  position: relative;
+  z-index: 1;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--purple .landing-eyebrow-pill-icon-wrap--purple {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: purple-pill-dot-pulse 2.6s ease-in-out infinite;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--green {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  animation: green-pill-glow 2.6s ease-in-out infinite;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--green::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(105deg, transparent 0%, rgba(167, 243, 208, 0.09) 45%, transparent 70%);
+  pointer-events: none;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--green::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  left: 0;
+  width: 45%;
+  height: 180%;
+  z-index: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.26) 45%,
+    transparent 100%
+  );
+  animation: problem-pill-sheen 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--green > * {
+  position: relative;
+  z-index: 1;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--green .landing-eyebrow-dot--green {
+  animation: green-pill-dot-pulse 2.6s ease-in-out infinite;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--muted {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(245, 245, 247, 0.55);
+  animation: muted-pill-glow 2.6s ease-in-out infinite;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--muted::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(105deg, transparent 0%, rgba(255, 255, 255, 0.06) 45%, transparent 70%);
+  pointer-events: none;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--muted::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  left: 0;
+  width: 45%;
+  height: 180%;
+  z-index: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.22) 45%,
+    transparent 100%
+  );
+  animation: problem-pill-sheen 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--muted > * {
+  position: relative;
+  z-index: 1;
+}
+
+.lp-landing-apple .landing-eyebrow-pill--muted .landing-eyebrow-dot--muted {
+  animation: muted-pill-dot-pulse 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-landing-apple .landing-eyebrow-pill--problem {
+    animation: none;
+    box-shadow: 0 0 16px rgba(255, 181, 71, 0.2);
+  }
+  .lp-landing-apple .landing-eyebrow-pill--problem::after {
+    animation: none;
+    opacity: 0;
+  }
+  .lp-landing-apple .landing-eyebrow-pill--problem .landing-eyebrow-dot--problem {
+    animation: none;
+    transform: none;
+  }
+  .lp-landing-apple .landing-eyebrow-pill--cyan {
+    animation: none;
+    box-shadow: 0 0 18px rgba(0, 212, 255, 0.15);
+  }
+  .lp-landing-apple .landing-eyebrow-pill--cyan::after {
+    animation: none;
+    opacity: 0;
+  }
+  .lp-landing-apple .landing-eyebrow-pill--cyan .landing-eyebrow-dot--cyan {
+    animation: none;
+    transform: none;
+  }
+  .lp-landing-apple .landing-eyebrow-pill--purple {
+    animation: none;
+    box-shadow: 0 0 16px rgba(168, 85, 247, 0.18);
+  }
+  .lp-landing-apple .landing-eyebrow-pill--purple::after {
+    animation: none;
+    opacity: 0;
+  }
+  .lp-landing-apple .landing-eyebrow-pill--purple .landing-eyebrow-pill-icon-wrap--purple {
+    animation: none;
+    transform: none;
+    filter: none;
+  }
+  .lp-landing-apple .landing-eyebrow-pill--green {
+    animation: none;
+    box-shadow: 0 0 16px rgba(34, 197, 94, 0.16);
+  }
+  .lp-landing-apple .landing-eyebrow-pill--green::after {
+    animation: none;
+    opacity: 0;
+  }
+  .lp-landing-apple .landing-eyebrow-pill--green .landing-eyebrow-dot--green {
+    animation: none;
+    transform: none;
+  }
+  .lp-landing-apple .landing-eyebrow-pill--muted {
+    animation: none;
+    box-shadow: 0 0 14px rgba(0, 212, 255, 0.08);
+  }
+  .lp-landing-apple .landing-eyebrow-pill--muted::after {
+    animation: none;
+    opacity: 0;
+  }
+  .lp-landing-apple .landing-eyebrow-pill--muted .landing-eyebrow-dot--muted {
+    animation: none;
+    transform: none;
+  }
+}
+
+.lp-landing-apple .landing-eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.lp-landing-apple .landing-display {
+  font-size: clamp(2rem, 4.8vw, 3.125rem);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: var(--apple-fg);
+  margin: 0 0 12px;
+}
+
+.lp-landing-apple .landing-lede {
+  font-size: 17px;
+  line-height: 1.47;
+  color: var(--apple-fg-secondary);
+  margin: 0 auto;
+  max-width: 36rem;
+}
+
+.lp-landing-apple .landing-hero-title {
+  font-size: clamp(1.5rem, 4.5vw, 2.75rem);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  color: var(--apple-fg);
+  margin: 0 0 32px;
+  text-shadow: 0 2px 40px rgba(0, 0, 0, 0.45), 0 0 60px rgba(0, 212, 255, 0.08);
+}
+
+.lp-landing-apple .apple-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--apple-fg-tertiary);
+  margin: 0 0 12px;
+}
+
+.lp-landing-apple .apple-display {
+  font-size: clamp(2rem, 4.6vw, 3.25rem);
+  font-weight: 600;
+  line-height: 1.07;
+  letter-spacing: -0.028em;
+  color: var(--apple-fg);
+  margin: 0 0 20px;
+}
+
+.lp-landing-apple .apple-body {
+  font-size: 17px;
+  line-height: 1.47059;
+  color: var(--apple-fg-secondary);
+  margin: 0 0 20px;
+  max-width: 38rem;
+}
+
+.lp-landing-apple .apple-callout {
+  font-size: 21px;
+  line-height: 1.381;
+  font-weight: 600;
+  color: var(--apple-fg);
+  margin: 0 0 8px;
+  max-width: 38rem;
+}
+
+.lp-landing-apple .apple-accent-word {
+  color: var(--brand-cyan);
+  font-weight: 600;
+}
+
+.lp-landing-apple .apple-accent-gradient {
+  background: linear-gradient(135deg, var(--brand-cyan), var(--brand-purple), var(--brand-cyan));
+  background-size: 180% 180%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 600;
+  animation: gradientShift 5s ease infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-landing-apple .apple-accent-gradient {
+    animation: none;
+    background-position: 0% 50%;
+  }
+}
+
+.lp-landing-apple .apple-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 38rem;
+}
+
+.lp-landing-apple .apple-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--apple-hairline);
+  font-size: 17px;
+  line-height: 1.47059;
+  color: var(--apple-fg-secondary);
+}
+
+.lp-landing-apple .apple-list li:last-child {
+  border-bottom: none;
+}
+
+.lp-landing-apple .apple-list .apple-list-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--apple-fg-tertiary);
+}
+
+.lp-landing-apple .apple-chart-card {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--apple-hairline);
+  box-shadow: none;
+}
+
+/* Spotlight glow (Problem chart kartica) — pointer u koordinatama kartice, bez fixed attachment */
+.spotlight-glow-card {
+  --lx: 200;
+  --ly: 230;
+  --xp: 0.5;
+  --yp: 0.35;
+  position: relative;
+  isolation: isolate;
+  border-radius: calc(var(--radius, 18) * 1px);
+  touch-action: manipulation;
+  background-image: radial-gradient(
+    var(--spotlight-size) var(--spotlight-size) at
+    calc(var(--lx, 200) * 1px)
+    calc(var(--ly, 230) * 1px),
+    hsl(var(--hue, 280) calc(var(--saturation, 100) * 1%) calc(var(--lightness, 70) * 1%) / var(--bg-spot-opacity, 0.14)),
+    transparent
+  );
+  background-color: var(--backdrop, hsl(0 0% 60% / 0.12));
+  background-size: calc(100% + (2 * var(--border-size))) calc(100% + (2 * var(--border-size)));
+  background-position: 50% 50%;
+  border: var(--border-size) solid var(--backup-border, hsl(0 0% 60% / 0.12));
+  box-shadow: 0 1rem 2rem -1rem rgba(0, 0, 0, 0.45);
+}
+
+.spotlight-glow-card::before,
+.spotlight-glow-card::after {
+  pointer-events: none;
+  content: "";
+  position: absolute;
+  inset: calc(var(--border-size) * -1);
+  border: var(--border-size) solid transparent;
+  border-radius: calc(var(--radius) * 1px);
+  background-repeat: no-repeat;
+  background-position: 50% 50%;
+  background-size: calc(100% + (2 * var(--border-size))) calc(100% + (2 * var(--border-size)));
+  mask: linear-gradient(transparent, transparent), linear-gradient(white, white);
+  -webkit-mask: linear-gradient(transparent, transparent), linear-gradient(white, white);
+  mask-clip: padding-box, border-box;
+  -webkit-mask-clip: padding-box, border-box;
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+  z-index: 0;
+}
+
+.spotlight-glow-card::before {
+  background-image: radial-gradient(
+    calc(var(--spotlight-size) * 0.75) calc(var(--spotlight-size) * 0.75) at
+    calc(var(--lx, 200) * 1px)
+    calc(var(--ly, 230) * 1px),
+    hsl(var(--hue, 280) calc(var(--saturation, 100) * 1%) calc(50 * 1%) / var(--border-spot-opacity, 0.85)),
+    transparent 100%
+  );
+  filter: brightness(1.85);
+}
+
+.spotlight-glow-card::after {
+  background-image: radial-gradient(
+    calc(var(--spotlight-size) * 0.5) calc(var(--spotlight-size) * 0.5) at
+    calc(var(--lx, 200) * 1px)
+    calc(var(--ly, 230) * 1px),
+    hsl(0 100% 100% / var(--border-light-opacity, 0.32)),
+    transparent 100%
+  );
+}
+
+.lp-landing-apple .spotlight-glow-card .apple-chart-card {
+  position: relative;
+  z-index: 1;
+  background: rgba(12, 12, 18, 0.72);
+  border: none;
+  box-shadow: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-glow-card,
+  .spotlight-glow-card::before,
+  .spotlight-glow-card::after {
+    filter: none;
+  }
+}
+
+.lp-landing-apple .apple-steps-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px 4px;
+  margin: 0 auto 52px;
+  max-width: 720px;
+}
+
+.lp-landing-apple .apple-step-cluster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lp-landing-apple .apple-step-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 76px;
+}
+
+.lp-landing-apple .apple-step-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--apple-hairline);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lp-landing-apple .apple-step-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--apple-fg-tertiary);
+}
+
+.lp-landing-apple .apple-solution-lede {
+  font-size: 17px;
+  line-height: 1.47059;
+  color: var(--apple-fg-secondary);
+  max-width: 32rem;
+  margin: 0 auto 0;
+}
+
+.lp-landing-apple .apple-solution-subhead {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--apple-fg);
+  margin: 0 0 8px;
+}
+
+.lp-landing-apple .apple-chevron {
+  color: var(--apple-fg-tertiary);
+  opacity: 0.35;
+  align-self: center;
+}
+
+.lp-landing-apple .problem-grid-apple {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 48px;
+  align-items: center;
+}
+@media (min-width: 768px) {
+  .lp-landing-apple .problem-grid-apple {
+    grid-template-columns: 1fr 1fr;
+    gap: 72px;
+  }
+}
+
 /* Bez background-attachment:fixed — izbegava repaint na svaki scroll, manje lag-a */
 /* @media (min-width: 769px) { .problem-solution-bg__image { background-attachment: fixed; } } */
 
-/* VideoShowcase → Blog — jedinstvena plexus pozadina; contain smanjuje repaint pri skrolu */
+/* VideoShowcase → Blog — jedinstvena plexus pozadina; blaži contain = manje agresivno pri skrolu */
 .plexus-sections-bg {
   position: relative;
   overflow: hidden;
-  contain: layout style paint;
+  contain: layout;
 }
 
 .plexus-sections-bg__image {
@@ -299,29 +1197,12 @@ body {
 /* Bez fixed — manje lag-a pri skrolu */
 /* @media (min-width: 769px) { .plexus-sections-bg__image { background-attachment: fixed; } } */
 
-/* Dynamic import — tih placeholder dok se chunk učitava */
+/* Placeholder za deferred/dynamic sekcije — statičan (bez beskonačne animacije = manje GPU) */
 .section-chunk-fallback {
-  min-height: clamp(240px, 28vh, 420px);
+  min-height: clamp(220px, 26vh, 400px);
   width: 100%;
   border-radius: 0;
-  background: linear-gradient(
-    100deg,
-    rgba(255, 255, 255, 0.02) 40%,
-    rgba(255, 255, 255, 0.055) 50%,
-    rgba(255, 255, 255, 0.02) 60%
-  );
-  background-size: 200% 100%;
-  animation: section-chunk-shimmer 1.15s ease-in-out infinite;
-}
-@keyframes section-chunk-shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .section-chunk-fallback {
-    animation: none;
-    background: rgba(255, 255, 255, 0.02);
-  }
+  background: rgba(255, 255, 255, 0.022);
 }
 
 /* Animated gradient text */
@@ -395,11 +1276,7 @@ body {
   .hero-vsl-pulse-ring { animation: none !important; opacity: 0.35; }
 }
 
-/* Hero VSL u repro / fullscreen: pauziraj beskonačne animacije da dekodiranje ne secka */
-html[data-hero-vsl-heavy="1"] .video-showcase-section .vs-track-l,
-html[data-hero-vsl-heavy="1"] .video-showcase-section .vs-track-r {
-  animation-play-state: paused !important;
-}
+/* Hero VSL u repro / fullscreen: showcase je horizontalni skrol (bez CSS marquee); autoplay gasi React preko paused prop-a */
 html[data-hero-vsl-heavy="1"] .marquee-track,
 html[data-hero-vsl-heavy="1"] .marquee-track-reverse {
   animation-play-state: paused !important;
@@ -778,6 +1655,26 @@ html[data-hero-vsl-heavy="1"] .ticker-track.ticker-anim {
   object-fit: cover;
 }
 
+/* Hero VSL: puna širina unutar .section-container (do --landing-shell-max), ne samo 42rem copy stub. */
+.lp-landing-apple .hero-vsl-outer {
+  width: 100%;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 1024px) {
+  .lp-landing-apple .hero-vsl-outer .hero-vsl-frame {
+    border-radius: 18px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .lp-landing-apple .hero-vsl-outer .hero-vsl-frame {
+    border-radius: 20px;
+  }
+}
+
 /* Hero VSL: box-shadow samo preko CSS :hover — manje React re-rendera na mousemove */
 .hero-vsl-frame {
   box-shadow: 0 16px 50px rgba(0, 0, 0, 0.6);
@@ -825,8 +1722,7 @@ input:focus::placeholder {
   background-color: var(--gv-bg);
   position: relative;
   overflow-x: clip;
-  /* visina stranice = sadržaj — izbegava prazan skrol ispod sekcije */
-  min-height: auto;
+  min-height: 100vh;
 }
 
 .giveaway-page__bg {
@@ -899,8 +1795,6 @@ input:focus::placeholder {
 .giveaway-page__main {
   position: relative;
   z-index: 1;
-  /* Fiksni header (72px): sadržaj i pozadina giveaway sekcije kreću ispod njega */
-  padding-top: 72px;
 }
 
 .giveaway-page__headline {
@@ -939,40 +1833,21 @@ input:focus::placeholder {
 }
 
 .giveaway-page__card {
-  position: relative;
   max-width: 640px;
   margin: 0 auto;
   border-radius: 28px;
-  border: 1px solid rgba(79, 227, 240, 0.44);
-  background:
-    radial-gradient(500px 320px at 12% 14%, rgba(0, 212, 255, 0.07), transparent 58%),
-    radial-gradient(380px 260px at 84% 84%, rgba(102, 45, 145, 0.06), transparent 62%),
-    rgba(8, 14, 24, 0.78);
+  border: 1px solid var(--gv-border);
+  background: linear-gradient(180deg, rgba(0, 212, 255, 0.08) 0%, rgba(102, 45, 145, 0.06) 22%, rgba(5, 5, 8, 0.92) 62%);
   box-shadow:
-    0 14px 44px rgba(0, 0, 0, 0.40),
-    0 0 46px rgba(0, 212, 255, 0.24),
-    0 0 70px rgba(102, 45, 145, 0.18);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+    0 18px 80px rgba(0, 0, 0, 0.48),
+    0 0 44px rgba(0, 212, 255, 0.10),
+    0 0 64px rgba(102, 45, 145, 0.12);
   padding: 28px 24px;
-}
-.giveaway-page__card::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  pointer-events: none;
-  border: 1px solid rgba(79, 227, 240, 0.58);
-  box-shadow:
-    0 0 0 1px rgba(79, 227, 240, 0.22) inset,
-    0 0 36px rgba(79, 227, 240, 0.40),
-    0 0 56px rgba(123, 97, 255, 0.24);
 }
 
 @media (max-width: 640px) {
   .giveaway-page__section {
-    /* main već ima padding-top za header; ostaje samo bočni i kompaktniji donji razmak */
-    padding: 24px 16px 20px !important;
+    padding: 92px 16px 92px !important;
   }
 
   .giveaway-page__headline {
@@ -988,11 +1863,8 @@ input:focus::placeholder {
   }
 
   .giveaway-page__card {
-    border-radius: 20px;
-    padding: 14px 12px 16px;
-    width: 100%;
-    max-width: 640px;
-    box-sizing: border-box;
+    border-radius: 22px;
+    padding: 18px 14px 16px;
     box-shadow:
       0 14px 46px rgba(0, 0, 0, 0.44),
       0 0 30px rgba(0, 212, 255, 0.10),

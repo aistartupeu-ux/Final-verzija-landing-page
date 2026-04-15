@@ -7,28 +7,116 @@ import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 const faqs = [
   {
-    q: "Da li je ovo za potpune početnike?",
-    a: "Da. Kurs je dizajniran od nule. Ne treba ti prethodno znanje o AI-u, kodiranju niti filmskoj produkciji. Vodiš se korak po korak od osnova do prvog projekta.",
+    q: "Koliko košta program?",
+    a: `Razumemo zašto je to prvo pitanje.
+Cena je 297€, jednokratno nema mesečnih plaćanja.
+
+Ali realno pitanje nije cena.
+Pitanje je da li ćeš nastaviti da gubiš vreme na lutanje…
+ili ćeš imati jasan put šta da radiš.`,
+  },
+  {
+    q: "Da li ovo stvarno može da donese zaradu?",
+    a: [
+      "Ovo je drugo najčešće pitanje.",
+      "AI sam po sebi ne znači ništa.",
+      "Ali ako znaš kako da ga koristiš za:",
+      "",
+      "ㆍReklame",
+      "ㆍContent",
+      "ㆍKlijente",
+      "",
+      "Onda postaje alat za prihod.",
+    ].join("\n"),
   },
   {
     q: "Na kom jeziku je sadržaj?",
     a: "Ceo kurs je na srpsko-hrvatskom jeziku. Svi materijali, videi i zajednica su u potpunosti lokalizovani za Balkan.",
   },
   {
-    q: "Koliko traje kurs i koliko vremena sedmično treba?",
-    a: "Program ima 8 modula sa 30+ sati sadržaja. Možeš napredovati sopstvenim tempom, preporučujemo 3-5 sati sedmično za optimalne rezultate.",
+    q: "Koliko brzo mogu da dođem do prvog klijenta ili zarade?",
+    a: `Brže nego što misliš,
+ako prestaneš da čekaš i kreneš da radiš.
+
+Neki ljudi čekaju da „nauče sve“ pa nikad ne krenu.
+Drugi krenu odmah i uče kroz praksu.
+Mi te vodimo da što pre dođeš do prvih konkretnih rezultata,
+ne da samo gledaš i skupljaš informacije.`,
+  },
+  {
+    q: "Da li je ovo za mene ako nemam iskustva i ne znam odakle da krenem?",
+    a: `Ako ti je u glavi:
+„nemam pojma odakle da krenem“
+„nemam iskustva“
+„da li mi treba znanje u programiranju“
+
+Onda si tačno tamo gde većina počinje.
+I to je normalno.
+
+Ne treba ti nikakvo tehničko znanje.
+Ne treba ti iskustvo.
+Ako znaš da koristiš računar i internet, imaš sve što ti treba.
+
+Problem nije što ne znaš AI.
+Problem je što nemaš jasan smer.
+
+Zato je kurs napravljen da te vodi od nule, korak po korak,
+bez lutanja i bez komplikovanja.`,
   },
   {
     q: "Kada dobijam pristup kursu?",
-    a: "Nakon što se prijaviš, dolaziš na listu čekanja. Za 3 nedelje otvaramo kupovinu samo za prijavljene. Imaš 7 dana da se odlučiš, posle toga zatvaramo prijave.",
+    a: `Nakon prijave ulaziš na waitlistu.
+Kupovina se 15. aprila, prvo za ljude sa liste.`,
+  },
+  {
+    q: "Koje alate treba da koristim i koliko to košta?",
+    a: `Realno pitanje, jer danas ih ima previše.
+Zato ti tačno pokazujemo koje koristiti, kada i zašto,
+bez bacanja para i bez testiranja naslepo.
+
+Možeš da kreneš sa free verzijama i minimalnim troškom.
+Kasnije, kad vidiš rezultate, tek tada ima smisla ulagati više.`,
+  },
+  {
+    q: "Da li ovo stvarno radi ili je samo hype?",
+    a: `Razumemo skeptičnost.
+Većina ljudi tako razmišlja dok ne vidi kako izgleda u praksi.
+AI već koriste ozbiljne firme, pitanje je samo da li ćeš i ti.`,
+  },
+  {
+    q: "Šta ako nemam biznis?",
+    a: `To je zapravo prednost.
+Krećeš od nule, ali sa pravim smerom.
+Gradiš skill koji možeš odmah da naplatiš.`,
+  },
+  {
+    q: "Da li mogu sve ovo sam ili mi treba tim?",
+    a: `Da li mogu sve ovo sam ili mi treba tim?
+Danas više nego ikad, možeš sam.
+AI ti daje brzinu i mogućnosti
+koje su ranije imali samo timovi.`,
   },
   {
     q: "Postoji li podrška tokom kursa?",
-    a: "Da. Dobijаš pristup privatnoj zajednici gdje možeš postavljati pitanja, deliti projekte i dobijati feedback. Instruktori su aktivni u zajednici.",
+    a: `Da.
+Ne ostaješ sam sa materijalom.
+Ako zapneš ili se izgubiš usput, tu smo.
+Dobijaš pristup privatnoj zajednici gde možeš da pitaš,
+podeliš šta radiš i dobiješ konkretan feedback.
+
+Instruktori su aktivni u zajednici,
+nije da postaviš pitanje i čekaš danima.`,
   },
   {
     q: "Šta ako nisam zadovoljan kursem?",
-    a: "Ovo je program koji zahteva akciju, ne pasivno gledanje. Ako prođeš kroz gradivo i ne vidiš vrednost, razgovaraćemo. Cilj nam je tvoj napredak, ne tvoj novac.",
+    a: `Fer pitanje.
+Ovo nije kurs koji samo gledaš,
+nego program koji traži da primeniš.
+Ako prođeš kroz gradivo i stvarno ne vidiš vrednost,
+razgovaraćemo.
+
+Cilj nam je da napraviš rezultat,
+ne da samo kupiš kurs.`,
   },
 ];
 
@@ -52,7 +140,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
           textAlign: "left", gap: 16, fontFamily: "inherit",
         }}
       >
-        <span style={{ fontSize: 15, fontWeight: 600, color: open ? "#fff" : "#ccc", lineHeight: 1.4, transition: "color 0.2s" }}>
+        <span style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.01em", color: "#ffffff", lineHeight: 1.4 }}>
           {q}
         </span>
         <div style={{
@@ -68,11 +156,11 @@ function FAQItem({ q, a }: { q: string; a: string }) {
         </div>
       </button>
       <div style={{
-        maxHeight: open ? 300 : 0,
+        maxHeight: open ? 3200 : 0,
         overflow: "hidden",
         transition: "max-height 0.35s cubic-bezier(0.4,0,0.2,1)",
       }}>
-        <p style={{ fontSize: 14, color: "#888", lineHeight: 1.75, paddingBottom: 20 }}>
+        <p style={{ fontSize: 16, color: "rgba(245,245,247,0.55)", lineHeight: 1.55, paddingBottom: 20, whiteSpace: "pre-line" }}>
           {a}
         </p>
       </div>
@@ -87,26 +175,29 @@ export default function FAQSection() {
   const iv = inView || reduced;
 
   return (
-    <section ref={ref} className={reduced ? "sr-nomotion" : undefined} style={{ position: "relative", zIndex: 10, padding: "100px 24px", contentVisibility: "auto", containIntrinsicSize: "auto 550px" }}>
-      <div className="section-container" style={{ maxWidth: 720 }}>
-        <div className={`sr-from-y sr-from-y-xl sr-ease ${iv ? "sr-inview" : ""}`} style={{ textAlign: "center", marginBottom: 48 }}>
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 8,
-            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: 50, padding: "6px 16px", marginBottom: 18,
-          }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#00d4ff", boxShadow: "0 0 6px #00d4ff" }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#aaa", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>FAQ</span>
+    <section
+      ref={ref}
+      className={`landing-section-y${reduced ? " sr-nomotion" : ""}`}
+      style={{ position: "relative", zIndex: 10 }}
+    >
+      <div className="section-container landing-measure-narrow">
+        <div className={`landing-section-head sr-from-y sr-from-y-xl sr-ease ${iv ? "sr-inview" : ""}`}>
+          <div className="landing-eyebrow-pill landing-eyebrow-pill--muted">
+            <span
+              className="landing-eyebrow-dot landing-eyebrow-dot--muted"
+              style={{ background: "#00d4ff", boxShadow: "0 0 8px rgba(0,212,255,0.4)" }}
+            />
+            <span className="landing-eyebrow-pill-label">FAQ</span>
           </div>
-          <h2 style={{ fontSize: "clamp(26px, 4.5vw, 44px)", fontWeight: 800, lineHeight: 1.15 }}>
-            Imaš pitanja? <span style={{ color: "#00d4ff" }}>Mi imamo odgovore.</span>
+          <h2 className="landing-display">
+            Imaš pitanja? <span className="apple-accent-gradient">Mi imamo odgovore.</span>
           </h2>
         </div>
 
         {(inView || reduced) && (
           <div>
-            {faqs.map((item, i) => (
-              <FAQItem key={i} q={item.q} a={item.a} />
+            {faqs.map((item) => (
+              <FAQItem key={item.q} q={item.q} a={item.a} />
             ))}
           </div>
         )}

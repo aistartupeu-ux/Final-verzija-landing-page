@@ -1,16 +1,30 @@
 "use client";
 
-import { useRef, useEffect, useState, memo, useCallback } from "react";
+import { useRef, useEffect, useLayoutEffect, useState, memo, useCallback } from "react";
 import { useInView } from "@/lib/use-in-view";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
-import Image from "next/image";
+import NextImage from "next/image";
 import { Sparkles } from "lucide-react";
 import { getCdnMediaUrl } from "@/lib/cdn-media";
 import { useDocumentHtmlDataFlag } from "@/lib/use-html-data-flag";
-import { CDN_PATH_SHOWCASE_ROW1, CDN_PATH_SHOWCASE_ROW2 } from "@/lib/video-cdn-paths";
+import { CDN_PATH_SHOWCASE_VIDEOS } from "@/lib/video-cdn-paths";
 
-const DEFAULT_ROW1 = CDN_PATH_SHOWCASE_ROW1.map((p) => getCdnMediaUrl(p));
-const DEFAULT_ROW2 = CDN_PATH_SHOWCASE_ROW2.map((p) => getCdnMediaUrl(p));
+/** Isti URL kao video, pathname .webm → .webp (poster na CDN-u / public/). */
+function posterUrlFromVideoUrl(videoUrl: string): string {
+  try {
+    if (videoUrl.startsWith("http://") || videoUrl.startsWith("https://")) {
+      const u = new URL(videoUrl);
+      u.pathname = u.pathname.replace(/\.webm$/i, ".webp");
+      return u.href;
+    }
+  } catch {
+    /* fall through */
+  }
+  return videoUrl.replace(/\.webm(?=$|[?#])/i, ".webp");
+}
+
+/** Podrazumevana lista ako stranica ne prosledi URL-ove (skraćeni showcase). */
+const DEFAULT_SHOWCASE_VIDEOS = CDN_PATH_SHOWCASE_VIDEOS.map((p) => getCdnMediaUrl(p));
 
 const VIDEO_CARD_BG =
   "linear-gradient(135deg, rgba(15,15,28,0.95) 0%, rgba(25,20,45,0.9) 100%)";
@@ -27,7 +41,7 @@ const LogoFallback = () => (
       background: VIDEO_CARD_BG,
     }}
   >
-    <Image
+    <NextImage
       src="/logo.png"
       alt="AI Hype Academy"
       width={100}
@@ -39,165 +53,190 @@ const LogoFallback = () => (
   </div>
 );
 
-const LOAD_REVEAL_FALLBACK_MS = 12_000;
-const VIDEO_NEAR_VIEWPORT_ROOT_MARGIN = "220px 260px 220px 260px";
-const SHOWCASE_PREWARM_MARGIN = "900px 0px 900px 0px";
-const DESKTOP_INITIAL_ATTACH_COUNT = 4;
-const DESKTOP_ATTACH_STEP_MS = 260;
-const DESKTOP_ATTACH_PAUSED_STEP_MS = 420;
-const DESKTOP_ATTACH_START_DELAY_MS = 260;
-const DESKTOP_TOP_ROW_AUTOPLAY_MAX = 2;
-const DESKTOP_SECOND_AUTOPLAY_DELAY_MS = 850;
+/** Retki IO pragovi — izbegava guste setState-ove dok skroluješ preko sekcije (useInView podrazumevano koristi ~17 pragova). */
+const SHOWCASE_INVIEW_THRESHOLDS = [0, 0.16, 0.35, 0.55, 0.75, 1] as const;
+/**
+ * Light-strip (telefon/tablet): histeresis za jedan `<video src>`.
+ * — Drži trenutnu karticu dok ima bar ovoliko vidljive površine (video „radi do kraja“).
+ * — Sledeća mora da bude za ovoliko viša po površini da preuzme pre vremena (manje treperenja).
+ * — Kandidat sa bilo kakvim presekom ulazi u igru (ivica u kadru = počinje učitavanje u sledećem tick-u).
+ */
+/** Drži slot dok desna ivica kartice ne prođe skoro pored leve ivice scroll-root-a (px). */
+const LIGHT_STRIP_HOLD_RIGHT_VS_ROOT_LEFT_PX = 2;
+/** Koliko često biramo aktivni slot na touch / tablet traci (marquee). */
+const MOBILE_VIDEO_PICK_MS = 180;
+/** Trajanje jednog kruga automatske trake (s); skalira se sa brojem klipova. */
+const SHOWCASE_MARQUEE_BASE_S = 38;
+const SHOWCASE_MARQUEE_PER_CARD_S = 3.2;
+/** Minimalan horizontalni udeo širine kartice u preseku sa root-om za autoplay ranking (ivica u kadar). */
+const VISIBILITY_AUTOPLAY_MIN_H_FRAC = 0.002;
+const DEFAULT_MAX_AUTOPLAY_DESKTOP = 3;
+const DEFAULT_MAX_AUTOPLAY_MOBILE = 1;
+/** Koliko često računamo vidljivost kartica (polling; ređe = manje getBoundingClientRect pri skrolu stranice). */
+const VISIBILITY_POLL_MS = 750;
+/** Desktop/light-strip: koliko px širimo root levo-desno da se media kači pre ulaska u kadar (~2 kartice). */
+const SHOWCASE_HORIZONTAL_PREFETCH_PX = 520;
+/** Desktop: periodično ponovo zakači vidljive kartice (hvata ref/layout bez skrola). */
+const DESKTOP_ATTACH_POLL_MS = 650;
 
-function makeDesktopInitialKeys(primaryLen: number): Set<string> {
-  const next = new Set<string>();
-  let attached = 0;
-  for (let i = 0; i < primaryLen && attached < DESKTOP_INITIAL_ATTACH_COUNT; i += 2) {
-    next.add(String(i));
-    attached += 1;
-  }
-  return next;
+/** Jedinstven ključ za koju fizičku karticu (prva ili druga kopija u loop-u) drži `<video src>` na mobilnom. */
+function mobileVideoAttachKey(segment: "first" | "second", baseIdx: number): string {
+  return `${segment}-${baseIdx}`;
 }
 
+function horizontalOverlapWidthPx(el: HTMLElement, sr: DOMRect): number {
+  const er = el.getBoundingClientRect();
+  return Math.max(0, Math.min(er.right, sr.right) - Math.max(er.left, sr.left));
+}
+
+/** Širi „prozor“ levo-desno da se `<video src>` kači pre nego što kartica uđe u pravi kadar (desktop + light-strip pick). */
+function horizontalOverlapWithPrefetchPx(
+  el: HTMLElement,
+  root: HTMLElement,
+  expandX: number
+): number {
+  const sr = root.getBoundingClientRect();
+  const left = sr.left - expandX;
+  const right = sr.right + expandX;
+  const er = el.getBoundingClientRect();
+  return Math.max(0, Math.min(er.right, right) - Math.max(er.left, left));
+}
+
+/** Udeo širine kartice koji je u horizontalnom preseku sa root rect-om (ivica do ivice root-a). */
+function horizontalVisibleWidthFraction(el: HTMLElement, sr: DOMRect): number {
+  const iw = horizontalOverlapWidthPx(el, sr);
+  const er = el.getBoundingClientRect();
+  if (er.width <= 0) return 0;
+  return iw / er.width;
+}
+
+function elementForMobileVideoSlotKey(
+  key: string,
+  firstRefs: { current: (HTMLElement | null)[] },
+  secondRefs: { current: (HTMLElement | null)[] }
+): HTMLElement | null {
+  const m = /^(first|second)-(\d+)$/.exec(key);
+  if (!m) return null;
+  const idx = Number(m[2]);
+  if (Number.isNaN(idx)) return null;
+  return m[1] === "first" ? firstRefs.current[idx] ?? null : secondRefs.current[idx] ?? null;
+}
+
+/** Laptop/desktop: ručni skrol + pun desktop režim. Ostalo: automatski marquee + jedan video (posteri). */
+function getShowcaseDesktopLike(): boolean {
+  if (globalThis.window === undefined) return true;
+  return (
+    globalThis.window.matchMedia("(min-width: 1100px)").matches &&
+    globalThis.window.matchMedia("(hover: hover)").matches &&
+    globalThis.window.matchMedia("(pointer: fine)").matches
+  );
+}
+
+/**
+ * Jedna horizontalna traka: ista lista klipova renderuje se dva puta uzastopno u istom flex redu.
+ * To nije „drugi red“ — standard je za beskonačni skrol: kad `scrollLeft` pređe pola širine, pomerimo ga za −half
+ * i korisnik vidi isti sadržaj (šav je nevidljiv). `showcaseLoopSegment` razlikuje dve ćelije istog indeksa za ref/IO.
+ */
 const VideoCard = memo(function VideoCard({
-  instanceKey,
   src,
+  posterUrl,
   reduced,
   sectionInView,
   canAttach = sectionInView,
-  lazySrcMode = "io",
   manualSrcAttached = false,
   hoverLoop = false,
-  tapToPlay = false,
-  tapGroup,
   autoPlayActive = false,
   allowAutoPlay = true,
-  onVisibilityRatio,
-}: {
-  instanceKey: string;
+  showcaseBaseIndex,
+  showcaseLoopSegment,
+  registerShowcaseCard,
+  posterAsPlaceholder = false,
+  posterLoading = "lazy",
+}: Readonly<{
   src: string;
+  posterUrl: string;
   reduced: boolean;
   sectionInView: boolean;
-  /** Allow metadata/src attach before full in-view to prewarm decode/network. */
   canAttach?: boolean;
-  /** Desktop opt: "manual" = parent controls attach cadence; "io" = per-card IntersectionObserver. */
-  lazySrcMode?: "io" | "manual";
-  /** Used when lazySrcMode="manual". */
   manualSrcAttached?: boolean;
-  /** Donji red: puštanje na hover (desktop). */
   hoverLoop?: boolean;
-  /** Telefon: puštanje na tap (bez autoplay-a ili kao override za klipove koji nisu u autoplay setu). */
-  tapToPlay?: boolean;
-  /** Grupisanje da tap pauzira ostale u istoj grupi. */
-  tapGroup?: string;
   autoPlayActive?: boolean;
-  /** Za auto red: false kad je marquee zbog skrola ili sekcija van kadra. */
   allowAutoPlay?: boolean;
-  onVisibilityRatio?: (key: string, ratio: number) => void;
-}) {
+  showcaseBaseIndex?: number;
+  showcaseLoopSegment?: "first" | "second";
+  registerShowcaseCard?: (baseIndex: number, segment: "first" | "second", el: HTMLDivElement | null) => void;
+  /** Mobil: kad nema video src, prikaži WebP poster umesto loga — brz paint, bez dekodera. */
+  posterAsPlaceholder?: boolean;
+  posterLoading?: "eager" | "lazy";
+}>) {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
   const [videoSrc, setVideoSrc] = useState(src);
-  /** Ne vezuj src dok kartica nije blizu viewporta — ne povlači sve mp4 odjednom. */
-  const [srcAttached, setSrcAttached] = useState(false);
-  const [nearViewport, setNearViewport] = useState(false);
   const [hoverAttached, setHoverAttached] = useState(false);
   const [hoverPlaying, setHoverPlaying] = useState(false);
-  const [tapPlaying, setTapPlaying] = useState(false);
-  const didMarkLoaded = useRef(false);
+  const [posterUnderlayFailed, setPosterUnderlayFailed] = useState(false);
+  const [posterPlaceholderFailed, setPosterPlaceholderFailed] = useState(false);
+  const [videoHasRenderableFrame, setVideoHasRenderableFrame] = useState(false);
   const errorRetries = useRef(0);
 
-  const markLoaded = useCallback(() => {
-    if (didMarkLoaded.current) return;
-    didMarkLoaded.current = true;
-    setLoaded(true);
-  }, []);
+  useEffect(() => {
+    const id = globalThis.window.requestAnimationFrame(() => {
+      setPosterUnderlayFailed(false);
+      setPosterPlaceholderFailed(false);
+      setVideoHasRenderableFrame(false);
+    });
+    return () => globalThis.window.cancelAnimationFrame(id);
+  }, [posterUrl, src]);
 
-  const effectiveSrcAttached =
-    lazySrcMode === "manual"
-      ? Boolean(canAttach && nearViewport && (manualSrcAttached || hoverAttached) && !reduced && !failed)
-      : srcAttached;
+  const effectiveSrcAttached = Boolean(
+    canAttach && (manualSrcAttached || hoverAttached) && !reduced && !failed
+  );
 
   useEffect(() => {
-    // Track whether card is near viewport and attach src only in near zone.
-    if (reduced || failed || !canAttach) return;
-    const el = cardRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([e]) => {
-        const isNear = Boolean(e?.isIntersecting);
-        setNearViewport(isNear);
-        // Mobilni stability: jednom kad je src attachovan, ne skidaj ga ponovo (sprečava stalne reload/decode spike).
-        if (lazySrcMode === "io") setSrcAttached((prev) => prev || isNear);
-      },
-      { root: null, rootMargin: VIDEO_NEAR_VIEWPORT_ROOT_MARGIN, threshold: 0 }
-    );
-    io.observe(el);
-    return () => {
-      io.disconnect();
-      setNearViewport(false);
-      // Namerno: ne resetuj srcAttached u IO režimu (sticky attach).
-    };
-  }, [lazySrcMode, reduced, failed, canAttach]);
+    if (effectiveSrcAttached) return;
+    const id = globalThis.window.requestAnimationFrame(() => {
+      setVideoHasRenderableFrame(false);
+    });
+    return () => globalThis.window.cancelAnimationFrame(id);
+  }, [effectiveSrcAttached]);
 
-  useEffect(() => {
-    // Visibility reporting for autoplay decisions.
-    if (reduced || failed || !sectionInView || !onVisibilityRatio) return;
-    const el = cardRef.current;
-    if (!el) return;
-    const thresholds = [0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95, 1];
-    const io = new IntersectionObserver(
-      (entries) => {
-        const e = entries[0];
-        if (!e) return;
-        onVisibilityRatio(instanceKey, e.intersectionRatio);
-      },
-      { root: null, rootMargin: "0px", threshold: thresholds }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [reduced, failed, sectionInView, onVisibilityRatio, instanceKey]);
+  const setCardEl = useCallback(
+    (el: HTMLDivElement | null) => {
+      cardRef.current = el;
+      if (showcaseBaseIndex !== undefined && showcaseLoopSegment && registerShowcaseCard) {
+        registerShowcaseCard(showcaseBaseIndex, showcaseLoopSegment, el);
+      }
+    },
+    [showcaseBaseIndex, showcaseLoopSegment, registerShowcaseCard]
+  );
 
   const shouldPlay =
-    (tapToPlay && tapPlaying && sectionInView) ||
     (hoverLoop && hoverPlaying && sectionInView) ||
     (autoPlayActive && allowAutoPlay);
 
   useEffect(() => {
-    if (!tapToPlay || !tapGroup) return;
-    const onTap = (e: Event) => {
-      const ev = e as CustomEvent<{ group?: string; key?: string }>;
-      if (!ev.detail) return;
-      if (ev.detail.group !== tapGroup) return;
-      if (ev.detail.key === instanceKey) return;
-      setTapPlaying(false);
-    };
-    window.addEventListener("aha:tap-play", onTap);
-    return () => window.removeEventListener("aha:tap-play", onTap);
-  }, [tapToPlay, tapGroup, instanceKey]);
-
-  useEffect(() => {
     const v = videoRef.current;
     if (!v || failed || !effectiveSrcAttached) return;
+    /* Uvek auto kad je src u DOM-u — bez čekanja na hover da bi se učitao kadar (neparni desktop). */
+    v.preload = "auto";
     if (shouldPlay) {
-      v.preload = "auto";
       void v.play().catch(() => {});
     } else {
       v.pause();
-      // Keep non-active cards light to prevent decode spikes near section boundaries.
-      v.preload = "none";
     }
   }, [shouldPlay, failed, effectiveSrcAttached, videoSrc]);
 
+  /** Safari/WebKit: kratak seek kad krene repro da se iscrta kadar (samo kad stvarno puštamo). */
   useEffect(() => {
-    if (reduced || failed || !sectionInView || loaded || !effectiveSrcAttached) return;
-    const t = window.setTimeout(() => {
-      if (!didMarkLoaded.current) markLoaded();
-    }, LOAD_REVEAL_FALLBACK_MS);
-    return () => clearTimeout(t);
-  }, [sectionInView, reduced, failed, loaded, markLoaded, effectiveSrcAttached]);
+    const v = videoRef.current;
+    if (!v || failed || !effectiveSrcAttached || !shouldPlay) return;
+    try {
+      v.currentTime = 0.001;
+    } catch {
+      /* ignore */
+    }
+  }, [shouldPlay, failed, effectiveSrcAttached]);
 
   if (reduced) {
     return (
@@ -221,8 +260,10 @@ const VideoCard = memo(function VideoCard({
 
   return (
     <div
-      ref={cardRef}
+      ref={setCardEl}
       className="video-card"
+      data-showcase-base={showcaseBaseIndex !== undefined ? String(showcaseBaseIndex) : undefined}
+      data-showcase-segment={showcaseLoopSegment}
       style={{
         flexShrink: 0,
         borderRadius: 18,
@@ -235,29 +276,12 @@ const VideoCard = memo(function VideoCard({
         cursor: hoverLoop ? "pointer" : "default",
         background: VIDEO_CARD_BG,
       }}
-      onClick={() => {
-        if (!tapToPlay) return;
-        if (!sectionInView) return;
-        // On tap, ensure src is attached in both modes.
-        if (lazySrcMode === "manual") setHoverAttached(true);
-        if (lazySrcMode === "io") setSrcAttached(true);
-
-        const next = !tapPlaying;
-        setTapPlaying(next);
-        if (next && tapGroup) {
-          try {
-            window.dispatchEvent(new CustomEvent("aha:tap-play", { detail: { group: tapGroup, key: instanceKey } }));
-          } catch {
-            // ignore
-          }
-        }
-      }}
       onPointerEnter={() => {
-        if (lazySrcMode === "manual") setHoverAttached(true);
+        setHoverAttached(true);
         if (!hoverLoop) return;
         if (!sectionInView) return;
-        if (typeof window === "undefined") return;
-        if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+        if (globalThis.window === undefined) return;
+        if (!globalThis.window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
         setHoverPlaying(true);
       }}
       onPointerLeave={() => {
@@ -265,27 +289,62 @@ const VideoCard = memo(function VideoCard({
         setHoverPlaying(false);
       }}
     >
-      {!failed && (lazySrcMode === "manual" ? effectiveSrcAttached : srcAttached) && (
-        <video
+      {!failed && effectiveSrcAttached && (
+        <>
+          {!posterUnderlayFailed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={posterUrl}
+              alt=""
+              width={400}
+              height={712}
+              decoding="async"
+              loading="eager"
+              draggable={false}
+              onError={() => setPosterUnderlayFailed(true)}
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                pointerEvents: "none",
+                background: VIDEO_CARD_BG,
+              }}
+            />
+          ) : (
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 0,
+                background: VIDEO_CARD_BG,
+              }}
+            />
+          )}
+          <video
           ref={videoRef}
           src={videoSrc}
           muted
           loop={shouldPlay}
           playsInline
           disableRemotePlayback
-          preload={shouldPlay ? "auto" : "metadata"}
+          preload="auto"
           onError={() => {
             if (errorRetries.current >= 1) {
               setFailed(true);
               return;
             }
             errorRetries.current += 1;
-            didMarkLoaded.current = false;
-            setLoaded(false);
             try {
               const u = videoSrc.startsWith("http")
                 ? new URL(videoSrc)
-                : new URL(videoSrc, typeof window !== "undefined" ? window.location.href : "https://local.invalid");
+                : new URL(
+                    videoSrc,
+                    globalThis.window?.location.href ?? "https://local.invalid"
+                  );
               u.searchParams.set("_r", String(Date.now()));
               setVideoSrc(u.href);
             } catch {
@@ -306,33 +365,23 @@ const VideoCard = memo(function VideoCard({
             if (!v || failed || !shouldPlay) return;
             void v.play().catch(() => {});
           }}
-          onProgress={() => {
-            const el = videoRef.current;
-            if (!el || failed || didMarkLoaded.current) return;
-            try {
-              if (el.buffered.length > 0 && el.buffered.end(0) > 0.05) markLoaded();
-            } catch {
-              /* ignore */
-            }
-          }}
+          onPlaying={() => setVideoHasRenderableFrame(true)}
           onLoadedMetadata={() => {
             const v = videoRef.current;
             if (!v) return;
             try {
-              v.currentTime = 0.001;
               if (!shouldPlay) v.pause();
             } catch {
               /* ignore */
             }
-            markLoaded();
           }}
           onLoadedData={() => {
+            setVideoHasRenderableFrame(true);
             if (!shouldPlay) videoRef.current?.pause();
-            markLoaded();
           }}
           onCanPlay={() => {
+            setVideoHasRenderableFrame(true);
             if (!shouldPlay) videoRef.current?.pause();
-            markLoaded();
           }}
           style={{
             width: "100%",
@@ -342,15 +391,52 @@ const VideoCard = memo(function VideoCard({
             position: "absolute",
             inset: 0,
             zIndex: 1,
-            opacity: loaded ? 1 : 0,
-            transition: "opacity 0.25s ease",
-            transform: "translateZ(0)",
-            backfaceVisibility: "hidden",
             backgroundColor: "transparent",
+            opacity: videoHasRenderableFrame ? 1 : 0,
+            transition: "opacity 0.2s ease",
           }}
         />
+        </>
       )}
-      {!failed && (!(lazySrcMode === "manual" ? effectiveSrcAttached : srcAttached) || !loaded) && (
+      {!failed && !effectiveSrcAttached && posterAsPlaceholder && (
+        <>
+          {!posterPlaceholderFailed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={posterUrl}
+              alt=""
+              width={400}
+              height={712}
+              decoding="async"
+              loading={posterLoading}
+              draggable={false}
+              onError={() => setPosterPlaceholderFailed(true)}
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 2,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                pointerEvents: "none",
+                background: VIDEO_CARD_BG,
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 2,
+                pointerEvents: "none",
+              }}
+            >
+              <LogoFallback />
+            </div>
+          )}
+        </>
+      )}
+      {!failed && !effectiveSrcAttached && !posterAsPlaceholder && (
         <div
           style={{
             position: "absolute",
@@ -366,281 +452,547 @@ const VideoCard = memo(function VideoCard({
   );
 });
 
-const DRAG_SNAP_MS = 220;
-
-function pickTopVisibleNonAdjacent(entries: [string, number][], maxSlots: number): string[] {
-  const picked: string[] = [];
-  for (const [k] of entries) {
-    if (picked.length >= maxSlots) break;
-    const idx = Number(k);
-    if (!Number.isInteger(idx)) continue;
-    if (picked.some((pk) => Math.abs(Number(pk) - idx) <= 1)) continue;
-    picked.push(k);
-  }
-  return picked;
-}
-
 function VideoRow({
   videos,
-  reverse = false,
   paused = false,
   reduced,
   sectionInView,
   canAttachMedia,
-  hoverLoop = false,
-  /** Desktop: gornji red — svaki drugi + odloženi drugi autoplay (kao ranije). */
-  playEveryOtherDesktop = false,
-  /** Telefon: isključi autoplay (donji red), ali ostavi tap-to-play. */
-  disableAutoPlayOnMobile = false,
-  /** Telefon: tap-to-play za sve kartice u ovom redu. */
-  tapToPlayOnMobile = false,
-  /** Grupa za tap-to-play (pauzira ostale u istoj grupi). */
-  tapGroup,
-  autoPlayWinnerCount = 0,
-  autoPlayWinnerCountDesktop,
-}: {
+  maxConcurrentAutoplayDesktop = DEFAULT_MAX_AUTOPLAY_DESKTOP,
+  maxConcurrentAutoplayMobile = DEFAULT_MAX_AUTOPLAY_MOBILE,
+}: Readonly<{
   videos: string[];
-  reverse?: boolean;
   paused?: boolean;
   reduced: boolean;
   sectionInView: boolean;
   canAttachMedia: boolean;
-  hoverLoop?: boolean;
-  playEveryOtherDesktop?: boolean;
-  disableAutoPlayOnMobile?: boolean;
-  tapToPlayOnMobile?: boolean;
-  tapGroup?: string;
-  /** Mobilni / podrazumevano: najviše ovoliko autoplay (najvidljivije). */
-  autoPlayWinnerCount?: number;
-  /** Desktop: više autoplay; ako je veće od autoPlayWinnerCount, biraju se bez susednih kartica. */
-  autoPlayWinnerCountDesktop?: number;
-}) {
+  maxConcurrentAutoplayDesktop?: number;
+  maxConcurrentAutoplayMobile?: number;
+}>) {
+  const [isDesktopLike, setIsDesktopLike] = useState(() => getShowcaseDesktopLike());
+  const lightStrip = !isDesktopLike;
+  const isDesktopLikeRef = useRef(isDesktopLike);
+  const lightStripRef = useRef(lightStrip);
+  useEffect(() => {
+    isDesktopLikeRef.current = isDesktopLike;
+    lightStripRef.current = lightStrip;
+  }, [isDesktopLike, lightStrip]);
+
+  /** Ista lista dva puta uzastopno — beskonačni horizontalni skrol (isti klipovi, nema novih kartica). */
   const items = [...videos, ...videos];
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia("(max-width: 768px)").matches;
-  });
 
-  const [desktopSrcKeys, setDesktopSrcKeys] = useState<Set<string>>(() =>
-    makeDesktopInitialKeys(videos.length)
-  );
-  const desktopSrcTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [attachedBaseKeys, setAttachedBaseKeys] = useState<Set<string>>(() => new Set());
+  const [mobileVideoSlotKey, setMobileVideoSlotKey] = useState<string | null>(null);
+  const mobileVideoSlotKeyRef = useRef<string | null>(null);
+  const desktopSrcKeys = attachedBaseKeys;
 
-  const mobileSlots = reduced ? 0 : (disableAutoPlayOnMobile ? 0 : (autoPlayWinnerCount ?? 0));
-  const desktopSlots = reduced ? 0 : (autoPlayWinnerCountDesktop ?? autoPlayWinnerCount ?? 0);
-  const contestSlots = isMobile ? mobileSlots : desktopSlots;
-  const useSpacedDesktopPick =
-    !isMobile &&
-    !reduced &&
-    (autoPlayWinnerCountDesktop ?? 0) > (autoPlayWinnerCount ?? 0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const loopGuardRef = useRef(false);
+  const userScrolledRef = useRef(false);
+
+  const firstCopyRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const secondCopyRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  const maxSlotsEffective = reduced
+    ? 0
+    : lightStrip
+      ? Math.max(0, maxConcurrentAutoplayMobile)
+      : Math.max(0, maxConcurrentAutoplayDesktop);
 
   const visibilityRef = useRef<Map<string, number>>(new Map());
-  const rafPickRef = useRef(0);
-  const [winnerKeys, setWinnerKeys] = useState<Set<string>>(() => new Set());
-  const evenPrimaryVisibilityRef = useRef<Map<string, number>>(new Map());
-  const evenPrimaryRafRef = useRef(0);
-  const [evenPrimaryPlayKeys, setEvenPrimaryPlayKeys] = useState<Set<string>>(() => new Set());
-  const [evenPrimaryPlayOrder, setEvenPrimaryPlayOrder] = useState<string[]>([]);
-  const [secondAutoplayReady, setSecondAutoplayReady] = useState(false);
-  const secondAutoplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [activePlayKeys, setActivePlayKeys] = useState<Set<string>>(() => new Set());
 
-  const flushWinnerPick = useCallback(() => {
-    if (contestSlots <= 0) {
-      setWinnerKeys(new Set());
+  const flushActivePick = useCallback(() => {
+    if (maxSlotsEffective <= 0) {
+      setActivePlayKeys(new Set());
       return;
     }
-    const entries = [...visibilityRef.current.entries()]
-      .filter(([, r]) => r > 0.02)
-      .sort((a, b) => b[1] - a[1]);
-    const picked = useSpacedDesktopPick
-      ? pickTopVisibleNonAdjacent(entries, contestSlots)
-      : entries.slice(0, contestSlots).map(([k]) => k);
-    const next = new Set(picked);
-    setWinnerKeys((prev) => {
+    const ranked = [...visibilityRef.current.entries()]
+      .filter(([, r]) => r >= VISIBILITY_AUTOPLAY_MIN_H_FRAC)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k]) => k);
+    const selected: string[] = [];
+    const selectedIdx = new Set<number>();
+    const n = Math.max(1, videos.length);
+    for (const k of ranked) {
+      if (selected.length >= maxSlotsEffective) break;
+      const idx = Number(k);
+      if (Number.isNaN(idx)) continue;
+      const prev = (idx - 1 + n) % n;
+      const next = (idx + 1) % n;
+      if (selectedIdx.has(prev) || selectedIdx.has(next)) continue;
+      selected.push(k);
+      selectedIdx.add(idx);
+    }
+    // Fallback: ako je vidljivost takva da ne možemo popuniti budžet bez susednih,
+    // popuni ostatak po rangu da ne ostane sekcija "mrtva".
+    if (selected.length < maxSlotsEffective) {
+      for (const k of ranked) {
+        if (selected.length >= maxSlotsEffective) break;
+        if (selected.includes(k)) continue;
+        selected.push(k);
+      }
+    }
+    const next = new Set(selected);
+    setActivePlayKeys((prev) => {
       if (prev.size !== next.size) return next;
       for (const k of next) {
         if (!prev.has(k)) return next;
       }
       return prev;
     });
-  }, [contestSlots, useSpacedDesktopPick]);
+  }, [maxSlotsEffective, videos.length]);
 
-  const reportVisibility = useCallback(
-    (key: string, ratio: number) => {
-      if (contestSlots <= 0) return;
-      if (ratio < 0.02) visibilityRef.current.delete(key);
-      else visibilityRef.current.set(key, ratio);
-
-      if (rafPickRef.current) return;
-      rafPickRef.current = requestAnimationFrame(() => {
-        rafPickRef.current = 0;
-        flushWinnerPick();
-      });
-    },
-    [contestSlots, flushWinnerPick]
-  );
-
-  const reportEvenPrimaryVisibility = useCallback((key: string, ratio: number) => {
-    if (ratio < 0.08) evenPrimaryVisibilityRef.current.delete(key);
-    else evenPrimaryVisibilityRef.current.set(key, ratio);
-    if (evenPrimaryRafRef.current) return;
-    evenPrimaryRafRef.current = requestAnimationFrame(() => {
-      evenPrimaryRafRef.current = 0;
-      const picked = [...evenPrimaryVisibilityRef.current.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, DESKTOP_TOP_ROW_AUTOPLAY_MAX)
-        .map(([k]) => k);
-      const next = new Set(picked);
-      setEvenPrimaryPlayKeys((prev) => {
-        if (prev.size !== next.size) return next;
-        for (const k of next) {
-          if (!prev.has(k)) return next;
-        }
-        return prev;
-      });
-      setEvenPrimaryPlayOrder((prev) => {
-        if (prev.length !== picked.length) return picked;
-        for (let i = 0; i < picked.length; i += 1) {
-          if (prev[i] !== picked[i]) return picked;
-        }
-        return prev;
-      });
-    });
+  const registerShowcaseCard = useCallback((baseIndex: number, segment: "first" | "second", el: HTMLDivElement | null) => {
+    if (segment === "first") firstCopyRefs.current[baseIndex] = el;
+    else secondCopyRefs.current[baseIndex] = el;
   }, []);
+
+  /** Touch / tablet: jedan `<video src>`; prefetch zona širi root da se slot bira pre ulaska kartice u kadar. */
+  const pickMobileVideoSlot = useCallback(() => {
+    if (!lightStrip || reduced || !canAttachMedia) return;
+    const root = scrollRef.current;
+    if (!root) return;
+    const sr = root.getBoundingClientRect();
+    const px = SHOWCASE_HORIZONTAL_PREFETCH_PX;
+
+    type Cand = { key: string; left: number };
+    const cands: Cand[] = [];
+    for (let i = 0; i < videos.length; i += 1) {
+      const a = firstCopyRefs.current[i];
+      const b = secondCopyRefs.current[i];
+      if (a && horizontalOverlapWithPrefetchPx(a, root, px) > 0) {
+        cands.push({
+          key: mobileVideoAttachKey("first", i),
+          left: a.getBoundingClientRect().left,
+        });
+      }
+      if (b && horizontalOverlapWithPrefetchPx(b, root, px) > 0) {
+        cands.push({
+          key: mobileVideoAttachKey("second", i),
+          left: b.getBoundingClientRect().left,
+        });
+      }
+    }
+
+    const pickMaxLeft = (): string | null => {
+      if (cands.length === 0) return null;
+      let win = cands[0];
+      if (!win) return null;
+      for (let j = 1; j < cands.length; j += 1) {
+        const c = cands[j];
+        if (!c) continue;
+        if (c.left > win.left) win = c;
+      }
+      return win.key;
+    };
+
+    let next: string | null;
+    const cur = mobileVideoSlotKeyRef.current;
+    if (cands.length === 0) {
+      next = null;
+    } else if (cur) {
+      const curEl = elementForMobileVideoSlotKey(cur, firstCopyRefs, secondCopyRefs);
+      const curIw = curEl ? horizontalOverlapWidthPx(curEl, sr) : 0;
+      if (curEl && curIw > 0) {
+        const cer = curEl.getBoundingClientRect();
+        if (cer.right > sr.left + LIGHT_STRIP_HOLD_RIGHT_VS_ROOT_LEFT_PX) {
+          next = cur;
+        } else {
+          next = pickMaxLeft();
+        }
+      } else {
+        next = pickMaxLeft();
+      }
+    } else {
+      next = pickMaxLeft();
+    }
+
+    const syncAutoplayBase = (slot: string | null) => {
+      if (slot === null) {
+        setActivePlayKeys(new Set());
+      } else {
+        const parsed = /^(?:first|second)-(\d+)$/.exec(slot);
+        const base = parsed?.[1];
+        if (base !== undefined) setActivePlayKeys(new Set([base]));
+      }
+    };
+
+    if (next === mobileVideoSlotKeyRef.current) return;
+    mobileVideoSlotKeyRef.current = next;
+    setMobileVideoSlotKey(next);
+    syncAutoplayBase(next);
+  }, [lightStrip, reduced, canAttachMedia, videos.length]);
+
+  const mobilePickRafRef = useRef(0);
+  const scheduleMobileVideoPick = useCallback(() => {
+    if (!lightStrip || reduced || !canAttachMedia) return;
+    if (mobilePickRafRef.current) return;
+    mobilePickRafRef.current = requestAnimationFrame(() => {
+      mobilePickRafRef.current = 0;
+      pickMobileVideoSlot();
+    });
+  }, [lightStrip, reduced, canAttachMedia, pickMobileVideoSlot]);
+
+  const pollPrimaryVisibility = useCallback(() => {
+    if (maxSlotsEffective <= 0) return;
+    const root = scrollRef.current;
+    if (!root) return;
+    const sr = root.getBoundingClientRect();
+    visibilityRef.current.clear();
+    for (let i = 0; i < videos.length; i += 1) {
+      let best = 0;
+      const a = firstCopyRefs.current[i];
+      const b = secondCopyRefs.current[i];
+      if (a) best = Math.max(best, horizontalVisibleWidthFraction(a, sr));
+      if (b) best = Math.max(best, horizontalVisibleWidthFraction(b, sr));
+      if (best >= VISIBILITY_AUTOPLAY_MIN_H_FRAC) {
+        visibilityRef.current.set(String(i), best);
+      }
+    }
+    flushActivePick();
+  }, [videos.length, maxSlotsEffective, flushActivePick]);
+
+  /** Desktop: kači `<video src>` u proširenoj zoni (prefetch) da ne čeka skrol do ivice kadra. */
+  const attachVisibleDesktopCards = useCallback(() => {
+    if (lightStrip || reduced || !canAttachMedia) return;
+    const root = scrollRef.current;
+    if (!root) return;
+    const px = SHOWCASE_HORIZONTAL_PREFETCH_PX;
+    const toAdd: string[] = [];
+    for (let i = 0; i < videos.length; i += 1) {
+      const a = firstCopyRefs.current[i];
+      const b = secondCopyRefs.current[i];
+      const aHit = a ? horizontalOverlapWithPrefetchPx(a, root, px) > 0 : false;
+      const bHit = b ? horizontalOverlapWithPrefetchPx(b, root, px) > 0 : false;
+      if (aHit || bHit) {
+        toAdd.push(String(i));
+      }
+    }
+    if (toAdd.length === 0) return;
+    setAttachedBaseKeys((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const k of toAdd) {
+        if (!next.has(k)) {
+          next.add(k);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [lightStrip, reduced, canAttachMedia, videos.length]);
+
+  const desktopAttachRafRef = useRef(0);
+  const scheduleDesktopAttachVisible = useCallback(() => {
+    if (lightStrip || reduced || !canAttachMedia) return;
+    if (desktopAttachRafRef.current) return;
+    desktopAttachRafRef.current = requestAnimationFrame(() => {
+      desktopAttachRafRef.current = 0;
+      attachVisibleDesktopCards();
+    });
+  }, [lightStrip, reduced, canAttachMedia, attachVisibleDesktopCards]);
+
+  const desktopVisibilityRafRef = useRef(0);
+  const scheduleDesktopVisibilityPick = useCallback(() => {
+    if (lightStrip || reduced || !canAttachMedia || maxSlotsEffective <= 0) return;
+    if (desktopVisibilityRafRef.current) return;
+    desktopVisibilityRafRef.current = requestAnimationFrame(() => {
+      desktopVisibilityRafRef.current = 0;
+      pollPrimaryVisibility();
+    });
+  }, [lightStrip, reduced, canAttachMedia, maxSlotsEffective, pollPrimaryVisibility]);
+
+  useEffect(() => {
+    if (!sectionInView || maxSlotsEffective <= 0 || reduced || paused) return;
+    if (lightStripRef.current) return;
+    const first = globalThis.window.requestAnimationFrame(() => {
+      pollPrimaryVisibility();
+    });
+    const id = globalThis.window.setInterval(pollPrimaryVisibility, VISIBILITY_POLL_MS);
+    return () => {
+      globalThis.window.cancelAnimationFrame(first);
+      globalThis.window.clearInterval(id);
+    };
+  }, [sectionInView, maxSlotsEffective, reduced, paused, pollPrimaryVisibility]);
 
   const allowAutoPlay = sectionInView && !paused;
 
   useEffect(() => {
-    if (secondAutoplayTimerRef.current != null) {
-      clearTimeout(secondAutoplayTimerRef.current);
-      secondAutoplayTimerRef.current = null;
-    }
-    secondAutoplayTimerRef.current = setTimeout(() => {
-      setSecondAutoplayReady(false);
-      secondAutoplayTimerRef.current = null;
-    }, 0);
-    if (!allowAutoPlay) return;
-    secondAutoplayTimerRef.current = setTimeout(() => {
-      setSecondAutoplayReady(true);
-      secondAutoplayTimerRef.current = null;
-    }, DESKTOP_SECOND_AUTOPLAY_DELAY_MS);
-    return () => {
-      if (secondAutoplayTimerRef.current != null) {
-        clearTimeout(secondAutoplayTimerRef.current);
-        secondAutoplayTimerRef.current = null;
-      }
-    };
-  }, [allowAutoPlay]);
+    if (maxSlotsEffective > 0) return;
+    visibilityRef.current.clear();
+    const id = globalThis.window.requestAnimationFrame(() => {
+      setActivePlayKeys(new Set());
+    });
+    return () => globalThis.window.cancelAnimationFrame(id);
+  }, [maxSlotsEffective]);
 
-  const [dragOffset, setDragOffset] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const touchDragEnabledRef = useRef(false);
-  const lastX = useRef(0);
-  const pendingOffset = useRef(0);
-  const rafRef = useRef<number | 0>(0);
+  // Fail-safe: ako IO/visibility kasne ili omanu na desktopu, inicijalno zakači i aktiviraj prvih N kartica.
+  useEffect(() => {
+    if (lightStrip || reduced || !canAttachMedia || paused || maxSlotsEffective <= 0) return;
+    if (activePlayKeys.size > 0 || attachedBaseKeys.size > 0) return;
+    const warm = new Set<string>();
+    for (let i = 0; i < Math.min(videos.length, maxSlotsEffective); i += 1) {
+      warm.add(String(i));
+    }
+    if (warm.size === 0) return;
+    const id = globalThis.window.requestAnimationFrame(() => {
+      setAttachedBaseKeys((prev) => {
+        const next = new Set(prev);
+        for (const k of warm) next.add(k);
+        return next;
+      });
+      setActivePlayKeys(warm);
+    });
+    return () => globalThis.window.cancelAnimationFrame(id);
+  }, [
+    lightStrip,
+    reduced,
+    canAttachMedia,
+    paused,
+    maxSlotsEffective,
+    videos.length,
+    activePlayKeys.size,
+    attachedBaseKeys.size,
+  ]);
 
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 768px)");
-    const fn = () => {
-      const nextIsMobile = mq.matches;
-      setIsMobile(nextIsMobile);
-      // Kad se breakpoint promeni, odmah resetuj izbor autoplay pobednika
-      // (izbegava “stare” winners dok ne stigne novi IO update).
+    const mqW = globalThis.window.matchMedia("(min-width: 1100px)");
+    const mqH = globalThis.window.matchMedia("(hover: hover)");
+    const mqP = globalThis.window.matchMedia("(pointer: fine)");
+    const sync = () => {
+      const next = mqW.matches && mqH.matches && mqP.matches;
+      setIsDesktopLike(next);
       visibilityRef.current.clear();
-      setWinnerKeys(new Set());
-      evenPrimaryVisibilityRef.current.clear();
-      setEvenPrimaryPlayKeys(new Set());
-      setEvenPrimaryPlayOrder([]);
-      setSecondAutoplayReady(false);
-      setDesktopSrcKeys(makeDesktopInitialKeys(videos.length));
-      if (desktopSrcTimerRef.current) {
-        clearTimeout(desktopSrcTimerRef.current);
-        desktopSrcTimerRef.current = null;
-      }
+      setActivePlayKeys(new Set());
+      setAttachedBaseKeys(new Set());
+      mobileVideoSlotKeyRef.current = null;
+      setMobileVideoSlotKey(null);
     };
-    mq.addEventListener("change", fn);
-    return () => mq.removeEventListener("change", fn);
+    sync();
+    mqW.addEventListener("change", sync);
+    mqH.addEventListener("change", sync);
+    mqP.addEventListener("change", sync);
+    return () => {
+      mqW.removeEventListener("change", sync);
+      mqH.removeEventListener("change", sync);
+      mqP.removeEventListener("change", sync);
+    };
   }, [videos.length]);
 
   useEffect(() => {
-    if (isMobile || reduced) return;
-    if (!canAttachMedia) return;
-    // Ostatak: 1 po 1 u pozadini po BASE listi (duplikat trake ne pokreće novi attach ciklus).
-    let idx = 0;
-    const tick = () => {
-      if (!canAttachMedia) return;
-      let nextIndex = -1;
-      setDesktopSrcKeys((prev) => {
-        while (idx < videos.length) {
-          if (!prev.has(String(idx))) {
-            nextIndex = idx;
-            break;
-          }
-          idx += 1;
-        }
-        if (nextIndex === -1) return prev;
-        const next = new Set(prev);
-        next.add(String(nextIndex));
-        idx = nextIndex + 1;
-        return next;
-      });
-      if (nextIndex === -1) return;
-      desktopSrcTimerRef.current = setTimeout(
-        tick,
-        paused ? DESKTOP_ATTACH_PAUSED_STEP_MS : DESKTOP_ATTACH_STEP_MS
-      );
-    };
-    desktopSrcTimerRef.current = setTimeout(tick, DESKTOP_ATTACH_START_DELAY_MS);
+    mobileVideoSlotKeyRef.current = null;
+    const id = globalThis.window.requestAnimationFrame(() => {
+      setMobileVideoSlotKey(null);
+    });
+    return () => globalThis.window.cancelAnimationFrame(id);
+  }, [isDesktopLike, videos.length]);
 
+  useEffect(() => {
+    if (!lightStrip || reduced) return;
+    if (!canAttachMedia || paused) {
+      mobileVideoSlotKeyRef.current = null;
+      const id = globalThis.window.requestAnimationFrame(() => {
+        setMobileVideoSlotKey(null);
+        setActivePlayKeys(new Set());
+      });
+      return () => globalThis.window.cancelAnimationFrame(id);
+    }
+    const first = globalThis.window.requestAnimationFrame(() => {
+      pickMobileVideoSlot();
+    });
+    const id = globalThis.window.setInterval(pickMobileVideoSlot, MOBILE_VIDEO_PICK_MS);
     return () => {
-      if (desktopSrcTimerRef.current) {
-        clearTimeout(desktopSrcTimerRef.current);
-        desktopSrcTimerRef.current = null;
+      globalThis.window.cancelAnimationFrame(first);
+      globalThis.window.clearInterval(id);
+    };
+  }, [lightStrip, reduced, canAttachMedia, paused, pickMobileVideoSlot]);
+
+  /** Desktop: IO + višestruko „hvatanje“ ref-ova (često su prazni u prvom layout-u). */
+  useLayoutEffect(() => {
+    if (lightStrip || reduced || !canAttachMedia) return;
+    const root = scrollRef.current;
+    if (!root) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const en of entries) {
+          if (!en.isIntersecting) continue;
+          const idx = (en.target as HTMLElement).dataset.showcaseBase;
+          if (idx === undefined) continue;
+          setAttachedBaseKeys((prev) => {
+            if (prev.has(idx)) return prev;
+            const next = new Set(prev);
+            next.add(idx);
+            return next;
+          });
+        }
+      },
+      {
+        root,
+        rootMargin: `0px ${SHOWCASE_HORIZONTAL_PREFETCH_PX}px 0px ${SHOWCASE_HORIZONTAL_PREFETCH_PX}px`,
+        threshold: 0,
+      }
+    );
+
+    const observeAll = () => {
+      for (let i = 0; i < videos.length; i += 1) {
+        const a = firstCopyRefs.current[i];
+        const b = secondCopyRefs.current[i];
+        if (a) io.observe(a);
+        if (b) io.observe(b);
       }
     };
-  }, [isMobile, reduced, canAttachMedia, paused, videos.length]);
 
-  /** Telefon: bez hover-play u redu (cela prva traka ostaje kao ranije — marquee + autoplay po vidljivosti). Desktop: hover kao i do sada. */
-  const hoverLoopEffective = hoverLoop && !isMobile;
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    if (!isMobile) return;
-    const target = e.target as HTMLElement | null;
-    // Tap na karticu treba samo da pusti video — bez ulaska u drag režim koji vizuelno "pauzira" traku.
-    if (target?.closest(".video-card")) {
-      touchDragEnabledRef.current = false;
-      return;
-    }
-    touchDragEnabledRef.current = true;
-    lastX.current = e.touches[0].clientX;
-    setIsDragging(true);
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (!isMobile) return;
-    if (!touchDragEnabledRef.current) return;
-    const dx = e.touches[0].clientX - lastX.current;
-    lastX.current = e.touches[0].clientX;
-    pendingOffset.current += dx;
-    if (rafRef.current) return;
-    rafRef.current = requestAnimationFrame(() => {
-      setDragOffset(pendingOffset.current);
-      rafRef.current = 0;
+    observeAll();
+    let rafA = 0;
+    let rafB = 0;
+    rafA = requestAnimationFrame(() => {
+      observeAll();
+      attachVisibleDesktopCards();
+      rafB = requestAnimationFrame(() => {
+        observeAll();
+        attachVisibleDesktopCards();
+      });
     });
-  };
 
-  const onTouchEnd = () => {
-    if (!isMobile) return;
-    if (!touchDragEnabledRef.current) return;
-    touchDragEnabledRef.current = false;
-    setIsDragging(false);
-    pendingOffset.current = 0;
-    setDragOffset(0);
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = 0;
+    return () => {
+      cancelAnimationFrame(rafA);
+      cancelAnimationFrame(rafB);
+      io.disconnect();
+    };
+  }, [lightStrip, reduced, canAttachMedia, videos.length, sectionInView, attachVisibleDesktopCards]);
+
+  /** Desktop: dodatni prolazi posle centriranja / fontova — uklanja „rupa“ kad IO promaši prvi frejm. */
+  useEffect(() => {
+    if (lightStrip || reduced || !canAttachMedia || paused) return;
+    const t0 = globalThis.window.setTimeout(() => attachVisibleDesktopCards(), 0);
+    const t1 = globalThis.window.setTimeout(() => attachVisibleDesktopCards(), 120);
+    const t2 = globalThis.window.setTimeout(() => attachVisibleDesktopCards(), 450);
+    return () => {
+      globalThis.window.clearTimeout(t0);
+      globalThis.window.clearTimeout(t1);
+      globalThis.window.clearTimeout(t2);
+    };
+  }, [lightStrip, reduced, canAttachMedia, paused, videos.length, sectionInView, attachVisibleDesktopCards]);
+
+  useEffect(() => {
+    if (lightStrip || reduced || !canAttachMedia || !sectionInView || paused) return;
+    const first = globalThis.window.setTimeout(() => attachVisibleDesktopCards(), 0);
+    const id = globalThis.window.setInterval(attachVisibleDesktopCards, DESKTOP_ATTACH_POLL_MS);
+    return () => {
+      globalThis.window.clearTimeout(first);
+      globalThis.window.clearInterval(id);
+    };
+  }, [
+    lightStrip,
+    reduced,
+    canAttachMedia,
+    sectionInView,
+    paused,
+    videos.length,
+    attachVisibleDesktopCards,
+  ]);
+
+  const runInfiniteScrollLoop = useCallback(() => {
+    if (!isDesktopLikeRef.current) return;
+    if (loopGuardRef.current) return;
+    const el = scrollRef.current;
+    const inner = innerRef.current;
+    if (!el || !inner || reduced) return;
+    const sw = inner.scrollWidth;
+    const half = sw / 2;
+    if (half < 64) return;
+    const left = el.scrollLeft;
+    /* Širi „mrtvi“ pojas pre šava = manje subpixel greške; skok malo pre ivice da korisnik ne vidi kraj druge kopije. */
+    const buffer = Math.min(120, Math.max(40, half * 0.035));
+    const releaseGuard = () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          loopGuardRef.current = false;
+        });
+      });
+    };
+    if (left >= half - buffer) {
+      loopGuardRef.current = true;
+      el.scrollLeft = Math.round(left - half);
+      releaseGuard();
+    } else if (left <= buffer) {
+      loopGuardRef.current = true;
+      el.scrollLeft = Math.round(left + half);
+      releaseGuard();
     }
-  };
+  }, [reduced]);
+
+  const onScrollLoop = useCallback(() => {
+    if (!loopGuardRef.current) {
+      userScrolledRef.current = true;
+    }
+    runInfiniteScrollLoop();
+    scheduleDesktopAttachVisible();
+    scheduleDesktopVisibilityPick();
+    scheduleMobileVideoPick();
+  }, [
+    runInfiniteScrollLoop,
+    scheduleDesktopAttachVisible,
+    scheduleDesktopVisibilityPick,
+    scheduleMobileVideoPick,
+  ]);
+
+
+  useEffect(() => {
+    userScrolledRef.current = false;
+  }, [videos.length]);
+
+  useLayoutEffect(() => {
+    if (reduced) return;
+    const scrollEl = scrollRef.current;
+    const inner = innerRef.current;
+    if (!scrollEl || !inner) return;
+
+    const tryCenterStrip = () => {
+      if (!isDesktopLikeRef.current) return;
+      if (userScrolledRef.current) return;
+      const sw = scrollEl.scrollWidth;
+      if (sw < 64) return;
+      const half = sw / 2;
+      scrollEl.scrollLeft = Math.max(0, half - scrollEl.clientWidth / 2);
+    };
+
+    tryCenterStrip();
+    let roRaf = 0;
+    const ro = new ResizeObserver(() => {
+      if (roRaf) return;
+      roRaf = requestAnimationFrame(() => {
+        roRaf = 0;
+        tryCenterStrip();
+        attachVisibleDesktopCards();
+        if (lightStripRef.current) pickMobileVideoSlot();
+      });
+    });
+    ro.observe(inner);
+    return () => {
+      ro.disconnect();
+      if (roRaf) cancelAnimationFrame(roRaf);
+    };
+  }, [videos.length, reduced, canAttachMedia, attachVisibleDesktopCards, pickMobileVideoSlot]);
+
+  useLayoutEffect(() => {
+    if (!lightStrip || reduced || !canAttachMedia) return;
+    const id = globalThis.window.requestAnimationFrame(() => pickMobileVideoSlot());
+    return () => globalThis.window.cancelAnimationFrame(id);
+  }, [lightStrip, reduced, canAttachMedia, videos.length, pickMobileVideoSlot]);
+
+  const marqueeDurationSec =
+    SHOWCASE_MARQUEE_BASE_S + videos.length * SHOWCASE_MARQUEE_PER_CARD_S;
+  const marqueeRunning = !reduced && canAttachMedia && !paused;
+
+  useLayoutEffect(() => {
+    if (isDesktopLike) return;
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = 0;
+  }, [isDesktopLike]);
 
   const fadeEdge =
     "linear-gradient(90deg, var(--color-background, #050508) 0%, transparent 100%)";
@@ -654,15 +1006,10 @@ function VideoRow({
         overflow: "hidden",
         position: "relative",
         contain: "layout",
-        transform: "translateZ(0)",
-        touchAction: isMobile ? "pan-y" : "auto",
       }}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onTouchCancel={onTouchEnd}
     >
       <style>{`
+        /* Bez scroll-snap — inače browser posle programskog loop skoka „povuče“ na snap tačku i deluje kao presek. */
         .video-card { width: 200px; height: 356px; }
         @media (hover: hover) and (pointer: fine) {
           .video-card:hover {
@@ -679,84 +1026,99 @@ function VideoRow({
           margin-right: calc(50% - 50vw) !important;
           box-sizing: border-box !important;
         }
-        @keyframes vsrow-l { from { transform: translate3d(0,0,0); } to { transform: translate3d(-50%,0,0); } }
-        @keyframes vsrow-r { from { transform: translate3d(-50%,0,0); } to { transform: translate3d(0,0,0); } }
-        .vs-track-l, .vs-track-r {
-          display: flex;
-          width: max-content;
-          backface-visibility: hidden;
-          transform: translate3d(0,0,0);
+        .video-showcase-scroll {
+          scroll-snap-type: none;
+          scroll-behavior: auto;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255,255,255,0.22) transparent;
         }
-        .vs-track-l { animation: vsrow-l 72s linear infinite; }
-        .vs-track-r { animation: vsrow-r 68s linear infinite; }
-        .vs-track-l.paused, .vs-track-r.paused { animation-play-state: paused; }
-        @media (prefers-reduced-motion: reduce) { .vs-track-l, .vs-track-r { animation: none; } }
+        .video-showcase-scroll::-webkit-scrollbar { height: 6px; }
+        .video-showcase-scroll::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.2);
+          border-radius: 999px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .video-showcase-scroll { scroll-behavior: auto; }
+          .video-showcase-inner--marquee {
+            animation: none !important;
+            transform: none !important;
+          }
+        }
+        @keyframes video-showcase-marquee {
+          from { transform: translate3d(0, 0, 0); }
+          to { transform: translate3d(-50%, 0, 0); }
+        }
+        .video-showcase-inner--marquee {
+          animation-name: video-showcase-marquee;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+          will-change: transform;
+        }
       `}</style>
-      <div className={`${reverse ? "vs-track-r" : "vs-track-l"}${paused ? " paused" : ""}`}>
+      <div
+        ref={scrollRef}
+        className="video-showcase-scroll"
+        aria-label="Primeri radova — automatski se vrti u krug"
+        onScroll={onScrollLoop}
+        style={{
+          width: "100%",
+          overflowX: "hidden",
+          overflowY: "hidden",
+          WebkitOverflowScrolling: undefined,
+          overscrollBehaviorX: "contain",
+          touchAction: "pan-y",
+        }}
+      >
         <div
+          ref={innerRef}
+          className={`video-showcase-inner${!reduced ? " video-showcase-inner--marquee" : ""}`}
           style={{
             display: "flex",
+            flexDirection: "row",
             width: "max-content",
             flexShrink: 0,
-            transform: `translate3d(${isMobile ? dragOffset : 0}px, 0, 0)`,
-            backfaceVisibility: "hidden",
-            transition: !isDragging ? `transform ${DRAG_SNAP_MS}ms cubic-bezier(0.22, 1, 0.36, 1)` : "none",
+            ...(!reduced
+              ? {
+                  animationDuration: `${marqueeDurationSec}s`,
+                  animationPlayState: marqueeRunning ? "running" : "paused",
+                }
+              : {}),
           }}
         >
           {items.map((videoSrc, i) => {
-            const instanceKey = String(i);
-            const isPrimaryCopy = i < videos.length;
-            const desktopEveryOtherActive =
-              playEveryOtherDesktop && !isMobile && isPrimaryCopy && i % 2 === 0;
-            const forceEveryOtherDesktop = playEveryOtherDesktop && !isMobile;
-            // Telefon: oba reda — autoplay samo na svakom drugom klipu (0,2,4…); učitavanje src i dalje IO za sve kartice.
-            const isContestCandidate =
-              !forceEveryOtherDesktop &&
-              !desktopEveryOtherActive &&
-              contestSlots > 0 &&
-              i < videos.length &&
-              (!isMobile || i % 2 === 0);
-            const isEvenPrimaryCandidate = forceEveryOtherDesktop && isPrimaryCopy && i % 2 === 0;
-            const useManualSrc = !isMobile;
-            const baseKey = String(i % videos.length);
-            const manualSrcAttached = useManualSrc && desktopSrcKeys.has(baseKey);
-            const evenOrderIndex = evenPrimaryPlayOrder.indexOf(instanceKey);
-            const evenAutoplayAllowed =
-              evenOrderIndex === 0 || (evenOrderIndex === 1 && secondAutoplayReady);
+            const baseIdx = i % videos.length;
+            const baseKey = String(baseIdx);
+            const showcaseLoopSegment: "first" | "second" =
+              i < videos.length ? "first" : "second";
+            const posterUrl = posterUrlFromVideoUrl(videoSrc);
+            const desktopActiveKey = activePlayKeys.has(baseKey);
+            const manualSrcAttached = lightStrip
+              ? mobileVideoSlotKey === mobileVideoAttachKey(showcaseLoopSegment, baseIdx)
+              : desktopSrcKeys.has(baseKey) || desktopActiveKey;
+            /** Desktop: vidljive kartice autoplay bez potrebe za hover-om (slot-limit štiti performanse). */
+            const desktopHoverPlay = false;
             return (
               <VideoCard
                 key={`${videoSrc}-${i}`}
-                instanceKey={instanceKey}
                 src={videoSrc}
+                posterUrl={posterUrl}
                 reduced={reduced}
                 sectionInView={sectionInView}
                 canAttach={canAttachMedia}
-                lazySrcMode={useManualSrc ? "manual" : "io"}
                 manualSrcAttached={manualSrcAttached}
-                hoverLoop={hoverLoopEffective}
-                tapToPlay={Boolean(isMobile && tapToPlayOnMobile)}
-                tapGroup={isMobile ? tapGroup : undefined}
-                autoPlayActive={
-                  (desktopEveryOtherActive &&
-                    allowAutoPlay &&
-                    evenPrimaryPlayKeys.has(instanceKey) &&
-                    evenAutoplayAllowed) ||
-                  (isContestCandidate && winnerKeys.has(instanceKey))
-                }
+                hoverLoop={desktopHoverPlay}
+                autoPlayActive={allowAutoPlay && maxSlotsEffective > 0 && desktopActiveKey}
                 allowAutoPlay={allowAutoPlay}
-                onVisibilityRatio={
-                  isEvenPrimaryCandidate
-                    ? reportEvenPrimaryVisibility
-                    : isContestCandidate
-                      ? reportVisibility
-                      : undefined
-                }
+                showcaseBaseIndex={baseIdx}
+                showcaseLoopSegment={showcaseLoopSegment}
+                registerShowcaseCard={registerShowcaseCard}
+                posterAsPlaceholder
+                posterLoading={canAttachMedia ? "eager" : "lazy"}
               />
             );
           })}
         </div>
       </div>
-      {/* Isto kao meki ivičnjak kao mask, ali bez skupe mask-kompozicije pri skrolu */}
       <div
         aria-hidden
         style={{
@@ -792,41 +1154,77 @@ function VideoRow({
 }
 
 export default function VideoShowcaseSection({
-  row1Srcs = DEFAULT_ROW1,
-  row2Srcs = DEFAULT_ROW2,
-}: {
-  row1Srcs?: string[];
-  row2Srcs?: string[];
-}) {
-  const row1 = row1Srcs;
-  const row2 = row2Srcs;
+  videoSrcs = DEFAULT_SHOWCASE_VIDEOS,
+}: Readonly<{
+  /** URL-ovi klipova za jednu horizontalnu traku (duplirana sekvenca u komponenti radi seamless loop-a). */
+  videoSrcs?: string[];
+}>) {
+  const stripVideos = videoSrcs;
   const ref = useRef(null);
-  const prewarmInView = useInView(ref, { once: false, amount: 0, margin: SHOWCASE_PREWARM_MARGIN });
-  /** Širi „prozor“ da se play/pause ne okida na border skrola (manje treperenja). */
-  const inView = useInView(ref, { once: false, amount: 0.16, margin: "40px 0px 60px 0px" });
+  const [tabVisible, setTabVisible] = useState(true);
+  /** Retki pragovi: manje re-rendera dok skroluješ kroz granicu sekcije (glavni uzrok „kočenja“ uz IO). */
+  const inView = useInView(ref, {
+    once: false,
+    amount: 0.16,
+    margin: "40px 0px 60px 0px",
+    thresholds: SHOWCASE_INVIEW_THRESHOLDS,
+  });
+  // Ranije zakači media resurse pre ulaska sekcije u viewport.
+  const nearInView = useInView(ref, {
+    once: false,
+    amount: 0,
+    margin: "340px 0px 360px 0px",
+    thresholds: [0, 0.01, 0.05, 0.1, 1] as const,
+  });
   const reduced = useReducedMotion();
   const sectionInView = inView ?? false;
-  const canAttachMedia = (prewarmInView ?? false) || sectionInView;
+  /** Prewarm: kačenje <video src> malo pre ulaska u kadar da kartice ne "kasne". */
+  const canAttachMedia = nearInView || sectionInView;
   const heroVslHeavy = useDocumentHtmlDataFlag("data-hero-vsl-heavy");
+
+  useEffect(() => {
+    const sync = () => setTabVisible(typeof document !== "undefined" && !document.hidden);
+    sync();
+    document.addEventListener("visibilitychange", sync);
+    return () => document.removeEventListener("visibilitychange", sync);
+  }, []);
 
   const reveal = reduced || sectionInView;
   const revealEase = "cubic-bezier(0.22, 1, 0.36, 1)";
 
-  // Keep handoff smooth around boundaries: don't stop marquee until we're fully outside prewarm zone.
-  const pauseMarquee = reduced || !canAttachMedia || heroVslHeavy;
+  // Pauziramo samo kada sekcija nije spremna ili tab nije aktivan.
+  // Hero "heavy" više ne gasi showcase skroz, već samo smanjujemo broj aktivnih slotova.
+  const pauseMarquee = reduced || !canAttachMedia || !tabVisible;
+  const desktopAutoplayBudget = heroVslHeavy ? 1 : 3;
+  const mobileAutoplayBudget = 1;
+  const postersWarmedRef = useRef(false);
+
+  // Prefetch postera malo pre ulaska u sekciju da kartice ne budu prazne pri prvom prikazu.
+  useEffect(() => {
+    if (!canAttachMedia || stripVideos.length === 0) return;
+    if (postersWarmedRef.current) return;
+    postersWarmedRef.current = true;
+    const warmCount = Math.min(stripVideos.length, 5);
+    for (let i = 0; i < warmCount; i += 1) {
+      const src = stripVideos[i];
+      if (!src) continue;
+      const poster = posterUrlFromVideoUrl(src);
+      const img = new globalThis.Image();
+      img.decoding = "async";
+      img.fetchPriority = i < 3 ? "high" : "auto";
+      img.src = poster;
+    }
+  }, [canAttachMedia, stripVideos]);
 
   return (
     <section
       ref={ref}
-      className={`video-showcase-section${sectionInView ? " video-showcase-inview" : ""}`}
+      className={`video-showcase-section landing-section-y--compact${sectionInView ? " video-showcase-inview" : ""}`}
       style={{
         position: "relative",
         zIndex: 10,
-        padding: "100px 0",
         overflow: "hidden",
-        contain: "layout paint",
-        contentVisibility: "auto",
-        containIntrinsicSize: "0 820px",
+        contain: "layout",
       }}
     >
       <div
@@ -844,88 +1242,44 @@ export default function VideoShowcaseSection({
       />
 
       <div
+        className="section-container landing-section-head"
         style={{
           textAlign: "center",
-          padding: "0 24px",
-          marginBottom: 48,
           position: "relative",
           opacity: reveal ? 1 : 0,
           transform: reveal ? "translateY(0)" : "translateY(16px)",
           transition: `opacity 0.55s ${revealEase}, transform 0.55s ${revealEase}`,
         }}
       >
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            background: "rgba(139,92,246,0.07)",
-            border: "1px solid rgba(139,92,246,0.18)",
-            borderRadius: 50,
-            padding: "6px 16px",
-            marginBottom: 20,
-          }}
-        >
-          <Sparkles size={12} color="#a855f7" />
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: "#a855f7",
-              textTransform: "uppercase" as const,
-              letterSpacing: "0.1em",
-            }}
-          >
-            Primeri radova
+        <div className="landing-eyebrow-pill landing-eyebrow-pill--purple">
+          <span className="landing-eyebrow-pill-icon-wrap--purple" aria-hidden>
+            <Sparkles size={12} color="#a855f7" />
           </span>
+          <span className="landing-eyebrow-pill-label">Primeri radova</span>
         </div>
-        <h2 style={{ fontSize: "clamp(26px,5vw,44px)", fontWeight: 800, lineHeight: 1.15, marginBottom: 10 }}>
-          Ovo ces praviti <span style={{ color: "#a855f7" }}>unutar kursa.</span>
+        <h2 className="landing-display" style={{ marginBottom: 10 }}>
+          Ovo ćeš praviti <span className="apple-accent-gradient">unutar kursa.</span>
         </h2>
-        <p style={{ fontSize: 15, color: "#8a8a9a", maxWidth: 440, margin: "0 auto", lineHeight: 1.7 }}>
-          Sve je napravljeno pomocu AI alata koje ces nauciti. Bez prethodnog iskustva.
+        <p className="landing-lede landing-measure-copy" style={{ maxWidth: "min(27.5rem, 100%)" }}>
+          Sve je napravljeno pomoću AI alata koje ćeš naučiti. Bez prethodnog iskustva.
         </p>
-      </div>
-
-      <div
-        style={{
-          marginBottom: 12,
-          opacity: reveal ? 1 : 0,
-          transition: `opacity 0.55s ${revealEase} 0.12s`,
-        }}
-      >
-        <VideoRow
-          videos={row1}
-          paused={pauseMarquee}
-          reduced={reduced}
-          sectionInView={sectionInView}
-          canAttachMedia={canAttachMedia}
-          hoverLoop
-          playEveryOtherDesktop
-          tapToPlayOnMobile
-          tapGroup="showcase-row1"
-          autoPlayWinnerCount={2}
-          autoPlayWinnerCountDesktop={4}
-        />
       </div>
 
       <div
         style={{
           marginBottom: 0,
           opacity: reveal ? 1 : 0,
-          transition: `opacity 0.55s ${revealEase} 0.22s`,
+          transition: `opacity 0.55s ${revealEase} 0.12s`,
         }}
       >
         <VideoRow
-          videos={row2}
-          reverse
+          videos={stripVideos}
           paused={pauseMarquee}
           reduced={reduced}
           sectionInView={sectionInView}
           canAttachMedia={canAttachMedia}
-          disableAutoPlayOnMobile
-          tapToPlayOnMobile
-          tapGroup="showcase-row2"
+          maxConcurrentAutoplayDesktop={desktopAutoplayBudget}
+          maxConcurrentAutoplayMobile={mobileAutoplayBudget}
         />
       </div>
     </section>

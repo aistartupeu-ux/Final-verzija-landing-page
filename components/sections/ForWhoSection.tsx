@@ -23,23 +23,25 @@ export default function ForWhoSection() {
   const iv = inView || reduced;
 
   return (
-    <section ref={ref} className={reduced ? "sr-nomotion" : undefined} style={{ position: "relative", zIndex: 10, padding: "100px 24px", textAlign: "center", contentVisibility: "auto", containIntrinsicSize: "auto 700px" }}>
-      <div className="section-container" style={{ maxWidth: 1000 }}>
-        <div className={`sr-from-y sr-from-y-xl sr-ease ${iv ? "sr-inview" : ""}`}>
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 8,
-            background: "rgba(0,212,255,0.06)", border: "1px solid rgba(0,212,255,0.15)",
-            borderRadius: 50, padding: "6px 16px", marginBottom: 24,
-          }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#00d4ff", boxShadow: "0 0 6px #00d4ff" }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#00d4ff", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>Šta ćeš naučiti</span>
+    <section
+      ref={ref}
+      className={`landing-section-y${reduced ? " sr-nomotion" : ""}`}
+      style={{ position: "relative", zIndex: 10, textAlign: "center" }}
+    >
+      <div className="section-container">
+        <div className={`landing-section-head sr-from-y sr-from-y-xl sr-ease ${iv ? "sr-inview" : ""}`}>
+          <div className="landing-eyebrow-pill landing-eyebrow-pill--cyan">
+            <span
+              className="landing-eyebrow-dot landing-eyebrow-dot--cyan"
+              style={{ background: "#00d4ff", boxShadow: "0 0 8px rgba(0,212,255,0.45)" }}
+            />
+            <span className="landing-eyebrow-pill-label">Šta ćeš naučiti</span>
           </div>
 
-          <h2 style={{ fontSize: "clamp(28px, 5vw, 48px)", fontWeight: 800, lineHeight: 1.15, marginBottom: 12 }}>
-            Posle kursa znaćeš kako da{" "}
-            <span style={{ color: "#00d4ff" }}>zaradiš od AI.</span>
+          <h2 className="landing-display">
+            Posle kursa znaćeš kako da <span className="gradient-text">zaradiš od AI.</span>
           </h2>
-          <p style={{ fontSize: 15, color: "#8a8a9a", maxWidth: 500, margin: "0 auto 52px", lineHeight: 1.7 }}>
+          <p className="landing-lede landing-measure-copy" style={{ marginBottom: 52 }}>
             Konkretne veštine. Realni projekti. Bez teorije koja ti ne treba.
           </p>
         </div>
@@ -63,8 +65,8 @@ export default function ForWhoSection() {
               }}>
                 <o.icon size={20} color={o.color} strokeWidth={1.8} />
               </div>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 6, lineHeight: 1.4 }}>{o.title}</h3>
-              <p style={{ fontSize: 12, color: "#777", lineHeight: 1.65 }}>{o.desc}</p>
+              <h3 style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.02em", color: "#f5f5f7", marginBottom: 8, lineHeight: 1.4 }}>{o.title}</h3>
+              <p style={{ fontSize: 14, color: "rgba(245,245,247,0.52)", lineHeight: 1.55 }}>{o.desc}</p>
             </div>
           ))}
         </div>
