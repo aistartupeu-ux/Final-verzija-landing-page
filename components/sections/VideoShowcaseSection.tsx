@@ -139,6 +139,7 @@ function getShowcaseDesktopLike(): boolean {
  */
 const VideoCard = memo(function VideoCard({
   src,
+  fallbackVideoSrc,
   posterUrl,
   reduced,
   sectionInView,
@@ -154,6 +155,7 @@ const VideoCard = memo(function VideoCard({
   posterLoading = "lazy",
 }: Readonly<{
   src: string;
+  fallbackVideoSrc?: string;
   posterUrl: string;
   reduced: boolean;
   sectionInView: boolean;
@@ -179,6 +181,7 @@ const VideoCard = memo(function VideoCard({
   const [posterPlaceholderFailed, setPosterPlaceholderFailed] = useState(false);
   const [videoHasRenderableFrame, setVideoHasRenderableFrame] = useState(false);
   const errorRetries = useRef(0);
+  const triedFallbackRef = useRef(false);
 
   useEffect(() => {
     const id = globalThis.window.requestAnimationFrame(() => {
@@ -333,6 +336,17 @@ const VideoCard = memo(function VideoCard({
           disableRemotePlayback
           preload="auto"
           onError={() => {
+            if (
+              fallbackVideoSrc &&
+              !triedFallbackRef.current &&
+              videoSrc !== fallbackVideoSrc
+            ) {
+              triedFallbackRef.current = true;
+              errorRetries.current = 0;
+              setVideoHasRenderableFrame(false);
+              setVideoSrc(fallbackVideoSrc);
+              return;
+            }
             if (errorRetries.current >= 1) {
               setFailed(true);
               return;
@@ -448,12 +462,25 @@ const VideoCard = memo(function VideoCard({
           <LogoFallback />
         </div>
       )}
+      {failed && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 3,
+            pointerEvents: "none",
+          }}
+        >
+          <LogoFallback />
+        </div>
+      )}
     </div>
   );
 });
 
 function VideoRow({
   videos,
+  fallbackVideoSrc,
   paused = false,
   reduced,
   sectionInView,
@@ -462,6 +489,7 @@ function VideoRow({
   maxConcurrentAutoplayMobile = DEFAULT_MAX_AUTOPLAY_MOBILE,
 }: Readonly<{
   videos: string[];
+  fallbackVideoSrc?: string;
   paused?: boolean;
   reduced: boolean;
   sectionInView: boolean;
@@ -1101,6 +1129,7 @@ function VideoRow({
               <VideoCard
                 key={`${videoSrc}-${i}`}
                 src={videoSrc}
+                fallbackVideoSrc={fallbackVideoSrc}
                 posterUrl={posterUrl}
                 reduced={reduced}
                 sectionInView={sectionInView}
@@ -1155,9 +1184,12 @@ function VideoRow({
 
 export default function VideoShowcaseSection({
   videoSrcs = DEFAULT_SHOWCASE_VIDEOS,
+  fallbackVideoSrc,
 }: Readonly<{
   /** URL-ovi klipova za jednu horizontalnu traku (duplirana sekvenca u komponenti radi seamless loop-a). */
   videoSrcs?: string[];
+  /** Rezervni video koji se prikazuje ako određeni showcase video nije dostupan. */
+  fallbackVideoSrc?: string;
 }>) {
   const stripVideos = videoSrcs;
   const ref = useRef(null);
@@ -1274,6 +1306,7 @@ export default function VideoShowcaseSection({
       >
         <VideoRow
           videos={stripVideos}
+          fallbackVideoSrc={fallbackVideoSrc}
           paused={pauseMarquee}
           reduced={reduced}
           sectionInView={sectionInView}

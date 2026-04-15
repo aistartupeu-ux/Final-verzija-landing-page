@@ -89,7 +89,10 @@ export default function HomeLanding() {
           </ViewportDeferredSection>
           <div className="section-divider section-divider--visible" />
           <ViewportDeferredSection rootMargin="160px 0px 240px 0px">
-            <VideoShowcaseSection videoSrcs={showcaseUrls} />
+            <VideoShowcaseSection
+              videoSrcs={showcaseUrls}
+              fallbackVideoSrc={heroMedia.explainerMp4}
+            />
           </ViewportDeferredSection>
           <div className="section-divider section-divider--visible" />
           <ViewportDeferredSection rootMargin="240px 0px 300px 0px">
