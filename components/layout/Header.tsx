@@ -71,7 +71,7 @@ export default function Header() {
 
   const goToSkool = () => {
     setOpen(false);
-    window.open(SKOOL_ABOUT_URL, "_blank", "noopener,noreferrer");
+    globalThis.location.assign(SKOOL_ABOUT_URL);
   };
 
   return (
@@ -133,6 +133,7 @@ export default function Header() {
               </a>
             ))}
           <button
+            type="button"
             onClick={goToSkool}
             className={usePromoHeaderVariant ? "glow-btn glow-btn--giveaway" : "glow-btn"}
             style={{ padding: "10px 24px", fontSize: 12, borderRadius: 10 }}
@@ -155,6 +156,7 @@ export default function Header() {
             </>
           )}
           <button
+            type="button"
             onClick={goToSkool}
             className={usePromoHeaderVariant ? "glow-btn glow-btn--giveaway" : "glow-btn"}
             style={{ width: "100%", marginTop: 12, borderRadius: 10, fontFamily: "inherit" }}

@@ -34,7 +34,7 @@ export default function MobileCTABar() {
   }, []);
 
   const openSkool = () => {
-    window.open(SKOOL_ABOUT_URL, "_blank", "noopener,noreferrer");
+    globalThis.location.assign(SKOOL_ABOUT_URL);
   };
 
   return (
@@ -59,6 +59,7 @@ export default function MobileCTABar() {
         }}
       >
         <button
+          type="button"
           onClick={openSkool}
           style={{
             width: "100%", padding: "14px 20px",

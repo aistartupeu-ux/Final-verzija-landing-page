@@ -45,6 +45,10 @@ function publicAsset(path: string) {
   return path.startsWith("/") ? path : `/${path}`;
 }
 
+function showcasePosterPathFromVideo(videoPath: string): string {
+  return videoPath.replace("/examples/", "/examples/posters/").replace(/\.webm$/i, ".jpg");
+}
+
 function useLocalHeroMedia() {
   const v = process.env.NEXT_PUBLIC_LOCAL_HERO_MEDIA?.trim().toLowerCase();
   if (v === "1" || v === "true" || v === "yes") return true;
@@ -65,7 +69,7 @@ export default function HomeLanding() {
       };
   const showcaseUrls = CDN_PATH_SHOWCASE_VIDEOS.map((p) => getServerCdnUrl(p));
   const showcasePosterUrls = CDN_PATH_SHOWCASE_VIDEOS.map((p) =>
-    getServerCdnUrl(p.replace(/\.webm$/i, ".webp"))
+    publicAsset(showcasePosterPathFromVideo(p))
   );
   const showcaseMp4Urls = CDN_PATH_SHOWCASE_VIDEOS.map((p) =>
     getServerCdnUrl(p.replace(/\.webm$/i, ".mp4"))
