@@ -83,7 +83,7 @@ const MOBILE_NEAR_ATTACH_MARGIN = "920px 0px 980px 0px";
 const DEFAULT_NEAR_ATTACH_MARGIN = "340px 0px 360px 0px";
 const MOBILE_VISIBILITY_POLL_MS = 360;
 const MOBILE_ATTACH_PREFETCH_PX = 140;
-const MOBILE_MAX_ATTACHED_SLOTS = 2;
+const MOBILE_MAX_ATTACHED_SLOTS = 1;
 const MOBILE_MARQUEE_SLOWDOWN_FACTOR = 1.45;
 const MOBILE_POSTER_ONLY_MODE = false;
 
@@ -1263,7 +1263,7 @@ export default function VideoShowcaseSection({
   // Hero "heavy" više ne gasi showcase skroz, već samo smanjujemo broj aktivnih slotova.
   const pauseMarquee = reduced || !canAttachMedia || !tabVisible;
   const desktopAutoplayBudget = heroVslHeavy ? 1 : 3;
-  const mobileAutoplayBudget = 2;
+  const mobileAutoplayBudget = 1;
   const postersWarmedRef = useRef(false);
   const videoMetadataWarmedRef = useRef(false);
 
