@@ -61,8 +61,6 @@ const SHOWCASE_INVIEW_THRESHOLDS = [0, 0.16, 0.35, 0.55, 0.75, 1] as const;
  * — Sledeća mora da bude za ovoliko viša po površini da preuzme pre vremena (manje treperenja).
  * — Kandidat sa bilo kakvim presekom ulazi u igru (ivica u kadru = počinje učitavanje u sledećem tick-u).
  */
-/** Drži slot dok desna ivica kartice ne prođe skoro pored leve ivice scroll-root-a (px). */
-const LIGHT_STRIP_HOLD_RIGHT_VS_ROOT_LEFT_PX = 2;
 /** Koliko često biramo aktivni slot na touch / tablet traci (marquee). */
 const MOBILE_VIDEO_PICK_MS = 200;
 /** Trajanje jednog kruga automatske trake (s); skalira se sa brojem klipova. */
@@ -83,9 +81,8 @@ const EARLY_MEDIA_WARM_MARGIN = "1200px 0px 1200px 0px";
 /** Mobilni uređaji kače media src ranije kako bi video krenuo odmah po dolasku do sekcije. */
 const MOBILE_NEAR_ATTACH_MARGIN = "920px 0px 980px 0px";
 const DEFAULT_NEAR_ATTACH_MARGIN = "340px 0px 360px 0px";
-const MOBILE_PROGRESSIVE_ATTACH_INITIAL = 4;
-const MOBILE_PROGRESSIVE_ATTACH_STEP_MS = 320;
 const MOBILE_VISIBILITY_POLL_MS = 360;
+const MOBILE_ATTACH_PREFETCH_PX = 140;
 
 /** Jedinstven ključ za koju fizičku karticu (prva ili druga kopija u loop-u) drži `<video src>` na mobilnom. */
 function mobileVideoAttachKey(segment: "first" | "second", baseIdx: number): string {
@@ -116,18 +113,6 @@ function horizontalVisibleWidthFraction(el: HTMLElement, sr: DOMRect): number {
   const er = el.getBoundingClientRect();
   if (er.width <= 0) return 0;
   return iw / er.width;
-}
-
-function elementForMobileVideoSlotKey(
-  key: string,
-  firstRefs: { current: (HTMLElement | null)[] },
-  secondRefs: { current: (HTMLElement | null)[] }
-): HTMLElement | null {
-  const m = /^(first|second)-(\d+)$/.exec(key);
-  if (!m) return null;
-  const idx = Number(m[2]);
-  if (Number.isNaN(idx)) return null;
-  return m[1] === "first" ? firstRefs.current[idx] ?? null : secondRefs.current[idx] ?? null;
 }
 
 /** Laptop/desktop: ručni skrol + pun desktop režim. Ostalo: automatski marquee + jedan video (posteri). */
@@ -554,8 +539,7 @@ function VideoRow({
   const items = [...videos, ...videos];
 
   const [attachedBaseKeys, setAttachedBaseKeys] = useState<Set<string>>(() => new Set());
-  const [mobileAttachCount, setMobileAttachCount] = useState(0);
-  const mobileVideoSlotKeyRef = useRef<string | null>(null);
+  const [mobileAttachedSlotKeys, setMobileAttachedSlotKeys] = useState<Set<string>>(() => new Set());
   const desktopSrcKeys = attachedBaseKeys;
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -626,63 +610,25 @@ function VideoRow({
     if (!lightStrip || reduced || !canAttachMedia) return;
     const root = scrollRef.current;
     if (!root) return;
-    const sr = root.getBoundingClientRect();
-    const px = SHOWCASE_HORIZONTAL_PREFETCH_PX;
-
-    type Cand = { key: string; left: number };
-    const cands: Cand[] = [];
+    const px = MOBILE_ATTACH_PREFETCH_PX;
+    const nextSlots = new Set<string>();
     for (let i = 0; i < videos.length; i += 1) {
       const a = firstCopyRefs.current[i];
       const b = secondCopyRefs.current[i];
       if (a && horizontalOverlapWithPrefetchPx(a, root, px) > 0) {
-        cands.push({
-          key: mobileVideoAttachKey("first", i),
-          left: a.getBoundingClientRect().left,
-        });
+        nextSlots.add(mobileVideoAttachKey("first", i));
       }
       if (b && horizontalOverlapWithPrefetchPx(b, root, px) > 0) {
-        cands.push({
-          key: mobileVideoAttachKey("second", i),
-          left: b.getBoundingClientRect().left,
-        });
+        nextSlots.add(mobileVideoAttachKey("second", i));
       }
     }
-
-    const pickMaxLeft = (): string | null => {
-      if (cands.length === 0) return null;
-      let win = cands[0];
-      if (!win) return null;
-      for (let j = 1; j < cands.length; j += 1) {
-        const c = cands[j];
-        if (!c) continue;
-        if (c.left > win.left) win = c;
+    setMobileAttachedSlotKeys((prev) => {
+      if (prev.size !== nextSlots.size) return nextSlots;
+      for (const key of nextSlots) {
+        if (!prev.has(key)) return nextSlots;
       }
-      return win.key;
-    };
-
-    let next: string | null;
-    const cur = mobileVideoSlotKeyRef.current;
-    if (cands.length === 0) {
-      next = null;
-    } else if (cur) {
-      const curEl = elementForMobileVideoSlotKey(cur, firstCopyRefs, secondCopyRefs);
-      const curIw = curEl ? horizontalOverlapWidthPx(curEl, sr) : 0;
-      if (curEl && curIw > 0) {
-        const cer = curEl.getBoundingClientRect();
-        if (cer.right > sr.left + LIGHT_STRIP_HOLD_RIGHT_VS_ROOT_LEFT_PX) {
-          next = cur;
-        } else {
-          next = pickMaxLeft();
-        }
-      } else {
-        next = pickMaxLeft();
-      }
-    } else {
-      next = pickMaxLeft();
-    }
-
-    if (next === mobileVideoSlotKeyRef.current) return;
-    mobileVideoSlotKeyRef.current = next;
+      return prev;
+    });
   }, [lightStrip, reduced, canAttachMedia, videos.length]);
 
   const mobilePickRafRef = useRef(0);
@@ -777,29 +723,6 @@ function VideoRow({
     };
   }, [sectionInView, maxSlotsEffective, reduced, paused, pollPrimaryVisibility]);
 
-  // Telefon: zakači sve kartice postepeno da nema neucitanih kartica u prikazu,
-  // ali bez naglog opterecenja koje koci/puca stranicu.
-  useEffect(() => {
-    if (!lightStrip || reduced || !canAttachMedia || paused) {
-      const resetId = globalThis.window.requestAnimationFrame(() => setMobileAttachCount(0));
-      return () => globalThis.window.cancelAnimationFrame(resetId);
-    }
-    const start = Math.min(videos.length, MOBILE_PROGRESSIVE_ATTACH_INITIAL);
-    const startId = globalThis.window.requestAnimationFrame(() => {
-      setMobileAttachCount((prev) => Math.max(prev, start));
-    });
-    const id = globalThis.window.setInterval(() => {
-      setMobileAttachCount((prev) => {
-        if (prev >= videos.length) return prev;
-        return prev + 1;
-      });
-    }, MOBILE_PROGRESSIVE_ATTACH_STEP_MS);
-    return () => {
-      globalThis.window.cancelAnimationFrame(startId);
-      globalThis.window.clearInterval(id);
-    };
-  }, [lightStrip, reduced, canAttachMedia, paused, videos.length]);
-
   const allowAutoPlay = sectionInView && !paused;
 
   useEffect(() => {
@@ -850,7 +773,7 @@ function VideoRow({
       visibilityRef.current.clear();
       setActivePlayKeys(new Set());
       setAttachedBaseKeys(new Set());
-      mobileVideoSlotKeyRef.current = null;
+      setMobileAttachedSlotKeys(new Set());
     };
     sync();
     mqW.addEventListener("change", sync);
@@ -864,14 +787,12 @@ function VideoRow({
   }, [videos.length]);
 
   useEffect(() => {
-    mobileVideoSlotKeyRef.current = null;
-  }, [isDesktopLike, videos.length]);
-
-  useEffect(() => {
     if (!lightStrip || reduced) return;
     if (!canAttachMedia || paused) {
-      mobileVideoSlotKeyRef.current = null;
-      const id = globalThis.window.requestAnimationFrame(() => setActivePlayKeys(new Set()));
+      const id = globalThis.window.requestAnimationFrame(() => {
+        setActivePlayKeys(new Set());
+        setMobileAttachedSlotKeys(new Set());
+      });
       return () => globalThis.window.cancelAnimationFrame(id);
     }
     const first = globalThis.window.requestAnimationFrame(() => {
@@ -1168,11 +1089,13 @@ function VideoRow({
             const posterUrl = posterSrcByBaseIndex?.[baseIdx] ?? posterUrlFromVideoUrl(videoSrc);
             const mp4FallbackSrc = mp4SrcByBaseIndex?.[baseIdx];
             const desktopActiveKey = activePlayKeys.has(baseKey);
+            const mobileSlotKey = mobileVideoAttachKey(showcaseLoopSegment, baseIdx);
+            const mobileCardAttached = mobileAttachedSlotKeys.has(mobileSlotKey);
             const manualSrcAttached = lightStrip
-              ? baseIdx < mobileAttachCount
+              ? mobileCardAttached
               : desktopSrcKeys.has(baseKey) || desktopActiveKey;
             const posterLoading: "eager" | "lazy" = lightStrip
-              ? baseIdx < mobileAttachCount
+              ? mobileCardAttached
                 ? "eager"
                 : "lazy"
               : canAttachMedia && (desktopActiveKey || baseIdx < 2)
