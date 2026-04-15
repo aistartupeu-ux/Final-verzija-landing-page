@@ -64,7 +64,7 @@ const SHOWCASE_INVIEW_THRESHOLDS = [0, 0.16, 0.35, 0.55, 0.75, 1] as const;
 /** Drži slot dok desna ivica kartice ne prođe skoro pored leve ivice scroll-root-a (px). */
 const LIGHT_STRIP_HOLD_RIGHT_VS_ROOT_LEFT_PX = 2;
 /** Koliko često biramo aktivni slot na touch / tablet traci (marquee). */
-const MOBILE_VIDEO_PICK_MS = 180;
+const MOBILE_VIDEO_PICK_MS = 280;
 /** Trajanje jednog kruga automatske trake (s); skalira se sa brojem klipova. */
 const SHOWCASE_MARQUEE_BASE_S = 38;
 const SHOWCASE_MARQUEE_PER_CARD_S = 3.2;
@@ -78,6 +78,8 @@ const VISIBILITY_POLL_MS = 750;
 const SHOWCASE_HORIZONTAL_PREFETCH_PX = 520;
 /** Desktop: periodično ponovo zakači vidljive kartice (hvata ref/layout bez skrola). */
 const DESKTOP_ATTACH_POLL_MS = 650;
+/** Koliko ranije (van viewport-a) kreće prewarm za mobilne uređaje. */
+const EARLY_MEDIA_WARM_MARGIN = "1200px 0px 1200px 0px";
 
 /** Jedinstven ključ za koju fizičku karticu (prva ili druga kopija u loop-u) drži `<video src>` na mobilnom. */
 function mobileVideoAttachKey(segment: "first" | "second", baseIdx: number): string {
@@ -217,18 +219,19 @@ const VideoCard = memo(function VideoCard({
   const shouldPlay =
     (hoverLoop && hoverPlaying && sectionInView) ||
     (autoPlayActive && allowAutoPlay);
+  const videoPreload = shouldPlay ? "auto" : "metadata";
 
   useEffect(() => {
     const v = videoRef.current;
     if (!v || failed || !effectiveSrcAttached) return;
-    /* Uvek auto kad je src u DOM-u — bez čekanja na hover da bi se učitao kadar (neparni desktop). */
-    v.preload = "auto";
+    /* iOS/mobile: van aktivnog slota držimo samo metadata preload radi manjeg memory/network pritiska. */
+    v.preload = videoPreload;
     if (shouldPlay) {
       void v.play().catch(() => {});
     } else {
       v.pause();
     }
-  }, [shouldPlay, failed, effectiveSrcAttached, videoSrc]);
+  }, [shouldPlay, failed, effectiveSrcAttached, videoSrc, videoPreload]);
 
   /** Safari/WebKit: kratak seek kad krene repro da se iscrta kadar (samo kad stvarno puštamo). */
   useEffect(() => {
@@ -302,7 +305,7 @@ const VideoCard = memo(function VideoCard({
               width={400}
               height={712}
               decoding="async"
-              loading="eager"
+              loading={posterLoading}
               draggable={false}
               onError={() => setPosterUnderlayFailed(true)}
               style={{
@@ -334,7 +337,7 @@ const VideoCard = memo(function VideoCard({
           loop={shouldPlay}
           playsInline
           disableRemotePlayback
-          preload="auto"
+          preload={videoPreload}
           onError={() => {
             if (
               mp4FallbackSrc &&
@@ -1126,6 +1129,13 @@ function VideoRow({
             const manualSrcAttached = lightStrip
               ? mobileVideoSlotKey === mobileVideoAttachKey(showcaseLoopSegment, baseIdx)
               : desktopSrcKeys.has(baseKey) || desktopActiveKey;
+            const posterLoading: "eager" | "lazy" = lightStrip
+              ? manualSrcAttached
+                ? "eager"
+                : "lazy"
+              : canAttachMedia && (desktopActiveKey || baseIdx < 2)
+                ? "eager"
+                : "lazy";
             /** Desktop: vidljive kartice autoplay bez potrebe za hover-om (slot-limit štiti performanse). */
             const desktopHoverPlay = false;
             return (
@@ -1145,7 +1155,7 @@ function VideoRow({
                 showcaseLoopSegment={showcaseLoopSegment}
                 registerShowcaseCard={registerShowcaseCard}
                 posterAsPlaceholder
-                posterLoading={canAttachMedia ? "eager" : "lazy"}
+                posterLoading={posterLoading}
               />
             );
           })}
@@ -1214,10 +1224,18 @@ export default function VideoShowcaseSection({
     margin: "340px 0px 360px 0px",
     thresholds: [0, 0.01, 0.05, 0.1, 1] as const,
   });
+  const earlyNearInView = useInView(ref, {
+    once: false,
+    amount: 0,
+    margin: EARLY_MEDIA_WARM_MARGIN,
+    thresholds: [0, 0.01] as const,
+  });
   const reduced = useReducedMotion();
   const sectionInView = inView ?? false;
   /** Prewarm: kačenje <video src> malo pre ulaska u kadar da kartice ne "kasne". */
   const canAttachMedia = nearInView || sectionInView;
+  /** Još raniji signal (pre sekcije) za zagrevanje postera/video metadata na telefonu. */
+  const canWarmMediaEarly = earlyNearInView || canAttachMedia;
   const heroVslHeavy = useDocumentHtmlDataFlag("data-hero-vsl-heavy");
 
   useEffect(() => {
@@ -1236,23 +1254,48 @@ export default function VideoShowcaseSection({
   const desktopAutoplayBudget = heroVslHeavy ? 1 : 3;
   const mobileAutoplayBudget = 1;
   const postersWarmedRef = useRef(false);
+  const videoMetadataWarmedRef = useRef(false);
 
   // Prefetch postera malo pre ulaska u sekciju da kartice ne budu prazne pri prvom prikazu.
   useEffect(() => {
-    if (!canAttachMedia || stripVideos.length === 0) return;
+    if (!canWarmMediaEarly || stripVideos.length === 0) return;
     if (postersWarmedRef.current) return;
     postersWarmedRef.current = true;
-    const warmCount = Math.min(stripVideos.length, 5);
+    const mobileLike = globalThis.window.matchMedia("(max-width: 900px)").matches;
+    const warmCount = Math.min(stripVideos.length, mobileLike ? 2 : 5);
     for (let i = 0; i < warmCount; i += 1) {
       const src = stripVideos[i];
       if (!src) continue;
       const poster = posterSrcs?.[i] ?? posterUrlFromVideoUrl(src);
       const img = new globalThis.Image();
       img.decoding = "async";
-      img.fetchPriority = i < 3 ? "high" : "auto";
+      img.fetchPriority = mobileLike ? "auto" : i < 3 ? "high" : "auto";
       img.src = poster;
     }
-  }, [canAttachMedia, stripVideos, posterSrcs]);
+  }, [canWarmMediaEarly, stripVideos, posterSrcs]);
+
+  // Telefoni: povuci metadata za prvih par klipova pre ulaska u sekciju.
+  useEffect(() => {
+    if (!canWarmMediaEarly || stripVideos.length === 0) return;
+    if (videoMetadataWarmedRef.current) return;
+    const mobileLike = globalThis.window.matchMedia("(max-width: 900px)").matches;
+    if (!mobileLike) return;
+
+    videoMetadataWarmedRef.current = true;
+    const warmCount = Math.min(stripVideos.length, 2);
+    for (let i = 0; i < warmCount; i += 1) {
+      const primary = stripVideos[i];
+      if (!primary) continue;
+      const fallbackMp4 = mp4Srcs?.[i];
+      const warmSrc = fallbackMp4 ?? primary;
+      const v = document.createElement("video");
+      v.preload = "metadata";
+      v.muted = true;
+      v.playsInline = true;
+      v.src = warmSrc;
+      v.load();
+    }
+  }, [canWarmMediaEarly, stripVideos, mp4Srcs]);
 
   return (
     <section

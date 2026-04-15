@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 
+const SKOOL_ABOUT_URL = "https://www.skool.com/ai-hype-academy/about";
+
 export default function MobileCTABar() {
   const [visible, setVisible] = useState(false);
 
@@ -31,8 +33,8 @@ export default function MobileCTABar() {
     };
   }, []);
 
-  const jump = () => {
-    document.getElementById("final-cta")?.scrollIntoView({ behavior: "smooth" });
+  const openSkool = () => {
+    window.open(SKOOL_ABOUT_URL, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -57,7 +59,7 @@ export default function MobileCTABar() {
         }}
       >
         <button
-          onClick={jump}
+          onClick={openSkool}
           style={{
             width: "100%", padding: "14px 20px",
             background: "linear-gradient(135deg, #00d4ff, #00b0e0)",
