@@ -71,7 +71,7 @@ const SHOWCASE_MARQUEE_PER_CARD_S = 3.2;
 /** Minimalan horizontalni udeo širine kartice u preseku sa root-om za autoplay ranking (ivica u kadar). */
 const VISIBILITY_AUTOPLAY_MIN_H_FRAC = 0.002;
 const DEFAULT_MAX_AUTOPLAY_DESKTOP = 3;
-const DEFAULT_MAX_AUTOPLAY_MOBILE = 1;
+const DEFAULT_MAX_AUTOPLAY_MOBILE = 2;
 /** Koliko često računamo vidljivost kartica (polling; ređe = manje getBoundingClientRect pri skrolu stranice). */
 const VISIBILITY_POLL_MS = 750;
 /** Desktop/light-strip: koliko px širimo root levo-desno da se media kači pre ulaska u kadar (~2 kartice). */
@@ -83,6 +83,9 @@ const EARLY_MEDIA_WARM_MARGIN = "1200px 0px 1200px 0px";
 /** Mobilni uređaji kače media src ranije kako bi video krenuo odmah po dolasku do sekcije. */
 const MOBILE_NEAR_ATTACH_MARGIN = "920px 0px 980px 0px";
 const DEFAULT_NEAR_ATTACH_MARGIN = "340px 0px 360px 0px";
+const MOBILE_PROGRESSIVE_ATTACH_INITIAL = 4;
+const MOBILE_PROGRESSIVE_ATTACH_STEP_MS = 320;
+const MOBILE_VISIBILITY_POLL_MS = 360;
 
 /** Jedinstven ključ za koju fizičku karticu (prva ili druga kopija u loop-u) drži `<video src>` na mobilnom. */
 function mobileVideoAttachKey(segment: "first" | "second", baseIdx: number): string {
@@ -551,7 +554,7 @@ function VideoRow({
   const items = [...videos, ...videos];
 
   const [attachedBaseKeys, setAttachedBaseKeys] = useState<Set<string>>(() => new Set());
-  const [mobileVideoSlotKey, setMobileVideoSlotKey] = useState<string | null>(null);
+  const [mobileAttachCount, setMobileAttachCount] = useState(0);
   const mobileVideoSlotKeyRef = useRef<string | null>(null);
   const desktopSrcKeys = attachedBaseKeys;
 
@@ -678,20 +681,8 @@ function VideoRow({
       next = pickMaxLeft();
     }
 
-    const syncAutoplayBase = (slot: string | null) => {
-      if (slot === null) {
-        setActivePlayKeys(new Set());
-      } else {
-        const parsed = /^(?:first|second)-(\d+)$/.exec(slot);
-        const base = parsed?.[1];
-        if (base !== undefined) setActivePlayKeys(new Set([base]));
-      }
-    };
-
     if (next === mobileVideoSlotKeyRef.current) return;
     mobileVideoSlotKeyRef.current = next;
-    setMobileVideoSlotKey(next);
-    syncAutoplayBase(next);
   }, [lightStrip, reduced, canAttachMedia, videos.length]);
 
   const mobilePickRafRef = useRef(0);
@@ -775,16 +766,39 @@ function VideoRow({
 
   useEffect(() => {
     if (!sectionInView || maxSlotsEffective <= 0 || reduced || paused) return;
-    if (lightStripRef.current) return;
     const first = globalThis.window.requestAnimationFrame(() => {
       pollPrimaryVisibility();
     });
-    const id = globalThis.window.setInterval(pollPrimaryVisibility, VISIBILITY_POLL_MS);
+    const pollMs = lightStripRef.current ? MOBILE_VISIBILITY_POLL_MS : VISIBILITY_POLL_MS;
+    const id = globalThis.window.setInterval(pollPrimaryVisibility, pollMs);
     return () => {
       globalThis.window.cancelAnimationFrame(first);
       globalThis.window.clearInterval(id);
     };
   }, [sectionInView, maxSlotsEffective, reduced, paused, pollPrimaryVisibility]);
+
+  // Telefon: zakači sve kartice postepeno da nema neucitanih kartica u prikazu,
+  // ali bez naglog opterecenja koje koci/puca stranicu.
+  useEffect(() => {
+    if (!lightStrip || reduced || !canAttachMedia || paused) {
+      const resetId = globalThis.window.requestAnimationFrame(() => setMobileAttachCount(0));
+      return () => globalThis.window.cancelAnimationFrame(resetId);
+    }
+    const start = Math.min(videos.length, MOBILE_PROGRESSIVE_ATTACH_INITIAL);
+    const startId = globalThis.window.requestAnimationFrame(() => {
+      setMobileAttachCount((prev) => Math.max(prev, start));
+    });
+    const id = globalThis.window.setInterval(() => {
+      setMobileAttachCount((prev) => {
+        if (prev >= videos.length) return prev;
+        return prev + 1;
+      });
+    }, MOBILE_PROGRESSIVE_ATTACH_STEP_MS);
+    return () => {
+      globalThis.window.cancelAnimationFrame(startId);
+      globalThis.window.clearInterval(id);
+    };
+  }, [lightStrip, reduced, canAttachMedia, paused, videos.length]);
 
   const allowAutoPlay = sectionInView && !paused;
 
@@ -837,7 +851,6 @@ function VideoRow({
       setActivePlayKeys(new Set());
       setAttachedBaseKeys(new Set());
       mobileVideoSlotKeyRef.current = null;
-      setMobileVideoSlotKey(null);
     };
     sync();
     mqW.addEventListener("change", sync);
@@ -852,20 +865,13 @@ function VideoRow({
 
   useEffect(() => {
     mobileVideoSlotKeyRef.current = null;
-    const id = globalThis.window.requestAnimationFrame(() => {
-      setMobileVideoSlotKey(null);
-    });
-    return () => globalThis.window.cancelAnimationFrame(id);
   }, [isDesktopLike, videos.length]);
 
   useEffect(() => {
     if (!lightStrip || reduced) return;
     if (!canAttachMedia || paused) {
       mobileVideoSlotKeyRef.current = null;
-      const id = globalThis.window.requestAnimationFrame(() => {
-        setMobileVideoSlotKey(null);
-        setActivePlayKeys(new Set());
-      });
+      const id = globalThis.window.requestAnimationFrame(() => setActivePlayKeys(new Set()));
       return () => globalThis.window.cancelAnimationFrame(id);
     }
     const first = globalThis.window.requestAnimationFrame(() => {
@@ -1163,10 +1169,10 @@ function VideoRow({
             const mp4FallbackSrc = mp4SrcByBaseIndex?.[baseIdx];
             const desktopActiveKey = activePlayKeys.has(baseKey);
             const manualSrcAttached = lightStrip
-              ? mobileVideoSlotKey === mobileVideoAttachKey(showcaseLoopSegment, baseIdx)
+              ? baseIdx < mobileAttachCount
               : desktopSrcKeys.has(baseKey) || desktopActiveKey;
             const posterLoading: "eager" | "lazy" = lightStrip
-              ? manualSrcAttached
+              ? baseIdx < mobileAttachCount
                 ? "eager"
                 : "lazy"
               : canAttachMedia && (desktopActiveKey || baseIdx < 2)
@@ -1298,7 +1304,7 @@ export default function VideoShowcaseSection({
   // Hero "heavy" više ne gasi showcase skroz, već samo smanjujemo broj aktivnih slotova.
   const pauseMarquee = reduced || !canAttachMedia || !tabVisible;
   const desktopAutoplayBudget = heroVslHeavy ? 1 : 3;
-  const mobileAutoplayBudget = 1;
+  const mobileAutoplayBudget = 2;
   const postersWarmedRef = useRef(false);
   const videoMetadataWarmedRef = useRef(false);
 
